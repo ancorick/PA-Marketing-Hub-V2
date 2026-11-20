@@ -144,10 +144,18 @@ export function ContactsPage() {
         description="One record per person: subscribers, leads, applicants, students and alumni."
         actions={
           !access && (
-            <a className="btn btn--primary" href="#/audience/contacts/new">
-              <Plus size={18} weight="bold" aria-hidden />
-              Add contact
-            </a>
+            <>
+              <a className="btn btn--ghost" href="#/audience/duplicates">
+                Duplicates
+              </a>
+              <a className="btn btn--secondary" href="#/audience/import">
+                Import CSV
+              </a>
+              <a className="btn btn--primary" href="#/audience/contacts/new">
+                <Plus size={18} weight="bold" aria-hidden />
+                Add contact
+              </a>
+            </>
           )
         }
       />
@@ -251,7 +259,7 @@ export function ContactsPage() {
                 >
                   {filtered
                     ? 'Try another name or email, or clear the filters.'
-                    : 'Add the first contact. CSV import arrives with AUD-03.'}
+                    : 'Add the first contact or import a CSV file.'}
                 </EmptyState>
               }
             />

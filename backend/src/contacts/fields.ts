@@ -66,6 +66,19 @@ export function normalizeEmail(input: string): string {
  */
 export const hashEmail = (email: string) => createHash('sha256').update(email.trim().toLowerCase()).digest('hex');
 
+/**
+ * Duplicate-detection key (AUD-04, PRD 12.4): emails are stored as entered, but "+tags" are dropped for every
+ * provider and dots for Gmail, so a.n.n.a+news@gmail.com and anna@googlemail.com are suggested as one person.
+ */
+export function emailKey(email: string): string {
+  const normalized = email.trim().toLowerCase();
+  const at = normalized.lastIndexOf('@');
+  const local = normalized.slice(0, at).replace(/\+.*$/, '');
+  const domain = normalized.slice(at + 1);
+  if (domain === 'gmail.com' || domain === 'googlemail.com') return `${local.replace(/\./g, '')}@gmail.com`;
+  return `${local}@${domain}`;
+}
+
 /** "+374 (91) 23-45-67" → "+37491234567"; "00374…" → "+374…". Empty → null. */
 export function normalizePhone(input: string | null | undefined): string | null {
   if (input === null || input === undefined || input.trim() === '') return null;

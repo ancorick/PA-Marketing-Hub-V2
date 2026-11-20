@@ -1,4 +1,4 @@
-import { and, count, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { AppPgDatabase } from '../db/client.js';
 import { consentRecords, suppressions, type ConsentRecordRow, type SuppressionRow } from '../db/schema.js';
 import type { ConsentMethod, ConsentState, Topic } from './wordings.js';
@@ -56,6 +56,19 @@ export class ConsentRepository {
       .from(suppressions)
       .where(and(eq(suppressions.emailHash, emailHash), isNull(suppressions.liftedAt)))
       .orderBy(desc(suppressions.createdAt))) as Suppression[];
+  }
+
+  /** Active suppression reasons per email hash, for bulk checks (imports, sends). */
+  async activeByHashes(hashes: string[]): Promise<Map<string, SuppressionReason[]>> {
+    const result = new Map<string, SuppressionReason[]>();
+    for (let i = 0; i < hashes.length; i += 1000) {
+      const rows = await this.db
+        .select({ emailHash: suppressions.emailHash, reason: suppressions.reason })
+        .from(suppressions)
+        .where(and(inArray(suppressions.emailHash, hashes.slice(i, i + 1000)), isNull(suppressions.liftedAt)));
+      for (const row of rows) result.set(row.emailHash, [...(result.get(row.emailHash) ?? []), row.reason as SuppressionReason]);
+    }
+    return result;
   }
 
   /** Lifts active "unsubscribed" rows only; bounces, complaints and erasure are never lifted. */

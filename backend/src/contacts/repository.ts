@@ -1,7 +1,7 @@
-import { and, arrayContains, asc, count, desc, eq, ilike, or, sql, type SQL } from 'drizzle-orm';
+import { and, arrayContains, asc, count, desc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm';
 import { auditEvents, contacts, type ContactRow } from '../db/schema.js';
 import type { AppPgDatabase } from '../db/client.js';
-import type { ContactStatus, ContactType, Frequency } from './fields.js';
+import { emailKey, type ContactStatus, type ContactType, type Frequency } from './fields.js';
 import type { Language } from '../integrations/core-engine/contract.js';
 
 export type Contact = Omit<ContactRow, 'language' | 'type' | 'status' | 'frequency'> & {
@@ -61,9 +61,13 @@ export interface ContactRepository {
   findByEmail(email: string): Promise<Contact | null>;
   findByCorePersonId(corePersonId: string): Promise<Contact | null>;
   /** Writes the contact and its audit row together. Throws DuplicateContactError on a unique clash. */
-  insert(input: NewContact & { status?: ContactStatus }, actorId: string): Promise<Contact>;
+  insert(input: NewContact & { status?: ContactStatus; importId?: string | null }, actorId: string): Promise<Contact>;
   /** Applies the changes and writes one audit row naming the changed fields. Null when the contact is gone. */
   update(id: string, changes: ContactChanges, actorId: string): Promise<Contact | null>;
+  /** Contacts with any of these (normalized) emails. */
+  findByEmails(emails: string[]): Promise<Contact[]>;
+  /** Bulk create for imports: one transaction per call, one audit row per contact. */
+  insertMany(inputs: (NewContact & { status?: ContactStatus; importId?: string | null })[], actorId: string): Promise<Contact[]>;
   /** Audit rows for one contact, oldest first (PRD 12.4; feeds the AUD-16 timeline later). */
   auditTrail(contactId: string): Promise<AuditEntry[]>;
 }
@@ -126,17 +130,20 @@ export class DrizzleContactRepository implements ContactRepository {
     return row ? toContact(row) : null;
   }
 
-  async insert(input: NewContact & { status?: ContactStatus }, actorId: string) {
+  async insert(input: NewContact & { status?: ContactStatus; importId?: string | null }, actorId: string) {
     return this.withDuplicates(input, () =>
       this.db.transaction(async (tx) => {
-        const [row] = await tx.insert(contacts).values(input).returning();
+        const [row] = await tx
+          .insert(contacts)
+          .values({ ...input, emailKey: input.email ? emailKey(input.email) : null })
+          .returning();
         const created = toContact(row as ContactRow);
         await tx.insert(auditEvents).values({
           entityType: 'contact',
           entityId: created.id,
           action: 'contact.created',
           actorId,
-          fields: Object.keys(input).filter((key) => input[key as keyof typeof input] != null),
+          fields: Object.keys(input).filter((key) => key !== 'importId' && input[key as keyof typeof input] != null),
         });
         return created;
       }),
@@ -146,7 +153,8 @@ export class DrizzleContactRepository implements ContactRepository {
   async update(id: string, changes: ContactChanges, actorId: string) {
     return this.withDuplicates(changes, () =>
       this.db.transaction(async (tx) => {
-        const [row] = await tx.update(contacts).set(changes).where(eq(contacts.id, id)).returning();
+        const values = changes.email !== undefined ? { ...changes, emailKey: changes.email ? emailKey(changes.email) : null } : changes;
+        const [row] = await tx.update(contacts).set(values).where(eq(contacts.id, id)).returning();
         if (!row) return null;
         await tx.insert(auditEvents).values({
           entityType: 'contact',
@@ -158,6 +166,33 @@ export class DrizzleContactRepository implements ContactRepository {
         return toContact(row);
       }),
     );
+  }
+
+  async findByEmails(emails: string[]) {
+    if (emails.length === 0) return [];
+    return (await this.db.select().from(contacts).where(inArray(contacts.email, emails))).map(toContact);
+  }
+
+  async insertMany(inputs: (NewContact & { status?: ContactStatus; importId?: string | null })[], actorId: string) {
+    if (inputs.length === 0) return [];
+    return this.db.transaction(async (tx) => {
+      const rows = await tx
+        .insert(contacts)
+        .values(inputs.map((input) => ({ ...input, emailKey: input.email ? emailKey(input.email) : null })))
+        .returning();
+      await tx.insert(auditEvents).values(
+        rows.map((row) => ({
+          entityType: 'contact',
+          entityId: row.id,
+          action: 'contact.imported',
+          actorId,
+          fields: ['email', 'firstName', 'lastName', 'phone', 'language', 'type', 'sourceChannel', 'sourceCampaign', 'firstTouchAt', 'tags'].filter(
+            (key) => row[key as keyof ContactRow] != null,
+          ),
+        })),
+      );
+      return rows.map(toContact);
+    });
   }
 
   async auditTrail(contactId: string) {

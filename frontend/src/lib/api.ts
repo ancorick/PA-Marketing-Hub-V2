@@ -272,3 +272,73 @@ export const publicUnsubscribeAll = (token: string) =>
 
 export const publicConfirm = (token: string) =>
   publicFetch<{ confirmed: true; language: Language }>(withToken('/api/public/confirm', token), { method: 'POST' });
+
+/* ---------- Audience: CSV import and duplicates (AUD-03, AUD-04) ---------- */
+
+export const IMPORT_FIELDS = [
+  'email',
+  'firstName',
+  'lastName',
+  'fullName',
+  'phone',
+  'language',
+  'type',
+  'sourceChannel',
+  'sourceCampaign',
+  'firstTouchAt',
+  'tags',
+  'consent',
+] as const;
+export type ImportField = (typeof IMPORT_FIELDS)[number];
+export type ColumnMapping = Partial<Record<ImportField, number>>;
+
+export type ImportOptions = {
+  defaultLanguage: Language;
+  defaultSourceChannel?: string;
+  sourceCampaign?: string | null;
+  tags?: string[];
+  consentTopic?: Topic;
+};
+
+export type ImportRow = {
+  line: number;
+  status: 'new' | 'match' | 'duplicate_in_file' | 'invalid';
+  email: string | null;
+  name: string | null;
+  errors: string[];
+  possibleDuplicate: { contactId: string | null; line: number | null; reason: 'email_key' | 'phone' } | null;
+  consent: 'granted' | 'withdrawn' | 'unknown';
+};
+
+export type ImportPreview = {
+  headers: string[];
+  mapping: ColumnMapping;
+  totals: { rows: number; new: number; match: number; duplicate_in_file: number; invalid: number; possibleDuplicates: number };
+  hasConsentColumn: boolean;
+  sample: ImportRow[];
+  problems: ImportRow[];
+};
+
+export type ImportRequest = { fileName: string; csv: string; mapping?: ColumnMapping; options: ImportOptions };
+
+export const previewImport = (request: ImportRequest) =>
+  apiFetch<ImportPreview>('/api/audience/imports/preview', { method: 'POST', body: JSON.stringify(request) });
+
+export const commitImport = (request: ImportRequest) =>
+  apiFetch<{ importId: string; created: number; updated: number; skipped: number; invalid: number }>('/api/audience/imports', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+
+export type DuplicateReason = 'email_key' | 'phone' | 'name';
+
+export const listDuplicates = () => apiFetch<{ pairs: { reason: DuplicateReason; contacts: ContactDetail[] }[] }>('/api/audience/duplicates');
+
+export const contactDuplicates = (id: string) =>
+  apiFetch<{ duplicates: { reason: DuplicateReason; contact: ContactDetail }[] }>(`/api/audience/contacts/${encodeURIComponent(id)}/duplicates`);
+
+export const dismissDuplicate = (contactA: string, contactB: string) =>
+  apiFetch<void>('/api/audience/duplicates/dismiss', { method: 'POST', body: JSON.stringify({ contactA, contactB }) });
+
+export const mergeContacts = (keepId: string, otherId: string) =>
+  apiFetch<ContactDetail>(`/api/audience/contacts/${encodeURIComponent(keepId)}/merge`, { method: 'POST', body: JSON.stringify({ otherId }) });

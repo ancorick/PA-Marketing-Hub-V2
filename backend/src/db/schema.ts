@@ -73,6 +73,13 @@ export const contacts = pgTable(
     corePersonId: text('core_person_id').unique(),
     /** Lower-cased and trimmed (PRD 12.4); unique, so one person has one record. */
     email: text('email').unique(),
+    /**
+     * Duplicate-detection key (AUD-04, 12.4): plus tags removed, Gmail dots removed. Not unique: two
+     * records with the same key are a suggested merge, not an error.
+     */
+    emailKey: text('email_key'),
+    /** The CSV import that created the record (7.4 guardrail on an import's first send). */
+    importId: uuid('import_id'),
     /** Digits with an optional leading "+", e.g. +37491234567. */
     phone: text('phone'),
     firstName: text('first_name'),
@@ -97,7 +104,12 @@ export const contacts = pgTable(
     frequency: text('frequency').notNull().default('all'),
     ...timestamps,
   },
-  (table) => [index('contacts_created_at_idx').on(table.createdAt)],
+  (table) => [
+    index('contacts_created_at_idx').on(table.createdAt),
+    index('contacts_email_key_idx').on(table.emailKey),
+    index('contacts_phone_idx').on(table.phone),
+    index('contacts_import_idx').on(table.importId),
+  ],
 );
 
 export type ContactRow = typeof contacts.$inferSelect;
@@ -208,3 +220,32 @@ export const touchpoints = pgTable(
 );
 
 export type TouchpointRow = typeof touchpoints.$inferSelect;
+
+/** CSV import (AUD-03): who imported what, with the outcome counts shown after commit. */
+export const contactImports = pgTable('contact_imports', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  fileName: text('file_name').notNull(),
+  actorId: text('actor_id').notNull(),
+  rowsTotal: integer('rows_total').notNull(),
+  created: integer('created').notNull(),
+  updated: integer('updated').notNull(),
+  invalid: integer('invalid').notNull(),
+  /** Column mapping and options used, for the record. */
+  settings: jsonb('settings').$type<Record<string, unknown>>().notNull(),
+  ...timestamps,
+});
+
+export type ContactImportRow = typeof contactImports.$inferSelect;
+
+/** Pairs a reviewer marked as different people (AUD-04): never suggested again. */
+export const duplicateDismissals = pgTable(
+  'duplicate_dismissals',
+  {
+    /** The smaller of the two contact IDs first, so each pair is stored once. */
+    contactA: uuid('contact_a').notNull(),
+    contactB: uuid('contact_b').notNull(),
+    actorId: text('actor_id').notNull(),
+    ...timestamps,
+  },
+  (table) => [primaryKey({ columns: [table.contactA, table.contactB] })],
+);

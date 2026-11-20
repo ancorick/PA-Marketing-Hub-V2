@@ -2211,3 +2211,13 @@ th[aria-sort='descending'] .sort-btn {
   letter-spacing: normal;
   text-transform: none;
 }
+
+.facts--compact {
+  gap: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .facts--compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

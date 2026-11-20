@@ -1,7 +1,7 @@
 import { ArrowLeft, PencilSimple, UserCircle } from '@phosphor-icons/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { ApiError, getContact, listChannels, type Contact } from '../lib/api';
+import { ApiError, contactDuplicates, getContact, listChannels, type Contact } from '../lib/api';
 import { contactPath, fullName, LANGUAGE_LABEL, STATUS, TYPE_LABEL } from '../lib/contacts';
 import { formatDate } from '../lib/format';
 import { useStaffRole } from '../lib/session';
@@ -18,6 +18,7 @@ import {
   Tag,
 } from '../ui';
 import { ConsentSection } from './ConsentSection';
+import { DuplicatePair } from './DuplicatesPage';
 import { ContactForm } from './ContactForm';
 
 const FIELD_LABEL: Record<string, string> = {
@@ -73,6 +74,7 @@ export function ContactPage({ id }: { id: string }) {
   const [editing, setEditing] = useState(false);
   const contact = useQuery({ queryKey: ['contact', id, role], queryFn: () => getContact(id), retry: retryServerErrors });
   const channels = useQuery({ queryKey: ['audience-channels'], queryFn: listChannels, staleTime: Infinity, enabled: contact.isSuccess });
+  const duplicates = useQuery({ queryKey: ['contact-duplicates', id, role], queryFn: () => contactDuplicates(id), enabled: contact.isSuccess });
 
   const access = accessProblem(contact.error);
   const data = contact.data;
@@ -191,6 +193,19 @@ export function ContactPage({ id }: { id: string }) {
             </dl>
           </section>
         )}
+
+        {duplicates.data?.duplicates.map((item) => (
+          <DuplicatePair
+            key={item.contact.id}
+            reason={item.reason}
+            a={data}
+            b={item.contact}
+            onDone={() => {
+              void queryClient.invalidateQueries({ queryKey: ['contact-duplicates', id] });
+              void queryClient.invalidateQueries({ queryKey: ['contact', id] });
+            }}
+          />
+        ))}
 
         {data.status !== 'erased' && <ConsentSection contactId={data.id} displayName={name ?? data.email ?? 'this contact'} />}
 

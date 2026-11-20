@@ -12,6 +12,8 @@ const DesignSystemPage = lazy(() => import('./pages/DesignSystemPage').then((mod
 /** Audience screens load on first visit (route-level split keeps the main bundle small). */
 const ContactsPage = lazy(() => import('./pages/ContactsPage').then((mod) => ({ default: mod.ContactsPage })));
 const ContactPage = lazy(() => import('./pages/ContactPage').then((mod) => ({ default: mod.ContactPage })));
+const ImportPage = lazy(() => import('./pages/ImportPage').then((mod) => ({ default: mod.ImportPage })));
+const DuplicatesPage = lazy(() => import('./pages/DuplicatesPage').then((mod) => ({ default: mod.DuplicatesPage })));
 /** Pages for contacts (unsubscribe, preferences, privacy): no staff shell, no staff session. */
 const PublicApp = lazy(() => import('./public/PublicApp').then((mod) => ({ default: mod.PublicApp })));
 const NewContactPage = lazy(() => import('./pages/ContactPage').then((mod) => ({ default: mod.NewContactPage })));
@@ -36,13 +38,15 @@ export function App() {
   }
   const placeholder = PLACEHOLDERS[path];
   const contactId = path.match(/^\/audience\/contacts\/([^/]+)$/)?.[1];
-  const audience = path === '/audience' || contactId !== undefined;
+  const audience = path === '/audience' || path === '/audience/import' || path === '/audience/duplicates' || contactId !== undefined;
   const known = placeholder || audience || path === '/design-system' || path === '/email-settings' ? path : '/';
 
   let page;
   if (path === '/design-system') page = <DesignSystemPage />;
   else if (path === '/email-settings') page = <EmailSettingsPage />;
   else if (path === '/audience') page = <ContactsPage />;
+  else if (path === '/audience/import') page = <ImportPage />;
+  else if (path === '/audience/duplicates') page = <DuplicatesPage />;
   else if (contactId === 'new') page = <NewContactPage />;
   else if (contactId !== undefined) page = <ContactPage key={contactId} id={decodeURIComponent(contactId)} />;
   else if (placeholder) page = <PlaceholderPage title={placeholder.title} phase={placeholder.phase} />;

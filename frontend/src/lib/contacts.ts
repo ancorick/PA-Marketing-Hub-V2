@@ -55,3 +55,9 @@ export const SUPPRESSION_LABEL: Record<import('./api').SuppressionReason, string
   complaint: 'Spam complaint',
   erased: 'Erased',
 };
+
+export const DUPLICATE_REASON: Record<import('./api').DuplicateReason, string> = {
+  email_key: 'Same email apart from dots or a +tag',
+  phone: 'Same phone number',
+  name: 'Similar name and email',
+};
