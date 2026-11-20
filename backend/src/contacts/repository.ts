@@ -1,13 +1,14 @@
 import { and, arrayContains, asc, count, desc, eq, ilike, or, sql, type SQL } from 'drizzle-orm';
 import { auditEvents, contacts, type ContactRow } from '../db/schema.js';
 import type { AppPgDatabase } from '../db/client.js';
-import type { ContactStatus, ContactType } from './fields.js';
+import type { ContactStatus, ContactType, Frequency } from './fields.js';
 import type { Language } from '../integrations/core-engine/contract.js';
 
-export type Contact = Omit<ContactRow, 'language' | 'type' | 'status'> & {
+export type Contact = Omit<ContactRow, 'language' | 'type' | 'status' | 'frequency'> & {
   language: Language;
   type: ContactType;
   status: ContactStatus;
+  frequency: Frequency;
 };
 
 /** Fields set on create; status starts as active. */
@@ -27,7 +28,7 @@ export type NewContact = Pick<
 >;
 
 /** Status changes come from suppression (AUD-12) and erasure (AUD-18), never from the edit form. */
-export type ContactChanges = Partial<NewContact> & { status?: ContactStatus };
+export type ContactChanges = Partial<NewContact> & { status?: ContactStatus; frequency?: Frequency };
 
 export type ContactFilter = {
   /** Part of the email or of "first last", case-insensitive. */

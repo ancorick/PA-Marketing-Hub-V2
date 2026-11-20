@@ -16,14 +16,17 @@ export class ApiError extends Error {
   }
 }
 
-/** JSON request to the backend API. Paths start with "/api/...". Sends the staff session token. */
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+/**
+ * JSON request to the backend API. Paths start with "/api/...". Sends the staff session token, except for
+ * public pages (`publicFetch`), which identify the person only by the signed link token (NFR-S5).
+ */
+export async function apiFetch<T>(path: string, init: RequestInit = {}, staff = true): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
-  headers.set('Authorization', `Bearer ${staffToken()}`);
+  if (staff) headers.set('Authorization', `Bearer ${staffToken()}`);
   if (init.body !== undefined && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
 
-  const response = await fetch(`${API_URL}${path}`, { ...init, headers, credentials: 'include' });
+  const response = await fetch(`${API_URL}${path}`, { ...init, headers, credentials: staff ? 'include' : 'omit' });
   const requestId = response.headers.get('x-request-id');
   if (!response.ok) {
     // The API answers errors as {error, message}; the message is written for staff.
@@ -234,3 +237,35 @@ export const unsubscribeContact = (contactId: string, reason: string) =>
   });
 
 export const getSuppressionSummary = () => apiFetch<{ active: Record<SuppressionReason, number> }>('/api/audience/suppressions/summary');
+
+/* ---------- Public pages: unsubscribe and preferences (AUD-09, AUD-11) ---------- */
+
+export const publicFetch = <T>(path: string, init: RequestInit = {}) => apiFetch<T>(path, init, false);
+
+export type Frequency = 'all' | 'monthly';
+
+export type PublicPreferences = {
+  email: string;
+  language: Language;
+  frequency: Frequency;
+  topics: Topic[];
+  suppressed: boolean;
+};
+
+const withToken = (path: string, token: string) => `${path}?t=${encodeURIComponent(token)}`;
+
+export const publicUnsubscribe = (token: string) =>
+  publicFetch<{ unsubscribed: true; language: Language; preferencesToken: string | null }>(withToken('/api/public/unsubscribe', token), {
+    method: 'POST',
+  });
+
+export const publicUndoUnsubscribe = (token: string) =>
+  publicFetch<{ unsubscribed: false }>(withToken('/api/public/unsubscribe/undo', token), { method: 'POST' });
+
+export const getPublicPreferences = (token: string) => publicFetch<PublicPreferences>(withToken('/api/public/preferences', token));
+
+export const savePublicPreferences = (token: string, change: { topics: Topic[]; language: Language; frequency: Frequency }) =>
+  publicFetch<PublicPreferences>(withToken('/api/public/preferences', token), { method: 'PUT', body: JSON.stringify(change) });
+
+export const publicUnsubscribeAll = (token: string) =>
+  publicFetch<PublicPreferences>(withToken('/api/public/preferences/unsubscribe', token), { method: 'POST' });

@@ -10,6 +10,7 @@ import {
   typeFromLifecycle,
   type ChannelId,
   type ContactStatus,
+  type Frequency,
   type ContactType,
 } from './fields.js';
 import {
@@ -65,6 +66,7 @@ export type ContactView = {
   firstTouchAt: string;
   tags: string[];
   status: ContactStatus;
+  frequency: Frequency;
   createdAt: string;
   updatedAt: string;
 };
@@ -100,6 +102,7 @@ const toView = (contact: Contact): ContactView => ({
   firstTouchAt: contact.firstTouchAt.toISOString(),
   tags: contact.tags,
   status: contact.status,
+  frequency: contact.frequency,
   createdAt: contact.createdAt.toISOString(),
   updatedAt: contact.updatedAt.toISOString(),
 });

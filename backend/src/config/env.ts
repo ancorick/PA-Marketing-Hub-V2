@@ -31,6 +31,15 @@ const envSchema = z.object({
   ALLOW_MOCK_SIGN_IN: z.enum(['true', 'false']).optional(),
   // How old a "verified" verdict may be before a marketing send re-checks DNS live (EML-03).
   DOMAIN_RECHECK_MINUTES: z.coerce.number().int().min(1).max(1440).default(60),
+  // HMAC key for unsubscribe, preferences and confirmation links (NFR-S5). Required in production.
+  LINK_SIGNING_SECRET: z
+    .string()
+    .optional()
+    .transform((value) => (value && value.trim().length > 0 ? value.trim() : undefined))
+    .pipe(z.string().min(32, 'must be at least 32 characters').optional()),
+  // Where people open public pages (frontend) and where mail clients POST one-click unsubscribes (backend).
+  PUBLIC_APP_URL: z.url().default('http://localhost:5173'),
+  PUBLIC_API_URL: z.url().default('http://localhost:4000'),
 });
 
 export type AppConfig = {
@@ -45,7 +54,13 @@ export type AppConfig = {
   domainRecheckMinutes: number;
   /** Mock sign-in with fixed tokens; never on in production unless explicitly enabled. */
   allowMockSignIn: boolean;
+  linkSigningSecret: string;
+  publicAppUrl: string;
+  publicApiUrl: string;
 };
+
+/** Development only: links signed with it stop working on any real deploy, where the secret is required. */
+const DEV_LINK_SECRET = 'development-only-link-signing-secret-not-for-production';
 
 /** Reads and validates configuration; fails fast with a readable message on bad values. */
 export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -57,6 +72,9 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new Error(`Invalid environment configuration: ${details}`);
   }
   const env = parsed.data;
+  if (env.NODE_ENV === 'production' && !env.LINK_SIGNING_SECRET) {
+    throw new Error('Invalid environment configuration: LINK_SIGNING_SECRET is required in production (NFR-S5)');
+  }
   return {
     nodeEnv: env.NODE_ENV,
     port: env.PORT,
@@ -70,5 +88,8 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     allowMockSignIn:
       env.INTEGRATIONS_MODE === 'mock' &&
       (env.ALLOW_MOCK_SIGN_IN === undefined ? env.NODE_ENV !== 'production' : env.ALLOW_MOCK_SIGN_IN === 'true'),
+    linkSigningSecret: env.LINK_SIGNING_SECRET ?? DEV_LINK_SECRET,
+    publicAppUrl: env.PUBLIC_APP_URL.replace(/\/+$/, ''),
+    publicApiUrl: env.PUBLIC_API_URL.replace(/\/+$/, ''),
   };
 }

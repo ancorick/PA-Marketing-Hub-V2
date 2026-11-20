@@ -30,6 +30,10 @@ export const CHANNELS = [
 export type ChannelId = (typeof CHANNELS)[number]['id'];
 export const CHANNEL_IDS = CHANNELS.map((channel) => channel.id) as [ChannelId, ...ChannelId[]];
 
+/** How often the person wants marketing email (AUD-11): monthly = at most one in 30 days. */
+export const FREQUENCIES = ['all', 'monthly'] as const;
+export type Frequency = (typeof FREQUENCIES)[number];
+
 export const MAX_TAGS = 20;
 
 /** Core Engine lifecycle → contact type; a linked contact's type always follows the Core Engine. */

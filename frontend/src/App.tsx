@@ -12,6 +12,8 @@ const DesignSystemPage = lazy(() => import('./pages/DesignSystemPage').then((mod
 /** Audience screens load on first visit (route-level split keeps the main bundle small). */
 const ContactsPage = lazy(() => import('./pages/ContactsPage').then((mod) => ({ default: mod.ContactsPage })));
 const ContactPage = lazy(() => import('./pages/ContactPage').then((mod) => ({ default: mod.ContactPage })));
+/** Pages for contacts (unsubscribe, preferences, privacy): no staff shell, no staff session. */
+const PublicApp = lazy(() => import('./public/PublicApp').then((mod) => ({ default: mod.PublicApp })));
 const NewContactPage = lazy(() => import('./pages/ContactPage').then((mod) => ({ default: mod.NewContactPage })));
 
 /** Screens not built yet, with the PLAYBOOK phase that delivers them (PRD 5.4). */
@@ -25,6 +27,13 @@ const PLACEHOLDERS: Record<string, { title: string; phase: string }> = {
 /** Staff shell. Layout and styling follow design-system/marketing-hub/MASTER.md. */
 export function App() {
   const path = useHashRoute();
+  if (path.startsWith('/p/')) {
+    return (
+      <Suspense fallback={<SkeletonCard />}>
+        <PublicApp path={path} />
+      </Suspense>
+    );
+  }
   const placeholder = PLACEHOLDERS[path];
   const contactId = path.match(/^\/audience\/contacts\/([^/]+)$/)?.[1];
   const audience = path === '/audience' || contactId !== undefined;

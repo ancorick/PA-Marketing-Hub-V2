@@ -4,9 +4,10 @@ import { createEmbeddedDatabase, truncateAll, type Database } from '../src/db/cl
 import type { DnsResolver } from '../src/domains/verify.js';
 
 export const FRONTEND_ORIGIN = 'http://localhost:5173';
+export const TEST_LINK_SECRET = 'test-link-signing-secret-0123456789abcdef';
 
 export function testConfig(overrides: Record<string, string> = {}) {
-  return loadConfig({ NODE_ENV: 'test', CORS_ORIGINS: FRONTEND_ORIGIN, ...overrides });
+  return loadConfig({ NODE_ENV: 'test', CORS_ORIGINS: FRONTEND_ORIGIN, LINK_SIGNING_SECRET: TEST_LINK_SECRET, ...overrides });
 }
 
 let shared: Promise<Database> | undefined;

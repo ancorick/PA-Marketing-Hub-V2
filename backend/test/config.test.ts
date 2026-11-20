@@ -27,8 +27,8 @@ describe('loadConfig', () => {
 
   it('turns mock sign-in off in production unless explicitly allowed', () => {
     expect(loadConfig({}).allowMockSignIn).toBe(true);
-    expect(loadConfig({ NODE_ENV: 'production' }).allowMockSignIn).toBe(false);
-    expect(loadConfig({ NODE_ENV: 'production', ALLOW_MOCK_SIGN_IN: 'true' }).allowMockSignIn).toBe(true);
+    expect(loadConfig({ NODE_ENV: 'production', LINK_SIGNING_SECRET: 's'.repeat(32) }).allowMockSignIn).toBe(false);
+    expect(loadConfig({ NODE_ENV: 'production', LINK_SIGNING_SECRET: 's'.repeat(32), ALLOW_MOCK_SIGN_IN: 'true' }).allowMockSignIn).toBe(true);
     expect(loadConfig({ ALLOW_MOCK_SIGN_IN: 'false' }).allowMockSignIn).toBe(false);
   });
 

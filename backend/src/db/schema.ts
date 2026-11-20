@@ -90,6 +90,11 @@ export const contacts = pgTable(
       .default(sql`'{}'::text[]`),
     /** active | unsubscribed | bounced | complained | erased; changed by phase 1 suppression and erasure. */
     status: text('status').notNull().default('active'),
+    /**
+     * all | monthly: how often the person wants marketing email, set on the preferences page (AUD-11).
+     * monthly = at most one marketing email in 30 days.
+     */
+    frequency: text('frequency').notNull().default('all'),
     ...timestamps,
   },
   (table) => [index('contacts_created_at_idx').on(table.createdAt)],

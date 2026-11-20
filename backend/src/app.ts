@@ -15,7 +15,9 @@ import { DomainService } from './domains/service.js';
 import { createDnsResolver, type DnsResolver } from './domains/verify.js';
 import { createEmailAdapter, type EmailAdapter } from './email/index.js';
 import { createIntegrations, type Integrations } from './integrations/index.js';
+import { ContactLinks, LinkSigner } from './links/tokens.js';
 import { consentRoutes } from './routes/consent.js';
+import { publicPreferenceRoutes } from './routes/public-preferences.js';
 import { contactRoutes } from './routes/contacts.js';
 import { domainRoutes } from './routes/domains.js';
 import { healthRoutes } from './routes/health.js';
@@ -27,6 +29,9 @@ declare module 'fastify' {
     domains: DomainService;
     contacts: ContactService;
     consent: ConsentService;
+    /** Signed unsubscribe, preferences and confirmation links (NFR-S5). */
+    links: ContactLinks;
+    signer: LinkSigner;
   }
 }
 
@@ -108,6 +113,9 @@ export async function buildApp({
   });
   app.decorate('contacts', contacts);
   app.decorate('consent', consent);
+  const signer = new LinkSigner(config.linkSigningSecret);
+  app.decorate('signer', signer);
+  app.decorate('links', new ContactLinks(signer, { app: config.publicAppUrl, api: config.publicApiUrl }));
   app.decorate('email', guardMarketingSends(espAdapter, domains));
   registerStaffAuth(app);
 
@@ -119,6 +127,7 @@ export async function buildApp({
   await app.register(domainRoutes, { domains, coreEngine: resolvedIntegrations.coreEngine });
   await app.register(contactRoutes, { contacts, coreEngine: resolvedIntegrations.coreEngine });
   await app.register(consentRoutes, { consent, coreEngine: resolvedIntegrations.coreEngine });
+  await app.register(publicPreferenceRoutes, { consent, contacts: contactRepository, signer });
 
   return app;
 }
