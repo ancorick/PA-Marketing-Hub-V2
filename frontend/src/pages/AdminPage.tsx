@@ -1,6 +1,6 @@
 import { ArrowClockwise, ShieldCheck } from '@phosphor-icons/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { listJobs, runJob, type JobStatus } from '../lib/api';
+import { listExports, listJobs, runJob, type ExportLogRow, type JobStatus } from '../lib/api';
 import { formatDate, formatNumber } from '../lib/format';
 import { STAFF_ROLES, useStaffRole } from '../lib/session';
 import { AccessNotice, accessProblem, Alert, Button, DataTable, PageHeader, retryServerErrors, StatusBadge, type Column, type Tone } from '../ui';
@@ -40,6 +40,7 @@ function RunButton({ job, canRun }: { job: JobStatus; canRun: boolean }) {
 export function AdminPage() {
   const role = useStaffRole();
   const jobs = useQuery({ queryKey: ['jobs', role], queryFn: listJobs, retry: retryServerErrors, refetchInterval: 30_000 });
+  const exportsLog = useQuery({ queryKey: ['exports', role], queryFn: listExports, retry: retryServerErrors });
   const access = accessProblem(jobs.error);
   const canRun = role === 'admin';
 
@@ -145,7 +146,28 @@ export function AdminPage() {
             />
           )}
         </section>
+        {!access && exportsLog.data && (
+          <section className="card stack" aria-labelledby="exports-heading">
+            <h2 id="exports-heading">Export log</h2>
+            <p className="muted">Every export of contact data: who, when, what and how many rows (AUD-19). Also written to the Core Engine activity log.</p>
+            <DataTable
+              caption="Export log"
+              captionHidden
+              columns={exportColumns}
+              rows={exportsLog.data.exports}
+              rowKey={(row) => row.id}
+              empty="No exports yet."
+            />
+          </section>
+        )}
       </div>
     </>
   );
 }
+
+const exportColumns: Column<ExportLogRow>[] = [
+  { key: 'when', header: 'When', render: (row) => <span className="num">{formatTime(row.createdAt)}</span> },
+  { key: 'who', header: 'Who', render: (row) => row.actorId },
+  { key: 'what', header: 'What', render: (row) => (row.kind === 'segment_csv' ? `Segment “${row.segmentName ?? ''}” (CSV)` : 'One person’s data (access request)') },
+  { key: 'rows', header: 'Rows', numeric: true, render: (row) => <span className="num">{formatNumber(row.rowCount)}</span> },
+];

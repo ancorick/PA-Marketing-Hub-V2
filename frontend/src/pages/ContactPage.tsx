@@ -1,7 +1,8 @@
 import { ArrowLeft, PencilSimple, UserCircle } from '@phosphor-icons/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { ApiError, contactDuplicates, getContact, listChannels, type Contact } from '../lib/api';
+import { useMutation } from '@tanstack/react-query';
+import { ApiError, contactDuplicates, contactTimeline, eraseContact, exportContactData, getContact, listChannels, type Contact } from '../lib/api';
 import { contactPath, fullName, LANGUAGE_LABEL, STATUS, TYPE_LABEL } from '../lib/contacts';
 import { formatDate } from '../lib/format';
 import { useStaffRole } from '../lib/session';
@@ -16,26 +17,13 @@ import {
   SkeletonCard,
   StatusBadge,
   Tag,
+  ConfirmDialog,
+  TextField,
 } from '../ui';
 import { ConsentSection } from './ConsentSection';
 import { DuplicatePair } from './DuplicatesPage';
 import { ContactForm } from './ContactForm';
 
-const FIELD_LABEL: Record<string, string> = {
-  email: 'email',
-  firstName: 'first name',
-  lastName: 'last name',
-  phone: 'phone',
-  language: 'language',
-  type: 'type',
-  sourceChannel: 'source channel',
-  sourceCampaign: 'source campaign',
-  firstTouchAt: 'first touch',
-  tags: 'tags',
-  corePersonId: 'Core Engine link',
-};
-
-const ACTION_LABEL: Record<string, string> = { 'contact.created': 'Created', 'contact.updated': 'Changed' };
 
 const formatTime = (iso: string) => formatDate(iso, undefined, { timeStyle: 'short' });
 
@@ -74,6 +62,19 @@ export function ContactPage({ id }: { id: string }) {
   const [editing, setEditing] = useState(false);
   const contact = useQuery({ queryKey: ['contact', id, role], queryFn: () => getContact(id), retry: retryServerErrors });
   const channels = useQuery({ queryKey: ['audience-channels'], queryFn: listChannels, staleTime: Infinity, enabled: contact.isSuccess });
+  const timeline = useQuery({ queryKey: ['contact-timeline', id, role, contact.data?.updatedAt], queryFn: () => contactTimeline(id), enabled: contact.isSuccess });
+  const canManage = role === 'admin' || role === 'marketing_manager';
+  const [erasing, setErasing] = useState(false);
+  const [eraseReason, setEraseReason] = useState('');
+  const erase = useMutation({
+    mutationFn: () => eraseContact(id, eraseReason),
+    onSuccess: () => {
+      setErasing(false);
+      void queryClient.invalidateQueries({ queryKey: ['contact', id] });
+      void queryClient.invalidateQueries({ queryKey: ['contacts'] });
+    },
+  });
+  const exportData = useMutation({ mutationFn: () => exportContactData(id) });
   const duplicates = useQuery({ queryKey: ['contact-duplicates', id, role], queryFn: () => contactDuplicates(id), enabled: contact.isSuccess });
 
   const access = accessProblem(contact.error);
@@ -137,9 +138,21 @@ export function ContactPage({ id }: { id: string }) {
         actions={
           !editing &&
           data.status !== 'erased' && (
-            <Button variant="secondary" icon={<PencilSimple size={18} weight="bold" aria-hidden />} onClick={() => setEditing(true)}>
-              Edit
-            </Button>
+            <>
+              {canManage && (
+                <>
+                  <Button variant="ghost" loading={exportData.isPending} onClick={() => exportData.mutate()}>
+                    Export data
+                  </Button>
+                  <Button variant="danger" onClick={() => setErasing(true)}>
+                    Erase
+                  </Button>
+                </>
+              )}
+              <Button variant="secondary" icon={<PencilSimple size={18} weight="bold" aria-hidden />} onClick={() => setEditing(true)}>
+                Edit
+              </Button>
+            </>
           )
         }
       />
@@ -209,23 +222,43 @@ export function ContactPage({ id }: { id: string }) {
 
         {data.status !== 'erased' && <ConsentSection contactId={data.id} displayName={name ?? data.email ?? 'this contact'} />}
 
+        {exportData.isError && <Alert tone="danger" title="Export failed">{exportData.error.message}</Alert>}
+        {data.status === 'erased' && (
+          <Alert tone="info" title="Personal data erased">
+            Only an anonymous row remains for totals, and the address stays on the suppression list so it is never emailed again (AUD-18).
+          </Alert>
+        )}
         <section className="card stack" aria-labelledby="history-heading">
-          <h2 id="history-heading">Change history</h2>
-          <p className="muted">Who changed which fields. Values are not kept here, so erasing a contact leaves no personal data behind.</p>
+          <h2 id="history-heading">Timeline</h2>
+          <p className="muted">Consent changes, emails, opens and clicks, events, outcomes and record changes. Record changes name the fields, not their values.</p>
           <ol className="list-reset history">
-            {[...data.history].reverse().map((entry, index) => (
-              <li key={`${entry.at}-${index}`} className="history__item">
-                <span className="history__time num">{formatTime(entry.at)}</span>
+            {(timeline.data?.items ?? []).map((item, index) => (
+              <li key={`${item.at}-${index}`} className="history__item">
+                <span className="history__time num">{formatTime(item.at)}</span>
                 <span>
-                  <strong>{ACTION_LABEL[entry.action] ?? entry.action}</strong> by {entry.actorId}
-                  {entry.action !== 'contact.created' && entry.fields.length > 0 && (
-                    <>: {entry.fields.map((field) => FIELD_LABEL[field] ?? field).join(', ')}</>
-                  )}
+                  <strong>{item.title}</strong>
+                  {item.detail && <span className="muted"> · {item.detail}</span>}
                 </span>
               </li>
             ))}
           </ol>
         </section>
+        <ConfirmDialog
+          open={erasing}
+          title={`Erase ${name ?? data.email ?? 'this contact'}?`}
+          confirmLabel="Erase personal data"
+          affected={{ count: 1, noun: 'person' }}
+          busy={erase.isPending}
+          onConfirm={() => erase.mutate()}
+          onCancel={() => setErasing(false)}
+        >
+          <p>
+            Name, email, phone, tags and links to other systems are deleted and cannot be restored. An anonymous row stays for
+            totals; the email’s fingerprint stays on the suppression list. Export the data first if the person asked for a copy.
+          </p>
+          <TextField label="Reason" required hint="Logged in the Core Engine activity log." value={eraseReason} onChange={(event) => setEraseReason(event.target.value)} />
+          {erase.isError && <Alert tone="danger" title="Not erased">{erase.error.message}</Alert>}
+        </ConfirmDialog>
       </div>
     </>
   );

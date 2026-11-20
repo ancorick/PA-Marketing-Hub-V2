@@ -7,6 +7,7 @@ import {
   countSegmentRule,
   createSegment,
   deleteSegment,
+  exportSegmentCsv,
   getSegment,
   listSegmentMembers,
   listSegments,
@@ -212,6 +213,9 @@ export function SegmentPage({ id }: { id: string | null }) {
   const [type, setType] = useState<'dynamic' | 'static'>('dynamic');
   const [rule, setRule] = useState<SegmentRule | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmExport, setConfirmExport] = useState(false);
+  const canExport = role === 'admin' || role === 'marketing_manager';
+  const exportCsv = useMutation({ mutationFn: () => exportSegmentCsv(segment!.id, segment!.name), onSuccess: () => setConfirmExport(false) });
 
   const segment = existing.data;
   const currentRule: SegmentRule = rule ?? segment?.rule ?? { op: 'and', conditions: [defaultCondition('language')] };
@@ -262,9 +266,16 @@ export function SegmentPage({ id }: { id: string | null }) {
         accent={segment ? undefined : 'segment'}
         description={currentType === 'dynamic' ? 'A rule: membership is recalculated at send time.' : 'A static list of hand-picked people.'}
         actions={segment && (
-          <Button variant="ghost" icon={<Trash size={18} weight="bold" aria-hidden />} onClick={() => setConfirmDelete(true)}>
-            Delete
-          </Button>
+          <>
+            {canExport && (
+              <Button variant="secondary" onClick={() => setConfirmExport(true)}>
+                Export CSV
+              </Button>
+            )}
+            <Button variant="ghost" icon={<Trash size={18} weight="bold" aria-hidden />} onClick={() => setConfirmDelete(true)}>
+              Delete
+            </Button>
+          </>
         )}
       />
       <div className="stack stack--lg">
@@ -297,6 +308,19 @@ export function SegmentPage({ id }: { id: string | null }) {
         {currentType === 'dynamic' && <LiveCount rule={currentRule} />}
         {segment?.type === 'static' && <StaticMembers segment={segment} />}
       </div>
+      <ConfirmDialog
+        open={confirmExport}
+        title={`Export ${segment?.name ?? 'segment'} as CSV?`}
+        confirmLabel="Export"
+        tone="primary"
+        affected={{ count: segment?.lastCount ?? 0, noun: 'people' }}
+        busy={exportCsv.isPending}
+        onConfirm={() => exportCsv.mutate()}
+        onCancel={() => setConfirmExport(false)}
+      >
+        <p>The file holds personal data. The export is logged with your name, the time, the segment and the row count (AUD-19). Keep the file only as long as you need it.</p>
+        {exportCsv.isError && <Alert tone="danger" title="Export failed">{exportCsv.error.message}</Alert>}
+      </ConfirmDialog>
       <ConfirmDialog
         open={confirmDelete}
         title={`Delete ${segment?.name ?? 'segment'}?`}

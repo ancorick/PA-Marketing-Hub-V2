@@ -477,3 +477,16 @@ export const alerts = pgTable(
 );
 
 export type AlertRow = typeof alerts.$inferSelect;
+
+/** Export log (AUD-19): every export of contact data with who, when, what and how many rows. */
+export const exportLog = pgTable('export_log', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  actorId: text('actor_id').notNull(),
+  /** segment_csv | contact_data (NFR-P4 access request) */
+  kind: text('kind').notNull(),
+  segmentId: uuid('segment_id'),
+  segmentName: text('segment_name'),
+  contactId: uuid('contact_id'),
+  rowCount: integer('row_count').notNull(),
+  ...timestamps,
+});

@@ -521,3 +521,30 @@ export type ImportRecord = {
 };
 export const listImports = () => apiFetch<{ imports: ImportRecord[] }>('/api/audience/imports');
 export const reviewImport = (id: string) => apiFetch<ImportRecord>(`/api/audience/imports/${encodeURIComponent(id)}/review`, { method: 'POST' });
+
+/* ---------- Contact history and privacy (AUD-16, AUD-18, AUD-19, NFR-P4) ---------- */
+
+/** Downloads a staff-only file (CSV, JSON) with the session token and saves it under `fileName`. */
+export async function apiDownload(path: string, fileName: string): Promise<void> {
+  const response = await fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${staffToken()}` }, credentials: 'include' });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string; message?: string } | null;
+    throw new ApiError(response.status, body?.message ?? `Download failed with ${response.status}`, response.headers.get('x-request-id'), body?.error ?? null);
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+export type TimelineItem = { at: string; kind: 'lifecycle' | 'consent' | 'email' | 'touch' | 'outcome' | 'record'; title: string; detail: string | null };
+export const contactTimeline = (id: string) => apiFetch<{ items: TimelineItem[] }>(`/api/audience/contacts/${encodeURIComponent(id)}/timeline`);
+export const eraseContact = (id: string, reason: string) =>
+  apiFetch<void>(`/api/audience/contacts/${encodeURIComponent(id)}/erase`, { method: 'POST', body: JSON.stringify({ reason }) });
+export const exportContactData = (id: string) => apiDownload(`/api/audience/contacts/${encodeURIComponent(id)}/export`, `contact-${id}.json`);
+export const exportSegmentCsv = (id: string, name: string) => apiDownload(`/api/audience/segments/${encodeURIComponent(id)}/export`, `${name}.csv`);
+
+export type ExportLogRow = { id: string; actorId: string; kind: 'segment_csv' | 'contact_data'; segmentName: string | null; contactId: string | null; rowCount: number; createdAt: string };
+export const listExports = () => apiFetch<{ exports: ExportLogRow[] }>('/api/admin/exports');

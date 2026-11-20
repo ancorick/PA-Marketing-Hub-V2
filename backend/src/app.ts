@@ -22,6 +22,8 @@ import { segmentRoutes } from './routes/segments.js';
 import { sendRoutes } from './routes/sends.js';
 import { webhookRoutes } from './routes/webhooks.js';
 import { alertRoutes } from './routes/alerts.js';
+import { privacyRoutes } from './routes/privacy.js';
+import { PrivacyService } from './privacy/service.js';
 import { AlertService } from './alerts/service.js';
 import { EspEventService } from './events/service.js';
 import { SendDispatcher } from './sends/dispatcher.js';
@@ -64,6 +66,7 @@ declare module 'fastify' {
     killSwitch: KillSwitch;
     alerts: AlertService;
     espEvents: EspEventService;
+    privacy: PrivacyService;
   }
 }
 
@@ -245,6 +248,9 @@ export async function buildApp({
   app.decorate('espEvents', espEvents);
   await app.register(webhookRoutes, { events: espEvents, secret: config.espWebhookSecret });
   await app.register(alertRoutes, { alerts, db: database.db, coreEngine: resolvedIntegrations.coreEngine });
+  const privacy = new PrivacyService({ db: database.db, segments, coreEngine: resolvedIntegrations.coreEngine, logger: app.log });
+  app.decorate('privacy', privacy);
+  await app.register(privacyRoutes, { privacy, coreEngine: resolvedIntegrations.coreEngine });
   const merge = new MergeService({ db: database.db, coreEngine: resolvedIntegrations.coreEngine, logger: app.log });
   await app.register(importRoutes, { imports, duplicates, merge, contacts, contactRepository, coreEngine: resolvedIntegrations.coreEngine });
 
