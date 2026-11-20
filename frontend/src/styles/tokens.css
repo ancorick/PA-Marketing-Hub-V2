@@ -1,0 +1,243 @@
+/*
+ * Design tokens. Source of truth: design-system/marketing-hub/MASTER.md.
+ * Concept: Picsart Academy brand (docs/references). Dark is the default theme, light is opt-in.
+ * Components use only these variables, never raw hex values.
+ * Every text and control pair is verified for WCAG 2.1 AA in both themes.
+ * Motion tokens are mirrored for Motion (JS) in src/lib/motion.ts: change both together.
+ */
+:root {
+  color-scheme: dark;
+
+  /* Brand (logo colors, same in both themes) */
+  --brand-yellow: #ffdc00;
+  --brand-aqua: #70ffe9;
+  --brand-magenta: #d400c7;
+  --brand-ink: #131317;
+  --gradient-brand: linear-gradient(90deg, #70ffe9 0%, #d47cf0 45%, #ff9ad5 70%, #ffdc00 100%);
+  --gradient-glow: linear-gradient(90deg, #ffdc00 0%, #9df27a 50%, #70ffe9 100%);
+  /* Two identical periods so sliding by one period loops seamlessly (main search border). */
+  --gradient-rainbow: linear-gradient(
+    90deg,
+    #ff2e63,
+    #ff9f1c,
+    #ffdc00,
+    #5cf59b,
+    #70ffe9,
+    #4d7cff,
+    #b04dff,
+    #ff3df2,
+    #ff2e63,
+    #ff9f1c,
+    #ffdc00,
+    #5cf59b,
+    #70ffe9,
+    #4d7cff,
+    #b04dff,
+    #ff3df2,
+    #ff2e63
+  );
+
+  /* Surfaces: dark (default) */
+  --color-bg: #141416;
+  --color-surface: #1c1c21;
+  --color-surface-raised: #26262c;
+  --color-surface-chip: #303037;
+  --color-text: #ffffff;
+  --color-text-muted: #c8cedb;
+  --color-text-subtle: #a6acbb;
+  --color-border: #313138;
+  --color-border-strong: #787c88;
+
+  /* Roles */
+  --color-primary: var(--brand-yellow);
+  --color-on-primary: var(--brand-ink);
+  --color-primary-edge: transparent;
+  --color-primary-text: #ffe433;
+  --color-secondary: var(--brand-aqua);
+  --color-on-secondary: var(--brand-ink);
+  --color-secondary-text: #7dffec;
+  --color-tertiary: var(--brand-magenta);
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-text: #ff70f8;
+  --color-link: #7dffec;
+  --color-info-soft: #0d3a35;
+  --color-success: #5cf59b;
+  --color-success-soft: #123a23;
+  --color-warning: #ffb547;
+  --color-warning-soft: #3d2a0c;
+  --color-danger: #ff8f8f;
+  --color-danger-soft: #451a1f;
+  --color-on-danger: var(--brand-ink);
+  --color-ring: #7dffec;
+  --color-scrim: rgb(5 5 7 / 0.72);
+
+  /* Inside brand-filled cards */
+  --color-on-brand-tint: rgb(19 19 23 / 0.1);
+  --color-on-brand-line: rgb(19 19 23 / 0.16);
+
+  /* Charts: pair every color with a line style or marker */
+  --chart-1: #ffe433;
+  --chart-2: #7dffec;
+  --chart-3: #ff70f8;
+  --chart-4: #5cf59b;
+  --chart-5: #ffb547;
+  --chart-6: #b4beff;
+  --chart-grid: #313138;
+
+  /* Typography */
+  --font-sans: 'Manrope Variable', 'Noto Sans Armenian Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+  --text-2xs: 0.6875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.25rem;
+  --text-display: clamp(2.25rem, 1.6rem + 2.4vw, 3.25rem);
+  --leading-tight: 1.15;
+  --leading-snug: 1.3;
+  --leading-normal: 1.55;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-heavy: 800;
+  --tracking-eyebrow: 0.08em;
+
+  /* Spacing: 4px grid */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  /* Shape */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  /* Elevation: flat at rest; hover adds lift + soft shadow; overlays get the big shadow */
+  --shadow-hover: 0 10px 24px -8px rgb(0 0 0 / 0.6), 0 2px 6px rgb(0 0 0 / 0.35);
+  --shadow-overlay: 0 24px 48px rgb(0 0 0 / 0.55), 0 2px 8px rgb(0 0 0 / 0.4);
+  --glow-primary: 0 0 0 1px rgb(255 220 0 / 0.45), 0 6px 24px rgb(255 220 0 / 0.3);
+  --glow-aqua: 0 0 0 1px rgb(112 255 233 / 0.45), 0 6px 24px rgb(112 255 233 / 0.25);
+  --glow-magenta: 0 0 0 1px rgb(212 0 199 / 0.5), 0 8px 28px rgb(212 0 199 / 0.35);
+  --spotlight-color: rgb(255 255 255 / 0.07); /* cursor glow on dark cards */
+
+  /* Layers */
+  --z-sticky: 10;
+  --z-nav: 20;
+  --z-overlay: 40;
+  --z-dialog: 100;
+  --z-toast: 1000;
+
+  /* Layout */
+  --content-max: 1440px;
+  --header-height: 4.5rem;
+  --control-height: 2.5rem;
+  --row-height: 2.75rem;
+
+  /* Motion: durations by distance/complexity (see MASTER.md §6) */
+  --duration-instant: 100ms; /* press, color of small controls */
+  --duration-fast: 150ms; /* hover on buttons, chips, nav, rows */
+  --duration-base: 200ms; /* card lift, menus, tooltips, page fade */
+  --duration-moderate: 250ms; /* dialogs, disclosure, reveal */
+  --duration-slow: 400ms; /* reveal of large blocks */
+  --duration-counter: 900ms; /* number count-up, chart grow */
+  --duration-shimmer: 1.4s; /* skeleton loop */
+  --duration-rainbow: 3s; /* rainbow border loop (main search only) */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1); /* most state changes */
+  --ease-enter: cubic-bezier(0, 0, 0.2, 1); /* decelerate: things arriving */
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1); /* accelerate: things leaving */
+  --ease-emphasized: cubic-bezier(0.2, 0.9, 0.1, 1.05); /* small overshoot: lifts, arrows */
+  --stagger-step: 40ms; /* delay between siblings in a reveal */
+  --lift-sm: -1px; /* buttons */
+  --lift-md: -3px; /* interactive cards */
+  --press-scale: 0.97;
+  --reveal-distance: 12px;
+  --tilt-max: 6deg;
+}
+
+/* Light theme: set by ThemeSwitcher (explicit choice or OS preference). */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --gradient-brand: linear-gradient(90deg, #00897b 0%, #b000a6 55%, #c2410c 100%);
+  --color-bg: #f6f5fa;
+  --color-surface: #ffffff;
+  --color-surface-raised: #f0eef7;
+  --color-surface-chip: #e7e4f2;
+  --color-text: #121216;
+  --color-text-muted: #43465a;
+  --color-text-subtle: #575b70;
+  --color-border: #e0ddeb;
+  --color-border-strong: #7f8296;
+  --color-primary-edge: #131317;
+  --color-primary-text: #765c00;
+  --color-secondary-text: #00786a;
+  --color-tertiary-text: #b000a6;
+  --color-link: #b000a6;
+  --color-info-soft: #d2fbf5;
+  --color-success: #0e7a36;
+  --color-success-soft: #d9f7e4;
+  --color-warning: #b04a00;
+  --color-warning-soft: #ffebd1;
+  --color-danger: #c8102e;
+  --color-danger-soft: #ffe3e6;
+  --color-on-danger: #ffffff;
+  --color-ring: #b000a6;
+  --color-scrim: rgb(19 19 23 / 0.5);
+  --chart-1: #8a6a00;
+  --chart-2: #00786a;
+  --chart-3: #b000a6;
+  --chart-4: #0e7a36;
+  --chart-5: #c2410c;
+  --chart-6: #4f46e5;
+  --chart-grid: #e0ddeb;
+  --shadow-hover: 0 12px 24px -10px rgb(40 20 80 / 0.25), 0 2px 6px rgb(40 20 80 / 0.08);
+  --shadow-overlay: 0 24px 48px rgb(19 19 23 / 0.18), 0 2px 8px rgb(19 19 23 / 0.1);
+  --glow-primary: 0 0 0 1px #131317, 0 6px 20px rgb(255 200 0 / 0.45);
+  --glow-aqua: 0 0 0 1px #131317, 0 6px 20px rgb(0 200 180 / 0.3);
+  --glow-magenta: 0 0 0 1px rgb(176 0 166 / 0.6), 0 8px 24px rgb(212 0 199 / 0.3);
+  --spotlight-color: rgb(176 0 166 / 0.07);
+}
+
+/*
+ * Reduced motion (PRD 14.5): OS setting or the preview toggle (data-motion="reduce").
+ * Durations collapse, distances go to zero; loops stop in components.css.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-instant: 1ms;
+    --duration-fast: 1ms;
+    --duration-base: 1ms;
+    --duration-moderate: 1ms;
+    --duration-slow: 1ms;
+    --duration-counter: 1ms;
+    --lift-sm: 0px;
+    --lift-md: 0px;
+    --press-scale: 1;
+    --reveal-distance: 0px;
+    --tilt-max: 0deg;
+  }
+}
+
+:root[data-motion='reduce'] {
+  --duration-instant: 1ms;
+  --duration-fast: 1ms;
+  --duration-base: 1ms;
+  --duration-moderate: 1ms;
+  --duration-slow: 1ms;
+  --duration-counter: 1ms;
+  --lift-sm: 0px;
+  --lift-md: 0px;
+  --press-scale: 1;
+  --reveal-distance: 0px;
+  --tilt-max: 0deg;
+}

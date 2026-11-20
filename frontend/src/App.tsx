@@ -1,35 +1,43 @@
-import { useQuery } from '@tanstack/react-query';
-import { getHealth } from './lib/api';
+import { AnimatePresence, m } from 'motion/react';
+import { lazy, Suspense } from 'react';
+import { useHashRoute } from './lib/useHashRoute';
+import { pageTransition } from './lib/motion';
+import { HomePage } from './pages/HomePage';
+import { PlaceholderPage } from './pages/PlaceholderPage';
+import { AppShell, SkeletonCard, ThemeSwitcher } from './ui';
 
-/**
- * Scaffold shell. The real layout, navigation and styling come from the design system (PLAYBOOK step 3).
- * Module slots: Audience, Newsletter, Analytics, Event Hub (PRD 5.1).
- */
-const MODULES = ['Audience', 'Newsletter', 'Analytics', 'Event Hub'] as const;
+/** The design-system preview is a dev aid with demo charts and data: keep it out of the main bundle. */
+const DesignSystemPage = lazy(() => import('./pages/DesignSystemPage').then((mod) => ({ default: mod.DesignSystemPage })));
 
+/** Screens not built yet, with the PLAYBOOK phase that delivers them (PRD 5.4). */
+const PLACEHOLDERS: Record<string, { title: string; phase: string }> = {
+  '/audience': { title: 'Audience', phase: 'phase 1' },
+  '/newsletter': { title: 'Newsletter', phase: 'phase 2' },
+  '/events': { title: 'Events', phase: 'phase 4' },
+  '/analytics': { title: 'Analytics', phase: 'phase 3' },
+  '/email-settings': { title: 'Email settings', phase: 'phases 0–1' },
+  '/admin': { title: 'Users and roles', phase: 'phase 0' },
+};
+
+/** Staff shell. Layout and styling follow design-system/marketing-hub/MASTER.md. */
 export function App() {
-  const health = useQuery({ queryKey: ['health'], queryFn: getHealth, retry: 1 });
+  const path = useHashRoute();
+  const placeholder = PLACEHOLDERS[path];
+  const known = placeholder || path === '/design-system' ? path : '/';
+
+  let page;
+  if (path === '/design-system') page = <DesignSystemPage />;
+  else if (placeholder) page = <PlaceholderPage title={placeholder.title} phase={placeholder.phase} />;
+  else page = <HomePage />;
 
   return (
-    <main>
-      <h1>Marketing Hub</h1>
-      <section aria-labelledby="api-status-heading">
-        <h2 id="api-status-heading">API status</h2>
-        <p role="status" aria-live="polite">
-          {health.isPending && 'Checking the API… (a sleeping Render free service can take up to a minute to wake)'}
-          {health.isError && `API unreachable: ${health.error.message}`}
-          {health.isSuccess &&
-            `API ${health.data.status}; database: ${health.data.database}; email adapter: ${health.data.email.adapter}; integrations: ${health.data.integrations.mode}`}
-        </p>
-      </section>
-      <section aria-labelledby="modules-heading">
-        <h2 id="modules-heading">Modules</h2>
-        <ul>
-          {MODULES.map((name) => (
-            <li key={name}>{name}: not built yet</li>
-          ))}
-        </ul>
-      </section>
-    </main>
+    <AppShell currentPath={known} headerEnd={<ThemeSwitcher />}>
+      {/* Page change: short crossfade; the old page leaves faster than the new one arrives. */}
+      <AnimatePresence mode="wait" initial={false}>
+        <m.div key={known} {...pageTransition}>
+          <Suspense fallback={<SkeletonCard />}>{page}</Suspense>
+        </m.div>
+      </AnimatePresence>
+    </AppShell>
   );
 }

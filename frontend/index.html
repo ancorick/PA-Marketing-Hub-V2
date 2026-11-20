@@ -1,10 +1,23 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex" />
-    <title>Marketing Hub</title>
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#141416" />
+    <link rel="icon" type="image/webp" href="/favicon.webp" />
+    <title>Marketing Hub · Picsart Academy</title>
+    <script>
+      // Apply the saved theme before first paint (no flash). Keep in sync with src/ui/ThemeSwitcher.tsx.
+      (function () {
+        try {
+          var c = localStorage.getItem('mh-theme');
+          var light = c === 'light' || (c === 'system' && matchMedia('(prefers-color-scheme: light)').matches);
+          document.documentElement.setAttribute('data-theme', light ? 'light' : 'dark');
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
