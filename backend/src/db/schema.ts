@@ -1,7 +1,7 @@
 // Drizzle schema for Marketing Hub (PRD section 12). Names are logical in the PRD; physical names below.
 // Change a table here, then `npm run db:generate` (writes drizzle/*.sql) and `npm run db:migrate`.
 import { sql } from 'drizzle-orm';
-import { date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import type { DnsCheckResult, EspDomainIdentity } from '../domains/types.js';
 
 /** Every table has created_at and updated_at (PRD 12.4). */
@@ -80,6 +80,13 @@ export const contacts = pgTable(
     emailKey: text('email_key'),
     /** The CSV import that created the record (7.4 guardrail on an import's first send). */
     importId: uuid('import_id'),
+    /** Navigator CRM lead and its current stage (AUD-06); AUD-17 excludes active admissions stages. */
+    crmLeadId: text('crm_lead_id').unique(),
+    crmStage: text('crm_stage'),
+    /** "How did you hear about us?" from the CRM application form (purpose: ANL-16). */
+    selfReportedSource: text('self_reported_source'),
+    /** Alumni Tracker: employed | seeking | not_seeking (purpose: segments in 6.4, e.g. "alumni, hired"). */
+    employmentStatus: text('employment_status'),
     /** Digits with an optional leading "+", e.g. +37491234567. */
     phone: text('phone'),
     firstName: text('first_name'),
@@ -249,3 +256,57 @@ export const duplicateDismissals = pgTable(
   },
   (table) => [primaryKey({ columns: [table.contactA, table.contactB] })],
 );
+
+/**
+ * Outcome (PRD 12.1): lead, applied, enrolled, completed, hired, mirrored from Navigator CRM, the Core
+ * Engine and Alumni Tracker (AUD-06). Unique per source record, so re-running a sync never double-counts.
+ */
+export const outcomes = pgTable(
+  'outcomes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    contactId: uuid('contact_id').references(() => contacts.id, { onDelete: 'set null' }),
+    corePersonId: text('core_person_id'),
+    /** lead | applied | enrolled | completed | hired */
+    type: text('type').notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    courseId: text('course_id'),
+    groupId: text('group_id'),
+    /** core_engine | navigator_crm | alumni_tracker */
+    sourceSystem: text('source_system').notNull(),
+    sourceRef: text('source_ref').notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex('outcomes_source_idx').on(table.sourceSystem, table.sourceRef, table.type),
+    index('outcomes_contact_idx').on(table.contactId, table.occurredAt),
+  ],
+);
+
+export type OutcomeRow = typeof outcomes.$inferSelect;
+
+/** SyncRun (PRD 12.3): every scheduled job run, for the jobs screen, Data Health (ANL-11) and alerts. */
+export const syncRuns = pgTable(
+  'sync_runs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** Job name, e.g. core_people, crm_leads. */
+    source: text('source').notNull(),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    /** running | ok | failed */
+    status: text('status').notNull(),
+    rowsIn: integer('rows_in').notNull().default(0),
+    rowsUpserted: integer('rows_upserted').notNull().default(0),
+    error: text('error'),
+    /** Window pulled; the next run starts from window_to minus the overlap. */
+    windowFrom: timestamp('window_from', { withTimezone: true }),
+    windowTo: timestamp('window_to', { withTimezone: true }),
+    /** manual runs name the staff member; scheduled runs say "scheduler". */
+    triggeredBy: text('triggered_by').notNull(),
+    ...timestamps,
+  },
+  (table) => [index('sync_runs_source_idx').on(table.source, table.startedAt)],
+);
+
+export type SyncRunRow = typeof syncRuns.$inferSelect;

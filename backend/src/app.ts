@@ -17,6 +17,9 @@ import { createEmailAdapter, type EmailAdapter } from './email/index.js';
 import { createIntegrations, type Integrations } from './integrations/index.js';
 import { ContactLinks, LinkSigner } from './links/tokens.js';
 import { consentRoutes } from './routes/consent.js';
+import { jobRoutes } from './routes/jobs.js';
+import { JobRunner } from './jobs/runner.js';
+import { SyncService } from './sync/service.js';
 import { importRoutes } from './routes/imports.js';
 import { ImportService } from './imports/service.js';
 import { DuplicateService } from './contacts/duplicates.js';
@@ -42,6 +45,9 @@ declare module 'fastify' {
     signer: LinkSigner;
     touchpoints: TouchpointRepository;
     signup: SignupService;
+    /** Scheduled jobs; server.ts starts the timers when JOBS_ENABLED. */
+    jobs: JobRunner;
+    sync: SyncService;
   }
 }
 
@@ -161,6 +167,20 @@ export async function buildApp({
   await app.register(publicSignupRoutes, { signup });
   const duplicates = new DuplicateService(database.db);
   const imports = new ImportService({ db: database.db, contacts: contactRepository, consentRepository, consent });
+  const jobs = new JobRunner({ db: database.db, logger: app.log });
+  const sync = new SyncService({
+    db: database.db,
+    contacts: contactRepository,
+    consent,
+    coreEngine: resolvedIntegrations.coreEngine,
+    crm: resolvedIntegrations.navigatorCrm,
+    alumni: resolvedIntegrations.alumniTracker,
+  });
+  for (const job of sync.jobs()) jobs.register(job);
+  app.decorate('jobs', jobs);
+  app.decorate('sync', sync);
+  app.addHook('onClose', async () => jobs.stop());
+  await app.register(jobRoutes, { jobs, coreEngine: resolvedIntegrations.coreEngine });
   const merge = new MergeService({ db: database.db, coreEngine: resolvedIntegrations.coreEngine, logger: app.log });
   await app.register(importRoutes, { imports, duplicates, merge, contacts, contactRepository, coreEngine: resolvedIntegrations.coreEngine });
 

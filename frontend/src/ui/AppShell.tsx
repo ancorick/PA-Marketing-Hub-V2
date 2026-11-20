@@ -29,7 +29,7 @@ export const PRIMARY_NAV: NavItem[] = [
 
 /** Admin (PRD 4.3) and the design-system preview, separated from the main modules. */
 export const SECONDARY_NAV: NavItem[] = [
-  { path: '/admin', label: 'Users and roles', icon: ShieldCheck },
+  { path: '/admin', label: 'Admin', icon: ShieldCheck },
   { path: '/design-system', label: 'Design system', icon: Palette },
 ];
 

@@ -342,3 +342,29 @@ export const dismissDuplicate = (contactA: string, contactB: string) =>
 
 export const mergeContacts = (keepId: string, otherId: string) =>
   apiFetch<ContactDetail>(`/api/audience/contacts/${encodeURIComponent(keepId)}/merge`, { method: 'POST', body: JSON.stringify({ otherId }) });
+
+/* ---------- Admin: scheduled jobs (AUD-06, PRD 14.4) ---------- */
+
+export type SyncRun = {
+  id: string;
+  status: 'running' | 'ok' | 'failed';
+  startedAt: string;
+  finishedAt: string | null;
+  rowsIn: number;
+  rowsUpserted: number;
+  error: string | null;
+  triggeredBy: string;
+};
+
+export type JobStatus = {
+  name: string;
+  description: string;
+  intervalMinutes: number;
+  running: boolean;
+  lastRun: SyncRun | null;
+  lastSuccessAt: string | null;
+};
+
+export const listJobs = () => apiFetch<{ jobs: JobStatus[] }>('/api/admin/jobs');
+
+export const runJob = (name: string) => apiFetch<SyncRun>(`/api/admin/jobs/${encodeURIComponent(name)}/run`, { method: 'POST' });

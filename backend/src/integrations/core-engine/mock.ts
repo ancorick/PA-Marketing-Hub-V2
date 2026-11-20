@@ -2,6 +2,7 @@ import {
   CORE_ENGINE_CONTRACT_VERSION,
   type ActivityLogEntry,
   type CoreEngineClient,
+  type CoreMarketingTouch,
   type CoreOutcome,
   type CorePerson,
   type StaffRole,
@@ -16,8 +17,8 @@ const PEOPLE: CorePerson[] = [
 ];
 
 const OUTCOMES: CoreOutcome[] = [
-  { id: 'core-o-001', personId: 'core-p-001', type: 'enrolled', courseId: 'course-frontend', occurredAt: '2026-09-01T08:00:00.000Z' },
-  { id: 'core-o-002', personId: 'core-p-002', type: 'completed', courseId: 'course-backend', occurredAt: '2026-06-30T08:00:00.000Z' },
+  { id: 'core-o-001', personId: 'core-p-001', type: 'enrolled', courseId: 'course-frontend', groupId: 'fe-2026-09', occurredAt: '2026-09-01T08:00:00.000Z' },
+  { id: 'core-o-002', personId: 'core-p-002', type: 'completed', courseId: 'course-backend', groupId: 'be-2026-01', occurredAt: '2026-06-30T08:00:00.000Z' },
 ];
 
 const ROLES: StaffRole[] = ['viewer', 'editor', 'marketing_manager', 'admin', 'leadership'];
@@ -62,5 +63,12 @@ export class MockCoreEngineClient implements CoreEngineClient {
 
   async writeActivityLog(entry: ActivityLogEntry): Promise<void> {
     this.activityLog.push(entry);
+  }
+
+  /** Touches written by Marketing Hub, by ID (idempotent like the real API). */
+  readonly touches = new Map<string, CoreMarketingTouch>();
+
+  async addMarketingTouches(touches: CoreMarketingTouch[]): Promise<void> {
+    for (const touch of touches) this.touches.set(touch.id, touch);
   }
 }

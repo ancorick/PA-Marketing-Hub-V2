@@ -30,6 +30,18 @@ export type CoreOutcome = {
   personId: string;
   type: CoreOutcomeType;
   courseId: string;
+  /** Group (cohort) of the enrollment; added in v1.1, optional for older payloads. */
+  groupId?: string | null;
+  occurredAt: string;
+};
+
+/** A marketing touch written to the person record in the Core Engine (PRD 11.1, "Marketing Hub writes"). */
+export type CoreMarketingTouch = {
+  id: string;
+  personId: string;
+  type: string;
+  channel: string | null;
+  campaign: string | null;
   occurredAt: string;
 };
 
@@ -60,4 +72,6 @@ export interface CoreEngineClient {
   listPeopleChangedSince(since: Date): Promise<CorePerson[]>;
   listOutcomesSince(since: Date): Promise<CoreOutcome[]>;
   writeActivityLog(entry: ActivityLogEntry): Promise<void>;
+  /** Idempotent by touch ID: sending the same touch twice stores it once. */
+  addMarketingTouches(touches: CoreMarketingTouch[]): Promise<void>;
 }

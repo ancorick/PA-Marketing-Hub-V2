@@ -43,6 +43,8 @@ const envSchema = z.object({
   // Sender of marketing and confirmation email (PRD 7.1: a named, monitored address on the sending subdomain).
   MAIL_FROM: z.string().min(3).default('Picsart Academy <news@news.academy-domain.invalid>'),
   // Physical address in every marketing email footer (EML-11, NFR-P3).
+  // Scheduled jobs (sync, sends, pipelines). Default on; off in tests, which run jobs directly.
+  JOBS_ENABLED: z.enum(['true', 'false']).optional(),
   ACADEMY_POSTAL_ADDRESS: z.string().min(3).default('Picsart Academy, address to be confirmed, Yerevan, Armenia'),
 });
 
@@ -63,6 +65,7 @@ export type AppConfig = {
   publicApiUrl: string;
   mailFrom: string;
   postalAddress: string;
+  jobsEnabled: boolean;
 };
 
 /** Development only: links signed with it stop working on any real deploy, where the secret is required. */
@@ -99,5 +102,6 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     publicApiUrl: env.PUBLIC_API_URL.replace(/\/+$/, ''),
     mailFrom: env.MAIL_FROM,
     postalAddress: env.ACADEMY_POSTAL_ADDRESS,
+    jobsEnabled: env.JOBS_ENABLED === undefined ? env.NODE_ENV !== 'test' : env.JOBS_ENABLED === 'true',
   };
 }

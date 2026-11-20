@@ -28,6 +28,8 @@ if (config.integrationsMode === 'mock') {
   app.log.warn('INTEGRATIONS_MODE=mock: Core Engine, Navigator CRM and Alumni Tracker are stubs');
 }
 
+if (config.jobsEnabled) app.jobs.start();
+
 const shutdown = async (signal: string) => {
   app.log.info({ signal }, 'shutting down');
   await app.close();

@@ -12,6 +12,7 @@ const DesignSystemPage = lazy(() => import('./pages/DesignSystemPage').then((mod
 /** Audience screens load on first visit (route-level split keeps the main bundle small). */
 const ContactsPage = lazy(() => import('./pages/ContactsPage').then((mod) => ({ default: mod.ContactsPage })));
 const ContactPage = lazy(() => import('./pages/ContactPage').then((mod) => ({ default: mod.ContactPage })));
+const AdminPage = lazy(() => import('./pages/AdminPage').then((mod) => ({ default: mod.AdminPage })));
 const ImportPage = lazy(() => import('./pages/ImportPage').then((mod) => ({ default: mod.ImportPage })));
 const DuplicatesPage = lazy(() => import('./pages/DuplicatesPage').then((mod) => ({ default: mod.DuplicatesPage })));
 /** Pages for contacts (unsubscribe, preferences, privacy): no staff shell, no staff session. */
@@ -23,7 +24,6 @@ const PLACEHOLDERS: Record<string, { title: string; phase: string }> = {
   '/newsletter': { title: 'Newsletter', phase: 'phase 2' },
   '/events': { title: 'Events', phase: 'phase 4' },
   '/analytics': { title: 'Analytics', phase: 'phase 3' },
-  '/admin': { title: 'Users and roles', phase: 'phase 0' },
 };
 
 /** Staff shell. Layout and styling follow design-system/marketing-hub/MASTER.md. */
@@ -39,11 +39,12 @@ export function App() {
   const placeholder = PLACEHOLDERS[path];
   const contactId = path.match(/^\/audience\/contacts\/([^/]+)$/)?.[1];
   const audience = path === '/audience' || path === '/audience/import' || path === '/audience/duplicates' || contactId !== undefined;
-  const known = placeholder || audience || path === '/design-system' || path === '/email-settings' ? path : '/';
+  const known = placeholder || audience || path === '/design-system' || path === '/email-settings' || path === '/admin' ? path : '/';
 
   let page;
   if (path === '/design-system') page = <DesignSystemPage />;
   else if (path === '/email-settings') page = <EmailSettingsPage />;
+  else if (path === '/admin') page = <AdminPage />;
   else if (path === '/audience') page = <ContactsPage />;
   else if (path === '/audience/import') page = <ImportPage />;
   else if (path === '/audience/duplicates') page = <DuplicatesPage />;

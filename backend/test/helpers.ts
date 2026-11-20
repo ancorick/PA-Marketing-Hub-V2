@@ -26,6 +26,12 @@ export async function testDatabase(): Promise<Database> {
   return database;
 }
 
+/** The current test file's database as it is now (no truncation), for reading rows a test produced. */
+export async function currentTestDatabase(): Promise<Database> {
+  if (!shared) throw new Error('No test database yet: build the app first');
+  return shared;
+}
+
 /** Tests never touch public DNS: the resolver defaults to an empty fake zone. */
 export async function buildTestApp(options: Partial<Omit<AppDeps, 'config'>> & { config?: AppDeps['config'] } = {}) {
   return buildApp({

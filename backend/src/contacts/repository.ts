@@ -28,7 +28,15 @@ export type NewContact = Pick<
 >;
 
 /** Status changes come from suppression (AUD-12) and erasure (AUD-18), never from the edit form. */
-export type ContactChanges = Partial<NewContact> & { status?: ContactStatus; frequency?: Frequency };
+export type ContactChanges = Partial<NewContact> & {
+  status?: ContactStatus;
+  frequency?: Frequency;
+  /** Mirrored by the sync (AUD-06), never edited by staff. */
+  crmLeadId?: string | null;
+  crmStage?: string | null;
+  selfReportedSource?: string | null;
+  employmentStatus?: string | null;
+};
 
 export type ContactFilter = {
   /** Part of the email or of "first last", case-insensitive. */
