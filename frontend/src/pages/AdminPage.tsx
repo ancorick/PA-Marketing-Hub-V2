@@ -77,7 +77,16 @@ export function AdminPage() {
 
   return (
     <>
-      <PageHeader title="Admin" accent="settings" description="Users and roles, integrations and scheduled jobs." />
+      <PageHeader
+        title="Admin"
+        accent="settings"
+        description="Users and roles, integrations and scheduled jobs."
+        actions={
+          <a className="btn btn--ghost" href="#/design-system">
+            Design system preview
+          </a>
+        }
+      />
       <div className="stack stack--lg">
         <section className="card stack" aria-labelledby="roles-heading">
           <div className="cluster">

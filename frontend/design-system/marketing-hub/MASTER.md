@@ -98,7 +98,7 @@ Gridlines `--chart-grid`. Bars and lines in the brand colors on dark cards, like
 
 ## 5. Layout and navigation
 
-- Sticky **header**: wordmark left ("Picsart Academy" + aqua "MARKETING HUB"), **pill navigation** in a raised capsule (PRD 9.6 order: Overview, Audience, Newsletter, Events, Analytics, Email settings | Users and roles, Design system), theme switch right. Active item = yellow pill with ink text, `aria-current="page"`.
+- Sticky **header**: wordmark left ("Picsart Academy" + aqua "MARKETING HUB"), **pill navigation** in a raised capsule (PRD 9.6 order: Overview, Audience, Campaigns, Newsletter, Events, Analytics, Email settings | Admin; the design-system preview is linked from Admin to keep the bar within 1280px), theme switch right. Active item = yellow pill with ink text, `aria-current="page"`.
 - Below 1280px the pill nav collapses into a menu button and a full-width drawer (Escape closes it). Verified: fits at 1280 and 1366, no horizontal scroll at 375.
 - Content max 1440px. Page: title (+ optional gradient accent word) → optional highlight row → filters → content.
 - Logo: official cube from `docs/references/picsart-academy-logo.webp` (transparent), copied to `src/assets/` and `public/favicon.webp`. Shown at 40px next to the text "Picsart Academy / MARKETING HUB" (its built-in wordmark is unreadable at that size), `alt=""` because the text names it. Below 420px only the cube shows.

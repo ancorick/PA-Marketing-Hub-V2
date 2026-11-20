@@ -4,7 +4,7 @@ import {
   EnvelopeSimple,
   List,
   Newspaper,
-  Palette,
+  PaperPlaneTilt,
   ShieldCheck,
   SquaresFour,
   UsersThree,
@@ -21,17 +21,15 @@ export type NavItem = { path: string; label: string; icon: Icon };
 export const PRIMARY_NAV: NavItem[] = [
   { path: '/', label: 'Overview', icon: SquaresFour },
   { path: '/audience', label: 'Audience', icon: UsersThree },
+  { path: '/campaigns', label: 'Campaigns', icon: PaperPlaneTilt },
   { path: '/newsletter', label: 'Newsletter', icon: Newspaper },
   { path: '/events', label: 'Events', icon: CalendarBlank },
   { path: '/analytics', label: 'Analytics', icon: ChartLine },
   { path: '/email-settings', label: 'Email settings', icon: EnvelopeSimple },
 ];
 
-/** Admin (PRD 4.3) and the design-system preview, separated from the main modules. */
-export const SECONDARY_NAV: NavItem[] = [
-  { path: '/admin', label: 'Admin', icon: ShieldCheck },
-  { path: '/design-system', label: 'Design system', icon: Palette },
-];
+/** Admin (PRD 4.3), separated from the main modules. The design-system preview is linked from Admin. */
+export const SECONDARY_NAV: NavItem[] = [{ path: '/admin', label: 'Admin', icon: ShieldCheck }];
 
 /** Official Picsart Academy cube (docs/references) + product name. The image is decorative: the text names it. */
 function Brand() {

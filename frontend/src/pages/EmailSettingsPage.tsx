@@ -14,6 +14,7 @@ import {
 } from '../lib/api';
 import { formatDate } from '../lib/format';
 import { useStaffRole } from '../lib/session';
+import { KillSwitchPanel } from './KillSwitch';
 import { WarmupSection } from './WarmupSection';
 import {
   AccessNotice,
@@ -366,6 +367,7 @@ export function EmailSettingsPage() {
         </AccessNotice>
       ) : (
         <div className="stack stack--lg">
+          <KillSwitchPanel />
           {canManage && <AddDomainForm />}
           {domains.isPending && <SkeletonCard />}
           {domains.isError && !access && (

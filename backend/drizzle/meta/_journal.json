@@ -71,6 +71,13 @@
       "when": 1795210922196,
       "tag": "0009_segments",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795211313894,
+      "tag": "0010_sends",
+      "breakpoints": true
     }
   ]
 }

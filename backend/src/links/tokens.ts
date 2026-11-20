@@ -1,12 +1,13 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 /** What a signed link lets its holder do (NFR-S5). */
-export type LinkPurpose = 'unsubscribe' | 'preferences' | 'confirm';
+export type LinkPurpose = 'unsubscribe' | 'preferences' | 'confirm' | 'track';
 
 export type LinkClaims = { contactId: string; purpose: LinkPurpose; expiresAt: Date };
 
 /** Unsubscribe and preferences links must keep working long after the email (a year); confirmations are short. */
-export const LINK_LIFETIME_DAYS: Record<LinkPurpose, number> = { unsubscribe: 365, preferences: 365, confirm: 7 };
+/** track: the contact token in tagged links (9.2 identity resolution), long-lived like the email itself. */
+export const LINK_LIFETIME_DAYS: Record<LinkPurpose, number> = { unsubscribe: 365, preferences: 365, confirm: 7, track: 730 };
 
 export class InvalidLinkError extends Error {
   constructor(readonly expired: boolean) {

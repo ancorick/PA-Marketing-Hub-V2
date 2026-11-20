@@ -19,6 +19,10 @@ import { ContactLinks, LinkSigner } from './links/tokens.js';
 import { consentRoutes } from './routes/consent.js';
 import { jobRoutes } from './routes/jobs.js';
 import { segmentRoutes } from './routes/segments.js';
+import { sendRoutes } from './routes/sends.js';
+import { SendDispatcher } from './sends/dispatcher.js';
+import { KillSwitch } from './sends/kill-switch.js';
+import { httpLinkChecker, SendService, type LinkChecker } from './sends/service.js';
 import { SegmentService } from './segments/service.js';
 import { JobRunner } from './jobs/runner.js';
 import { SyncService } from './sync/service.js';
@@ -51,6 +55,9 @@ declare module 'fastify' {
     jobs: JobRunner;
     sync: SyncService;
     segments: SegmentService;
+    sends: SendService;
+    dispatcher: SendDispatcher;
+    killSwitch: KillSwitch;
   }
 }
 
@@ -63,6 +70,9 @@ export type AppDeps = {
   /** Overrides for tests; by default public DNS. */
   dnsResolver?: DnsResolver;
   mailChecker?: MailDomainChecker;
+  linkChecker?: LinkChecker;
+  /** Tests skip the pause between batches. */
+  sleep?: (ms: number) => Promise<void>;
 };
 
 export async function buildApp({
@@ -72,6 +82,8 @@ export async function buildApp({
   email,
   dnsResolver,
   mailChecker,
+  linkChecker,
+  sleep,
 }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
     logger: {
@@ -119,7 +131,9 @@ export async function buildApp({
     recheckAfterMs: config.domainRecheckMinutes * 60_000,
   });
   app.decorate('domains', domains);
-  app.decorate('email', guardMarketingSends(espAdapter, domains));
+  const killSwitch = new KillSwitch(database.db);
+  app.decorate('killSwitch', killSwitch);
+  app.decorate('email', guardMarketingSends(espAdapter, domains, () => killSwitch.isPaused()));
   const contactRepository = new DrizzleContactRepository(database.db);
   const consentRepository = new ConsentRepository(database.db);
   const consent = new ConsentService({
@@ -187,6 +201,31 @@ export async function buildApp({
   const segments = new SegmentService(database.db);
   app.decorate('segments', segments);
   await app.register(segmentRoutes, { segments, contacts, coreEngine: resolvedIntegrations.coreEngine });
+  const sendService = new SendService({
+    db: database.db,
+    segments,
+    domains,
+    email: app.email,
+    links,
+    signer,
+    linkChecker: linkChecker ?? httpLinkChecker,
+    postalAddress: config.postalAddress,
+  });
+  const dispatcher = new SendDispatcher({
+    db: database.db,
+    sends: sendService,
+    segments,
+    consent,
+    email: app.email,
+    killSwitch,
+    logger: app.log,
+    options: { batchSize: config.sendBatchSize, ratePerSecond: config.sendRatePerSecond, tickBudgetMs: 50_000, maxAttempts: 5 },
+    sleep,
+  });
+  app.decorate('sends', sendService);
+  app.decorate('dispatcher', dispatcher);
+  jobs.register({ name: 'send_dispatcher', description: 'Sends approved campaigns in batches', intervalMs: 60_000, run: () => dispatcher.tick() });
+  await app.register(sendRoutes, { sends: sendService, killSwitch, seedList: config.seedList, coreEngine: resolvedIntegrations.coreEngine });
   const merge = new MergeService({ db: database.db, coreEngine: resolvedIntegrations.coreEngine, logger: app.log });
   await app.register(importRoutes, { imports, duplicates, merge, contacts, contactRepository, coreEngine: resolvedIntegrations.coreEngine });
 

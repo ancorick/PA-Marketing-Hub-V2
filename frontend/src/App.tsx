@@ -15,6 +15,8 @@ const ContactPage = lazy(() => import('./pages/ContactPage').then((mod) => ({ de
 const AdminPage = lazy(() => import('./pages/AdminPage').then((mod) => ({ default: mod.AdminPage })));
 const SegmentsPage = lazy(() => import('./pages/SegmentsPage').then((mod) => ({ default: mod.SegmentsPage })));
 const SegmentPage = lazy(() => import('./pages/SegmentsPage').then((mod) => ({ default: mod.SegmentPage })));
+const CampaignsPage = lazy(() => import('./pages/CampaignsPage').then((mod) => ({ default: mod.CampaignsPage })));
+const CampaignPage = lazy(() => import('./pages/CampaignsPage').then((mod) => ({ default: mod.CampaignPage })));
 const ImportPage = lazy(() => import('./pages/ImportPage').then((mod) => ({ default: mod.ImportPage })));
 const DuplicatesPage = lazy(() => import('./pages/DuplicatesPage').then((mod) => ({ default: mod.DuplicatesPage })));
 /** Pages for contacts (unsubscribe, preferences, privacy): no staff shell, no staff session. */
@@ -43,12 +45,16 @@ export function App() {
   const segmentId = path.match(/^\/audience\/segments\/([^/]+)$/)?.[1];
   const audience =
     ['/audience', '/audience/import', '/audience/duplicates', '/audience/segments'].includes(path) || contactId !== undefined || segmentId !== undefined;
-  const known = placeholder || audience || path === '/design-system' || path === '/email-settings' || path === '/admin' ? path : '/';
+  const campaignId = path.match(/^\/campaigns\/([^/]+)$/)?.[1];
+  const campaigns = path === '/campaigns' || campaignId !== undefined;
+  const known = placeholder || audience || campaigns || path === '/design-system' || path === '/email-settings' || path === '/admin' ? path : '/';
 
   let page;
   if (path === '/design-system') page = <DesignSystemPage />;
   else if (path === '/email-settings') page = <EmailSettingsPage />;
   else if (path === '/admin') page = <AdminPage />;
+  else if (path === '/campaigns') page = <CampaignsPage />;
+  else if (campaignId !== undefined) page = <CampaignPage key={campaignId} id={campaignId === 'new' ? null : decodeURIComponent(campaignId)} />;
   else if (path === '/audience') page = <ContactsPage />;
   else if (path === '/audience/import') page = <ImportPage />;
   else if (path === '/audience/duplicates') page = <DuplicatesPage />;

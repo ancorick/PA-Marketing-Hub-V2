@@ -82,7 +82,8 @@ export type DomainView = {
   createdAt: string;
 };
 
-export type SendVerdict = { allowed: true } | { allowed: false; reason: string };
+/** not_verified: fix DNS, then resume; daily_cap: the warm-up cap is used up, sending resumes tomorrow. */
+export type SendVerdict = { allowed: true } | { allowed: false; reason: string; kind: 'not_verified' | 'daily_cap' };
 
 type Actor = { userId: string };
 
@@ -200,7 +201,7 @@ export class DomainService {
    * EML-08: during warm-up each allowed message takes one slot of today's cap.
    */
   async authorizeMarketingSend(domainName: string): Promise<SendVerdict> {
-    const notRegistered = { allowed: false, reason: `${domainName} is not a registered sending domain` } as const;
+    const notRegistered = { allowed: false, kind: 'not_verified', reason: `${domainName} is not a registered sending domain` } as const;
     let domain = await this.deps.repository.findByDomain(domainName.toLowerCase());
     if (!domain) return notRegistered;
 
@@ -211,7 +212,7 @@ export class DomainService {
       if (!domain) return notRegistered;
     }
     const reason = blockedReason(domain);
-    if (reason !== null) return { allowed: false, reason: `${domain.domain}: ${reason}` };
+    if (reason !== null) return { allowed: false, kind: 'not_verified', reason: `${domain.domain}: ${reason}` };
 
     const now = this.now();
     const warmup = warmupState(domain, now);
@@ -220,6 +221,7 @@ export class DomainService {
       if (!reserved) {
         return {
           allowed: false,
+          kind: 'daily_cap',
           reason: `${domain.domain}: warm-up day ${warmup.day} of ${warmup.days}, today's cap of ${warmup.todayCap} marketing emails is reached; sending resumes tomorrow`,
         };
       }

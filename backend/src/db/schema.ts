@@ -1,7 +1,7 @@
 // Drizzle schema for Marketing Hub (PRD section 12). Names are logical in the PRD; physical names below.
 // Change a table here, then `npm run db:generate` (writes drizzle/*.sql) and `npm run db:migrate`.
 import { sql } from 'drizzle-orm';
-import { date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { boolean, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import type { DnsCheckResult, EspDomainIdentity } from '../domains/types.js';
 
 /** Every table has created_at and updated_at (PRD 12.4). */
@@ -346,3 +346,94 @@ export const segmentMembers = pgTable(
   },
   (table) => [primaryKey({ columns: [table.segmentId, table.contactId] }), index('segment_members_contact_idx').on(table.contactId)],
 );
+
+/**
+ * Send (PRD 12.2): one email to a segment, from draft to sent (Flow B). Content lives on the send until
+ * reusable templates arrive with the newsletter (NWS-15).
+ */
+export const sends = pgTable(
+  'sends',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name').notNull(),
+    /** campaign | newsletter | reengagement */
+    kind: text('kind').notNull().default('campaign'),
+    /** Consent topic recipients must have granted (6.3 rule 1). */
+    topic: text('topic').notNull(),
+    /** recruitment: contacts in an active admissions stage are left out unless included on purpose (AUD-17). */
+    purpose: text('purpose').notNull().default('other'),
+    includeActiveAdmissions: boolean('include_active_admissions').notNull().default(false),
+    segmentId: uuid('segment_id').references(() => segments.id, { onDelete: 'set null' }),
+    language: text('language').notNull(),
+    /** Local part of the From address; the domain is the verified sending domain. */
+    fromName: text('from_name').notNull(),
+    fromAddress: text('from_address').notNull(),
+    subject: text('subject').notNull(),
+    preheader: text('preheader'),
+    /** Body in a small, safe markup: paragraphs, **bold**, [links](https://…), ![alt](https://image). */
+    body: text('body').notNull(),
+    buttonLabel: text('button_label'),
+    buttonUrl: text('button_url'),
+    /** utm_campaign added to every link (Flow B step 2, ANL-04). */
+    utmCampaign: text('utm_campaign').notNull(),
+    /** draft | approved | scheduled | sending | paused | sent | cancelled */
+    status: text('status').notNull().default('draft'),
+    pausedReason: text('paused_reason'),
+    scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
+    approvedBy: text('approved_by'),
+    approvedAt: timestamp('approved_at', { withTimezone: true }),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    sentCount: integer('sent_count').notNull().default(0),
+    createdBy: text('created_by').notNull(),
+    ...timestamps,
+  },
+  (table) => [index('sends_status_idx').on(table.status, table.scheduledAt)],
+);
+
+export type SendRow = typeof sends.$inferSelect;
+
+/**
+ * Delivery (PRD 12.2, EML-10, EML-16): one row per send and contact, unique, so a contact can never get the
+ * same send twice. Status: queued | sending | sent | delivered | bounced_soft | bounced_hard | complained |
+ * skipped (suppressed or frequency at send time) | failed | unknown (a crash between the ESP call and saving).
+ */
+export const deliveries = pgTable(
+  'deliveries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    sendId: uuid('send_id')
+      .notNull()
+      .references(() => sends.id, { onDelete: 'cascade' }),
+    contactId: uuid('contact_id').references(() => contacts.id, { onDelete: 'set null' }),
+    email: text('email'),
+    status: text('status').notNull().default('queued'),
+    skipReason: text('skip_reason'),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
+    lastError: text('last_error'),
+    espMessageId: text('esp_message_id'),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+    openedAt: timestamp('opened_at', { withTimezone: true }),
+    firstClickAt: timestamp('first_click_at', { withTimezone: true }),
+    unsubscribedAt: timestamp('unsubscribed_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex('deliveries_send_contact_idx').on(table.sendId, table.contactId),
+    index('deliveries_status_idx').on(table.sendId, table.status),
+    index('deliveries_esp_idx').on(table.espMessageId),
+    index('deliveries_contact_idx').on(table.contactId, table.sentAt),
+  ],
+);
+
+export type DeliveryRow = typeof deliveries.$inferSelect;
+
+/** Kill switch (EML-14) and other single-row settings. */
+export const appSettings = pgTable('app_settings', {
+  key: text('key').primaryKey(),
+  value: jsonb('value').$type<Record<string, unknown>>().notNull(),
+  updatedBy: text('updated_by').notNull(),
+  ...timestamps,
+});

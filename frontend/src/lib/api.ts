@@ -423,3 +423,80 @@ export const segmentBreakdown = (id: string, topic?: Topic, excludeActiveAdmissi
   apiFetch<AudienceBreakdown>(
     `/api/audience/segments/${encodeURIComponent(id)}/breakdown?excludeActiveAdmissions=${excludeActiveAdmissions}${topic ? `&topic=${topic}` : ''}`,
   );
+
+/* ---------- Email: campaigns, sends and the kill switch (Flow B, EML-09 to EML-16) ---------- */
+
+export type SendStatus = 'draft' | 'approved' | 'scheduled' | 'sending' | 'paused' | 'sent' | 'cancelled';
+
+export type SendInput = {
+  name: string;
+  topic: Topic;
+  purpose: 'recruitment' | 'other';
+  includeActiveAdmissions: boolean;
+  segmentId: string | null;
+  language: Language;
+  fromName: string;
+  fromAddress: string;
+  subject: string;
+  preheader: string | null;
+  body: string;
+  buttonLabel: string | null;
+  buttonUrl: string | null;
+};
+
+export type Send = SendInput & {
+  id: string;
+  kind: 'campaign' | 'newsletter' | 'reengagement';
+  utmCampaign: string;
+  status: SendStatus;
+  pausedReason: string | null;
+  scheduledAt: string | null;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  sentCount: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SendCheck = { id: string; label: string; status: 'pass' | 'warn' | 'fail'; message: string };
+export type RenderedEmail = { from: string; subject: string; html: string; text: string; headers: Record<string, string> };
+export type DeliveryLogRow = {
+  id: string;
+  contactId: string | null;
+  email: string | null;
+  name: string | null;
+  status: string;
+  skipReason: string | null;
+  attempts: number;
+  lastError: string | null;
+  espMessageId: string | null;
+  sentAt: string | null;
+  openedAt: string | null;
+  firstClickAt: string | null;
+};
+export type KillSwitchState = { paused: boolean; reason: string | null; by: string | null; at: string | null };
+
+const sendPath = (id: string) => `/api/email/sends/${encodeURIComponent(id)}`;
+export const listSends = () => apiFetch<{ sends: Send[]; seedList: string[] }>('/api/email/sends');
+export const getSend = (id: string) => apiFetch<Send>(sendPath(id));
+export const createSend = (input: SendInput) => apiFetch<Send>('/api/email/sends', { method: 'POST', body: JSON.stringify(input) });
+export const updateSend = (id: string, input: SendInput) => apiFetch<Send>(sendPath(id), { method: 'PUT', body: JSON.stringify(input) });
+export const deleteSend = (id: string) => apiFetch<void>(sendPath(id), { method: 'DELETE' });
+export const previewSend = (id: string) => apiFetch<RenderedEmail>(`${sendPath(id)}/preview`);
+export const sendChecks = (id: string) => apiFetch<{ checks: SendCheck[] }>(`${sendPath(id)}/checks`);
+export const testSend = (id: string, emails?: string[]) =>
+  apiFetch<{ sent: number }>(`${sendPath(id)}/test`, { method: 'POST', body: JSON.stringify(emails && emails.length > 0 ? { emails } : {}) });
+export const approveSend = (id: string, scheduledAt: string | null) =>
+  apiFetch<Send>(`${sendPath(id)}/approve`, { method: 'POST', body: JSON.stringify({ scheduledAt }) });
+export const pauseSend = (id: string, reason: string) => apiFetch<Send>(`${sendPath(id)}/pause`, { method: 'POST', body: JSON.stringify({ reason }) });
+export const resumeSend = (id: string) => apiFetch<Send>(`${sendPath(id)}/resume`, { method: 'POST' });
+export const cancelSend = (id: string) => apiFetch<Send>(`${sendPath(id)}/cancel`, { method: 'POST' });
+export const sendReport = (id: string) =>
+  apiFetch<{ byStatus: Record<string, number>; openedEstimated: number; clicked: number; unsubscribed: number }>(`${sendPath(id)}/report`);
+export const sendLog = (id: string, offset = 0) => apiFetch<{ total: number; deliveries: DeliveryLogRow[] }>(`${sendPath(id)}/log?limit=50&offset=${offset}`);
+export const getKillSwitch = () => apiFetch<KillSwitchState>('/api/email/kill-switch');
+export const setKillSwitch = (paused: boolean, reason: string | null) =>
+  apiFetch<KillSwitchState>('/api/email/kill-switch', { method: 'PUT', body: JSON.stringify({ paused, reason }) });

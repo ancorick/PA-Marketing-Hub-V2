@@ -2239,3 +2239,44 @@ th[aria-sort='descending'] .sort-btn {
   font-weight: var(--weight-heavy);
   line-height: 1;
 }
+
+/* ---------- Campaign editor (Flow B, EML-13) ---------- */
+
+.textarea {
+  min-height: 12rem;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.6;
+}
+
+.check-row {
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+/* Email preview frames: a desktop client, a 375px phone, and a simulated dark-mode client. */
+.email-preview {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+
+.email-preview iframe {
+  display: block;
+  width: 100%;
+  height: 40rem;
+  margin: 0 auto;
+  border: 0;
+  background: var(--color-text);
+}
+
+.email-preview--mobile iframe {
+  width: 375px;
+  max-width: 100%;
+}
+
+/* Approximates how clients that force dark mode invert the colors; images are inverted back by the same filter pair. */
+.email-preview--dark iframe {
+  filter: invert(1) hue-rotate(180deg);
+}
