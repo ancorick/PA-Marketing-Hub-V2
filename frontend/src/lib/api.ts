@@ -195,3 +195,42 @@ export const updateContact = (id: string, changes: Partial<ContactInput>) =>
     method: 'PATCH',
     body: JSON.stringify(changes),
   });
+
+/* ---------- Audience: consent and suppression (AUD-07, AUD-12) ---------- */
+
+export type Topic = 'newsletter' | 'courses' | 'events' | 'alumni';
+export type ConsentState = 'granted' | 'withdrawn' | 'unknown' | 'pending';
+export type SuppressionReason = 'unsubscribed' | 'hard_bounce' | 'complaint' | 'erased';
+
+export type ConsentView = {
+  topics: { topic: Topic; state: ConsentState; method: string | null; wordingVersion: string | null; since: string | null }[];
+  suppressed: { reason: SuppressionReason; source: string; since: string }[];
+  history: {
+    id: string;
+    topic: Topic;
+    state: ConsentState;
+    method: string;
+    wordingVersion: string | null;
+    sourceUrl: string | null;
+    actorId: string | null;
+    reason: string | null;
+    at: string;
+  }[];
+};
+
+export const getConsent = (contactId: string) =>
+  apiFetch<ConsentView>(`/api/audience/contacts/${encodeURIComponent(contactId)}/consent`);
+
+export const changeConsent = (contactId: string, change: { topics: Topic[]; state: 'granted' | 'withdrawn'; reason: string }) =>
+  apiFetch<ConsentView>(`/api/audience/contacts/${encodeURIComponent(contactId)}/consent`, {
+    method: 'POST',
+    body: JSON.stringify(change),
+  });
+
+export const unsubscribeContact = (contactId: string, reason: string) =>
+  apiFetch<ConsentView>(`/api/audience/contacts/${encodeURIComponent(contactId)}/unsubscribe`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+
+export const getSuppressionSummary = () => apiFetch<{ active: Record<SuppressionReason, number> }>('/api/audience/suppressions/summary');

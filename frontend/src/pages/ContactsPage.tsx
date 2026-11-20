@@ -1,8 +1,8 @@
 import { Plus, UsersThree, X } from '@phosphor-icons/react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { listChannels, listContacts, type Contact, type ContactFilters, type ContactType, type Language } from '../lib/api';
-import { contactPath, fullName, LANGUAGE_LABEL, options, STATUS, TYPE_LABEL } from '../lib/contacts';
+import { getSuppressionSummary, listChannels, listContacts, type Contact, type ContactFilters, type ContactType, type Language } from '../lib/api';
+import { contactPath, fullName, LANGUAGE_LABEL, options, STATUS, SUPPRESSION_LABEL, TYPE_LABEL } from '../lib/contacts';
 import { formatDate, formatNumber } from '../lib/format';
 import { useStaffRole } from '../lib/session';
 import {
@@ -129,6 +129,7 @@ export function ContactsPage() {
   const channelName = (id: string | null) =>
     id === null ? 'Unknown' : (channels.data?.channels.find((channel) => channel.id === id)?.name ?? id);
 
+  const suppression = useQuery({ queryKey: ['suppression-summary', role], queryFn: getSuppressionSummary, enabled: !contacts.error });
   const access = accessProblem(contacts.error);
   const data = contacts.data;
   const filtered = Boolean(query.q || query.type || query.language || query.tag);
@@ -221,6 +222,14 @@ export function ContactsPage() {
                   : 'Loading…'}
               </p>
             </div>
+            {suppression.data && (
+              <p className="muted">
+                Suppression list (AUD-12):{' '}
+                {(Object.entries(suppression.data.active) as [keyof typeof SUPPRESSION_LABEL, number][])
+                  .map(([reason, count]) => `${SUPPRESSION_LABEL[reason]} ${formatNumber(count)}`)
+                  .join(' · ')}
+              </p>
+            )}
             <DataTable
               caption="Contacts"
               captionHidden

@@ -34,3 +34,24 @@ export function yerevanDate(iso: string): string {
 }
 
 export const contactPath = (id: string) => `#/audience/contacts/${encodeURIComponent(id)}`;
+
+export const TOPIC_LABEL: Record<import('./api').Topic, string> = {
+  newsletter: 'Newsletter',
+  courses: 'Courses',
+  events: 'Events',
+  alumni: 'Alumni',
+};
+
+export const CONSENT: Record<import('./api').ConsentState, { tone: Tone; label: string }> = {
+  granted: { tone: 'success', label: 'Granted' },
+  withdrawn: { tone: 'danger', label: 'Withdrawn' },
+  pending: { tone: 'warning', label: 'Awaiting confirmation' },
+  unknown: { tone: 'neutral', label: 'Unknown' },
+};
+
+export const SUPPRESSION_LABEL: Record<import('./api').SuppressionReason, string> = {
+  unsubscribed: 'Unsubscribed',
+  hard_bounce: 'Hard bounce',
+  complaint: 'Spam complaint',
+  erased: 'Erased',
+};

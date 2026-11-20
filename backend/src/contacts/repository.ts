@@ -26,7 +26,8 @@ export type NewContact = Pick<
   | 'tags'
 >;
 
-export type ContactChanges = Partial<NewContact>;
+/** Status changes come from suppression (AUD-12) and erasure (AUD-18), never from the edit form. */
+export type ContactChanges = Partial<NewContact> & { status?: ContactStatus };
 
 export type ContactFilter = {
   /** Part of the email or of "first last", case-insensitive. */
@@ -59,7 +60,7 @@ export interface ContactRepository {
   findByEmail(email: string): Promise<Contact | null>;
   findByCorePersonId(corePersonId: string): Promise<Contact | null>;
   /** Writes the contact and its audit row together. Throws DuplicateContactError on a unique clash. */
-  insert(input: NewContact, actorId: string): Promise<Contact>;
+  insert(input: NewContact & { status?: ContactStatus }, actorId: string): Promise<Contact>;
   /** Applies the changes and writes one audit row naming the changed fields. Null when the contact is gone. */
   update(id: string, changes: ContactChanges, actorId: string): Promise<Contact | null>;
   /** Audit rows for one contact, oldest first (PRD 12.4; feeds the AUD-16 timeline later). */
@@ -124,7 +125,7 @@ export class DrizzleContactRepository implements ContactRepository {
     return row ? toContact(row) : null;
   }
 
-  async insert(input: NewContact, actorId: string) {
+  async insert(input: NewContact & { status?: ContactStatus }, actorId: string) {
     return this.withDuplicates(input, () =>
       this.db.transaction(async (tx) => {
         const [row] = await tx.insert(contacts).values(input).returning();
@@ -134,7 +135,7 @@ export class DrizzleContactRepository implements ContactRepository {
           entityId: created.id,
           action: 'contact.created',
           actorId,
-          fields: Object.keys(input).filter((key) => input[key as keyof NewContact] !== null),
+          fields: Object.keys(input).filter((key) => input[key as keyof typeof input] != null),
         });
         return created;
       }),

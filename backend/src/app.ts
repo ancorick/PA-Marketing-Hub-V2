@@ -5,6 +5,8 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { registerStaffAuth } from './auth/staff.js';
 import type { AppConfig } from './config/env.js';
 import type { Database } from './db/client.js';
+import { ConsentRepository } from './consent/repository.js';
+import { ConsentService } from './consent/service.js';
 import { DrizzleContactRepository } from './contacts/repository.js';
 import { ContactService } from './contacts/service.js';
 import { DrizzleDomainRepository } from './domains/repository.js';
@@ -13,6 +15,7 @@ import { DomainService } from './domains/service.js';
 import { createDnsResolver, type DnsResolver } from './domains/verify.js';
 import { createEmailAdapter, type EmailAdapter } from './email/index.js';
 import { createIntegrations, type Integrations } from './integrations/index.js';
+import { consentRoutes } from './routes/consent.js';
 import { contactRoutes } from './routes/contacts.js';
 import { domainRoutes } from './routes/domains.js';
 import { healthRoutes } from './routes/health.js';
@@ -22,6 +25,8 @@ declare module 'fastify' {
     /** The only way to send email: marketing sends are blocked from unverified domains (EML-03). */
     email: EmailAdapter;
     domains: DomainService;
+    contacts: ContactService;
+    consent: ConsentService;
   }
 }
 
@@ -88,11 +93,21 @@ export async function buildApp({
     recheckAfterMs: config.domainRecheckMinutes * 60_000,
   });
   app.decorate('domains', domains);
-  const contacts = new ContactService({
-    repository: new DrizzleContactRepository(database.db),
+  const contactRepository = new DrizzleContactRepository(database.db);
+  const consent = new ConsentService({
+    consent: new ConsentRepository(database.db),
+    contacts: contactRepository,
     coreEngine: resolvedIntegrations.coreEngine,
     logger: app.log,
   });
+  const contacts = new ContactService({
+    repository: contactRepository,
+    coreEngine: resolvedIntegrations.coreEngine,
+    logger: app.log,
+    statusForEmail: (email) => consent.statusForEmail(email),
+  });
+  app.decorate('contacts', contacts);
+  app.decorate('consent', consent);
   app.decorate('email', guardMarketingSends(espAdapter, domains));
   registerStaffAuth(app);
 
@@ -103,6 +118,7 @@ export async function buildApp({
   });
   await app.register(domainRoutes, { domains, coreEngine: resolvedIntegrations.coreEngine });
   await app.register(contactRoutes, { contacts, coreEngine: resolvedIntegrations.coreEngine });
+  await app.register(consentRoutes, { consent, coreEngine: resolvedIntegrations.coreEngine });
 
   return app;
 }

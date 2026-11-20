@@ -29,6 +29,13 @@
       "when": 1795208490575,
       "tag": "0003_contacts",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795209321080,
+      "tag": "0004_consent_and_suppression",
+      "breakpoints": true
     }
   ]
 }

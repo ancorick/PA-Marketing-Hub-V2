@@ -17,6 +17,7 @@ import {
   StatusBadge,
   Tag,
 } from '../ui';
+import { ConsentSection } from './ConsentSection';
 import { ContactForm } from './ContactForm';
 
 const FIELD_LABEL: Record<string, string> = {
@@ -190,6 +191,8 @@ export function ContactPage({ id }: { id: string }) {
             </dl>
           </section>
         )}
+
+        {data.status !== 'erased' && <ConsentSection contactId={data.id} displayName={name ?? data.email ?? 'this contact'} />}
 
         <section className="card stack" aria-labelledby="history-heading">
           <h2 id="history-heading">Change history</h2>

@@ -119,3 +119,59 @@ export const auditEvents = pgTable(
 );
 
 export type AuditEventRow = typeof auditEvents.$inferSelect;
+
+/**
+ * ConsentRecord (PRD 12.1, AUD-07): append-only; the current state per topic is the latest record (12.4).
+ * pending = a website sign-up waiting for its confirmation click (AUD-08).
+ */
+export const consentRecords = pgTable(
+  'consent_records',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    contactId: uuid('contact_id')
+      .notNull()
+      .references(() => contacts.id, { onDelete: 'cascade' }),
+    /** newsletter | courses | events | alumni */
+    topic: text('topic').notNull(),
+    /** granted | withdrawn | unknown | pending */
+    state: text('state').notNull(),
+    /** form | event | import | manual | link */
+    method: text('method').notNull(),
+    /** Version of the consent wording the person saw (6.3 rule 4); text in src/consent/wordings.ts. */
+    wordingVersion: text('wording_version'),
+    sourceUrl: text('source_url'),
+    /** IP address or channel, where available. Erased with the contact (AUD-18). */
+    ip: text('ip'),
+    /** Staff user for manual changes. */
+    actorId: text('actor_id'),
+    /** Required for manual changes (6.3 rule 5). */
+    reason: text('reason'),
+    ...timestamps,
+  },
+  (table) => [index('consent_records_contact_idx').on(table.contactId, table.topic, table.createdAt)],
+);
+
+export type ConsentRecordRow = typeof consentRecords.$inferSelect;
+
+/**
+ * Global suppression list (PRD 12.1, AUD-12). Keyed by a hash of the normalized email so it survives
+ * erasure. Rows are never deleted; only an "unsubscribed" row can be lifted, and only by the person's own
+ * confirmed action (undo on the unsubscribe page, preferences page, confirmed sign-up).
+ */
+export const suppressions = pgTable(
+  'suppressions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    emailHash: text('email_hash').notNull(),
+    /** unsubscribed | hard_bounce | complaint | erased */
+    reason: text('reason').notNull(),
+    /** Where it came from: link, list_unsubscribe, preferences, esp_webhook, manual, erasure … */
+    source: text('source').notNull(),
+    liftedAt: timestamp('lifted_at', { withTimezone: true }),
+    liftSource: text('lift_source'),
+    ...timestamps,
+  },
+  (table) => [index('suppressions_email_hash_idx').on(table.emailHash)],
+);
+
+export type SuppressionRow = typeof suppressions.$inferSelect;

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { Language, LifecycleStatus } from '../integrations/core-engine/contract.js';
 
 /** Preferred language of a contact (AUD-02). */
@@ -54,6 +55,12 @@ export function normalizeEmail(input: string): string {
   }
   return email;
 }
+
+/**
+ * Key of the global suppression list (AUD-12, AUD-18): SHA-256 of the normalized email, so the list
+ * survives erasure without keeping the address itself.
+ */
+export const hashEmail = (email: string) => createHash('sha256').update(email.trim().toLowerCase()).digest('hex');
 
 /** "+374 (91) 23-45-67" → "+37491234567"; "00374…" → "+374…". Empty → null. */
 export function normalizePhone(input: string | null | undefined): string | null {

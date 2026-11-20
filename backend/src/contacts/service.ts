@@ -80,6 +80,8 @@ type ContactServiceDeps = {
   repository: ContactRepository;
   coreEngine: Pick<CoreEngineClient, 'getPerson' | 'findPersonByEmail'>;
   logger: { warn: (obj: object, msg: string) => void };
+  /** AUD-12: a new record for a suppressed address starts with that status (no import can override it). */
+  statusForEmail?: (email: string) => Promise<ContactStatus>;
   now?: () => Date;
 };
 
@@ -156,7 +158,8 @@ export class ContactService {
       const byPerson = await this.deps.repository.findByCorePersonId(fields.corePersonId);
       if (byPerson) throw new DuplicateContactError('corePersonId', byPerson.id);
     }
-    return toView(await this.deps.repository.insert(fields, actor.userId));
+    const status = (await this.deps.statusForEmail?.(email)) ?? 'active';
+    return toView(await this.deps.repository.insert({ ...fields, status }, actor.userId));
   }
 
   async update(id: string, input: UpdateContactInput, actor: Actor): Promise<ContactView | null> {
