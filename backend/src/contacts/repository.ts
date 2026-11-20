@@ -1,7 +1,6 @@
-import { randomUUID } from 'node:crypto';
 import { and, arrayContains, asc, count, desc, eq, ilike, or, sql, type SQL } from 'drizzle-orm';
 import { auditEvents, contacts, type ContactRow } from '../db/schema.js';
-import type { AppPgDatabase } from '../domains/repository.js';
+import type { AppPgDatabase } from '../db/client.js';
 import type { ContactStatus, ContactType } from './fields.js';
 import type { Language } from '../integrations/core-engine/contract.js';
 
@@ -181,76 +180,6 @@ export class DrizzleContactRepository implements ContactRepository {
       }
       const existing = values.email ? await this.findByEmail(values.email) : null;
       throw new DuplicateContactError('email', existing?.id ?? null);
-    }
-  }
-}
-
-/** Used when DATABASE_URL is not set (local work without Postgres): data lives until restart. */
-export class InMemoryContactRepository implements ContactRepository {
-  private readonly rows = new Map<string, Contact>();
-  private readonly audit = new Map<string, AuditEntry[]>();
-
-  async list(filter: ContactFilter): Promise<ContactPage> {
-    const search = filter.search?.trim().toLowerCase();
-    const matches = [...this.rows.values()]
-      .filter((row) => {
-        if (search) {
-          const haystack = [row.email, [row.firstName, row.lastName].filter(Boolean).join(' ')];
-          if (!haystack.some((value) => value?.toLowerCase().includes(search))) return false;
-        }
-        if (filter.type && row.type !== filter.type) return false;
-        if (filter.language && row.language !== filter.language) return false;
-        if (filter.tag && !row.tags.includes(filter.tag)) return false;
-        return true;
-      })
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id));
-    return { contacts: matches.slice(filter.offset, filter.offset + filter.limit), total: matches.length };
-  }
-
-  async findById(id: string) {
-    return this.rows.get(id) ?? null;
-  }
-
-  async findByEmail(email: string) {
-    return [...this.rows.values()].find((row) => row.email === email) ?? null;
-  }
-
-  async findByCorePersonId(corePersonId: string) {
-    return [...this.rows.values()].find((row) => row.corePersonId === corePersonId) ?? null;
-  }
-
-  async insert(input: NewContact, actorId: string) {
-    this.assertUnique(input, null);
-    const now = new Date();
-    const contact: Contact = { ...input, id: randomUUID(), status: 'active', createdAt: now, updatedAt: now };
-    this.rows.set(contact.id, contact);
-    const fields = Object.keys(input).filter((key) => input[key as keyof NewContact] !== null);
-    this.audit.set(contact.id, [{ action: 'contact.created', actorId, fields, at: now }]);
-    return contact;
-  }
-
-  async update(id: string, changes: ContactChanges, actorId: string) {
-    const row = this.rows.get(id);
-    if (!row) return null;
-    this.assertUnique(changes, id);
-    const now = new Date();
-    const next = { ...row, ...changes, updatedAt: now };
-    this.rows.set(id, next);
-    this.audit.get(id)?.push({ action: 'contact.updated', actorId, fields: Object.keys(changes), at: now });
-    return next;
-  }
-
-  async auditTrail(contactId: string) {
-    return this.audit.get(contactId) ?? [];
-  }
-
-  private assertUnique(values: ContactChanges, selfId: string | null) {
-    for (const row of this.rows.values()) {
-      if (row.id === selfId) continue;
-      if (values.email && row.email === values.email) throw new DuplicateContactError('email', row.id);
-      if (values.corePersonId && row.corePersonId === values.corePersonId) {
-        throw new DuplicateContactError('corePersonId', row.id);
-      }
     }
   }
 }

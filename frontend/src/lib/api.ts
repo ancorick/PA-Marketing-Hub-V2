@@ -47,7 +47,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 
 export type Health = {
   status: 'ok' | 'degraded';
-  database: 'ok' | 'unavailable' | 'not_configured';
+  database: 'ok' | 'unavailable' | 'embedded';
   email: { adapter: string };
   integrations: { mode: string; coreEngine: string; navigatorCrm: string; alumniTracker: string };
 };

@@ -1,5 +1,6 @@
 import { buildApp, type AppDeps } from '../src/app.js';
 import { loadConfig } from '../src/config/env.js';
+import { createEmbeddedDatabase, truncateAll, type Database } from '../src/db/client.js';
 import type { DnsResolver } from '../src/domains/verify.js';
 
 export const FRONTEND_ORIGIN = 'http://localhost:5173';
@@ -8,9 +9,25 @@ export function testConfig(overrides: Record<string, string> = {}) {
   return loadConfig({ NODE_ENV: 'test', CORS_ORIGINS: FRONTEND_ORIGIN, ...overrides });
 }
 
+let shared: Promise<Database> | undefined;
+
+/**
+ * One migrated in-process Postgres per test file (vitest isolates files), emptied before each use,
+ * so every test starts from a clean database without paying for migrations again.
+ */
+export async function testDatabase(): Promise<Database> {
+  shared ??= createEmbeddedDatabase().then(async (database) => {
+    await database.migrate();
+    return database;
+  });
+  const database = await shared;
+  await truncateAll(database);
+  return database;
+}
+
 /** Tests never touch public DNS: the resolver defaults to an empty fake zone. */
-export function buildTestApp(options: Omit<AppDeps, 'config'> = {}) {
-  return buildApp({ config: testConfig(), dnsResolver: new FakeDns(), ...options });
+export async function buildTestApp(options: Partial<Omit<AppDeps, 'config'>> & { config?: AppDeps['config'] } = {}) {
+  return buildApp({ config: testConfig(), dnsResolver: new FakeDns(), ...options, database: options.database ?? (await testDatabase()) });
 }
 
 const dnsError = (code: string) => Object.assign(new Error(`queryTxt ${code}`), { code });

@@ -1,7 +1,5 @@
-import { randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
-import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
-import type * as schema from '../db/schema.js';
+import type { AppPgDatabase } from '../db/client.js';
 import { domainDailySends, sendingDomains, type SendingDomainRow } from '../db/schema.js';
 import type { CheckStatus, DmarcPolicy, DnsCheckResult, EspDomainIdentity } from './types.js';
 
@@ -52,8 +50,6 @@ export interface DomainRepository {
   sentOn(domainId: string, day: string): Promise<number>;
 }
 
-/** Any Drizzle Postgres database with our schema: node-postgres in production, PGlite in tests. */
-export type AppPgDatabase = PgDatabase<PgQueryResultHKT, typeof schema>;
 
 /** Statuses are plain text columns; the service only ever writes CheckStatus / DmarcPolicy values. */
 const toDomain = (row: SendingDomainRow): SendingDomain => row as SendingDomain;
@@ -127,81 +123,5 @@ export class DrizzleDomainRepository implements DomainRepository {
       .from(domainDailySends)
       .where(and(eq(domainDailySends.domainId, domainId), eq(domainDailySends.day, day)));
     return row?.sent ?? 0;
-  }
-}
-
-/** Used when DATABASE_URL is not set (local work without Postgres): data lives until restart. */
-export class InMemoryDomainRepository implements DomainRepository {
-  private readonly rows = new Map<string, SendingDomain>();
-  private readonly dailySends = new Map<string, number>();
-
-  async list() {
-    return [...this.rows.values()].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-  }
-
-  async findById(id: string) {
-    return this.rows.get(id) ?? null;
-  }
-
-  async findByDomain(domain: string) {
-    return [...this.rows.values()].find((row) => row.domain === domain) ?? null;
-  }
-
-  async insert(input: { domain: string; espIdentity: EspDomainIdentity }) {
-    if (await this.findByDomain(input.domain)) throw new DuplicateDomainError(input.domain);
-    const now = new Date();
-    const row: SendingDomain = {
-      id: randomUUID(),
-      domain: input.domain,
-      espIdentity: input.espIdentity,
-      spfStatus: 'pending',
-      dkimStatus: 'pending',
-      dmarcStatus: 'pending',
-      trackingStatus: 'pending',
-      dmarcPolicy: null,
-      lastCheck: null,
-      lastCheckedAt: null,
-      verifiedAt: null,
-      warmupDays: 21,
-      warmupStartedAt: null,
-      warmupSkippedAt: null,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.rows.set(row.id, row);
-    return row;
-  }
-
-  async saveCheck(id: string, update: CheckUpdate) {
-    const row = this.rows.get(id);
-    if (!row) return null;
-    const next = { ...row, ...update, updatedAt: new Date() };
-    this.rows.set(id, next);
-    return next;
-  }
-
-  async updateWarmup(id: string, update: WarmupUpdate) {
-    const row = this.rows.get(id);
-    if (!row) return null;
-    const next = { ...row, ...update, updatedAt: new Date() };
-    this.rows.set(id, next);
-    return next;
-  }
-
-  async delete(id: string) {
-    for (const key of this.dailySends.keys()) if (key.startsWith(`${id}:`)) this.dailySends.delete(key);
-    return this.rows.delete(id);
-  }
-
-  async reserveDailySend(domainId: string, day: string, cap: number) {
-    const key = `${domainId}:${day}`;
-    const sent = this.dailySends.get(key) ?? 0;
-    if (sent >= cap) return false;
-    this.dailySends.set(key, sent + 1);
-    return true;
-  }
-
-  async sentOn(domainId: string, day: string) {
-    return this.dailySends.get(`${domainId}:${day}`) ?? 0;
   }
 }

@@ -5,9 +5,9 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { registerStaffAuth } from './auth/staff.js';
 import type { AppConfig } from './config/env.js';
 import type { Database } from './db/client.js';
-import { DrizzleContactRepository, InMemoryContactRepository, type ContactRepository } from './contacts/repository.js';
+import { DrizzleContactRepository } from './contacts/repository.js';
 import { ContactService } from './contacts/service.js';
-import { DrizzleDomainRepository, InMemoryDomainRepository, type DomainRepository } from './domains/repository.js';
+import { DrizzleDomainRepository } from './domains/repository.js';
 import { guardMarketingSends } from './domains/send-gate.js';
 import { DomainService } from './domains/service.js';
 import { createDnsResolver, type DnsResolver } from './domains/verify.js';
@@ -27,12 +27,11 @@ declare module 'fastify' {
 
 export type AppDeps = {
   config: AppConfig;
-  database?: Database;
+  /** Neon Postgres, or the embedded PGlite when DATABASE_URL is not set (and in tests). */
+  database: Database;
   integrations?: Integrations;
   email?: EmailAdapter;
-  /** Overrides for tests; by default chosen from `database` and public DNS. */
-  domainRepository?: DomainRepository;
-  contactRepository?: ContactRepository;
+  /** Override for tests; by default public DNS. */
   dnsResolver?: DnsResolver;
 };
 
@@ -41,8 +40,6 @@ export async function buildApp({
   database,
   integrations,
   email,
-  domainRepository,
-  contactRepository,
   dnsResolver,
 }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
@@ -81,9 +78,8 @@ export async function buildApp({
   const resolvedIntegrations =
     integrations ?? createIntegrations(config.integrationsMode, { allowMockSignIn: config.allowMockSignIn });
 
-  // Without DATABASE_URL (local work) domains and contacts live in memory until restart.
   const domains = new DomainService({
-    repository: domainRepository ?? (database ? new DrizzleDomainRepository(database.db) : new InMemoryDomainRepository()),
+    repository: new DrizzleDomainRepository(database.db),
     resolver: dnsResolver ?? createDnsResolver(),
     email: espAdapter,
     logger: app.log,
@@ -93,8 +89,7 @@ export async function buildApp({
   });
   app.decorate('domains', domains);
   const contacts = new ContactService({
-    repository:
-      contactRepository ?? (database ? new DrizzleContactRepository(database.db) : new InMemoryContactRepository()),
+    repository: new DrizzleContactRepository(database.db),
     coreEngine: resolvedIntegrations.coreEngine,
     logger: app.log,
   });

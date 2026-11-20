@@ -177,7 +177,7 @@ describe('domain changes when the Core Engine activity log is down', () => {
 
 describe('mock sign-in on a deployed API', () => {
   it('rejects the public mock tokens in production unless explicitly allowed', async () => {
-    const production = await buildApp({ config: testConfig({ NODE_ENV: 'production' }), dnsResolver: new FakeDns() });
+    const production = await buildTestApp({ config: testConfig({ NODE_ENV: 'production' }) });
     try {
       const response = await production.inject({ method: 'GET', url: '/api/email/domains', headers: bearer('admin') });
       expect(response.statusCode).toBe(401);

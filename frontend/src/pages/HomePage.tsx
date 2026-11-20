@@ -12,7 +12,7 @@ const MODULES = [
 
 function tone(value: string): Tone {
   if (value === 'ok') return 'success';
-  if (value === 'not_configured' || value === 'mock' || value === 'log') return 'warning';
+  if (value === 'embedded' || value === 'mock' || value === 'log') return 'warning';
   return 'danger';
 }
 

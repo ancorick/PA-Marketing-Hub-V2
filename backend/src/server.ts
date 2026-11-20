@@ -1,9 +1,9 @@
 import { buildApp } from './app.js';
 import { loadConfig } from './config/env.js';
-import { createDatabase } from './db/client.js';
+import { createDatabase, createEmbeddedDatabase } from './db/client.js';
 
 const config = loadConfig();
-const database = config.databaseUrl ? createDatabase(config.databaseUrl) : undefined;
+const database = config.databaseUrl ? createDatabase(config.databaseUrl) : await createEmbeddedDatabase();
 const app = await buildApp({ config, database });
 
 /**
@@ -12,7 +12,6 @@ const app = await buildApp({ config, database });
  * failed migrations retry in the background with backoff (30 s doubling to 5 min).
  */
 async function migrate(delayMs = 30_000): Promise<void> {
-  if (!database) return;
   try {
     await database.migrate();
     app.log.info('database migrations applied');
@@ -24,7 +23,7 @@ async function migrate(delayMs = 30_000): Promise<void> {
 // The first attempt runs before listening, so requests never meet a half-migrated schema.
 await migrate();
 
-if (!database) app.log.warn('DATABASE_URL is not set: running without a database');
+if (database.kind === 'embedded') app.log.warn('DATABASE_URL is not set: using an in-process database, data is lost on restart');
 if (config.integrationsMode === 'mock') {
   app.log.warn('INTEGRATIONS_MODE=mock: Core Engine, Navigator CRM and Alumni Tracker are stubs');
 }
@@ -32,7 +31,7 @@ if (config.integrationsMode === 'mock') {
 const shutdown = async (signal: string) => {
   app.log.info({ signal }, 'shutting down');
   await app.close();
-  await database?.close();
+  await database.close();
   process.exit(0);
 };
 process.once('SIGTERM', () => void shutdown('SIGTERM'));

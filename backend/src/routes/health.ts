@@ -4,7 +4,7 @@ import type { EmailAdapter } from '../email/index.js';
 import type { Integrations } from '../integrations/index.js';
 
 type HealthDeps = {
-  database: Database | undefined;
+  database: Database;
   integrations: Integrations;
   email: EmailAdapter;
 };
@@ -15,15 +15,13 @@ type HealthDeps = {
  */
 export async function healthRoutes(app: FastifyInstance, deps: HealthDeps) {
   app.get('/api/health', async () => {
-    let database: 'ok' | 'unavailable' | 'not_configured' = 'not_configured';
-    if (deps.database) {
-      try {
-        await deps.database.ping();
-        database = 'ok';
-      } catch (error) {
-        app.log.warn({ err: error }, 'database ping failed');
-        database = 'unavailable';
-      }
+    // embedded = no DATABASE_URL: in-process Postgres, data is lost on restart.
+    let database: 'ok' | 'embedded' | 'unavailable' = deps.database.kind === 'embedded' ? 'embedded' : 'ok';
+    try {
+      await deps.database.ping();
+    } catch (error) {
+      app.log.warn({ err: error }, 'database ping failed');
+      database = 'unavailable';
     }
     return {
       status: database === 'unavailable' ? 'degraded' : 'ok',

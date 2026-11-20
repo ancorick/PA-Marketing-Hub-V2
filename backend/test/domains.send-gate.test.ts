@@ -1,19 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
-import { InMemoryDomainRepository } from '../src/domains/repository.js';
+import { DrizzleDomainRepository } from '../src/domains/repository.js';
 import { guardMarketingSends, SendBlockedError } from '../src/domains/send-gate.js';
 import { DomainService, fromDomain } from '../src/domains/service.js';
 import { createEmailAdapter, type EmailMessage } from '../src/email/index.js';
-import { FakeDns, publishPlaceholderRecords } from './helpers.js';
+import { FakeDns, publishPlaceholderRecords, testDatabase } from './helpers.js';
 
 const DOMAIN = 'news.academy.example';
 const ADMIN = { userId: 'staff-admin' };
 
-function setup() {
+async function setup() {
   let now = new Date('2026-11-20T10:00:00Z');
   const dns = new FakeDns();
   const logger = { info: vi.fn() };
   const esp = createEmailAdapter('log', logger);
-  const repository = new InMemoryDomainRepository();
+  const repository = new DrizzleDomainRepository((await testDatabase()).db);
   const domains = new DomainService({
     repository,
     resolver: dns,
@@ -63,14 +63,14 @@ describe('marketing send gate (EML-03)', () => {
   });
 
   it('blocks marketing from an unregistered domain and from a From without a domain', async () => {
-    const { email, logger } = setup();
+    const { email, logger } = await setup();
     await expect(email.send(message())).rejects.toThrow(`${DOMAIN} is not a registered sending domain`);
     await expect(email.send(message({ from: 'nobody' }))).rejects.toBeInstanceOf(SendBlockedError);
     expect(logger.info).not.toHaveBeenCalled();
   });
 
   it('blocks marketing until SPF, DKIM and DMARC pass, checking DNS live', async () => {
-    const { email, domains, dns, logger } = setup();
+    const { email, domains, dns, logger } = await setup();
     await domains.add(DOMAIN, ADMIN);
     dns.setTxt(DOMAIN, 'v=spf1 include:spf.esp-not-chosen.invalid -all');
     const blocked = email.send(message());
@@ -86,7 +86,7 @@ describe('marketing send gate (EML-03)', () => {
   });
 
   it('re-checks a stale verdict, so a record removed from DNS blocks the next send', async () => {
-    const { email, domains, dns, advance } = setup();
+    const { email, domains, dns, advance } = await setup();
     await domains.add(DOMAIN, ADMIN);
     publishPlaceholderRecords(dns, DOMAIN);
     await expect(email.send(message())).resolves.toBeDefined();
@@ -99,7 +99,7 @@ describe('marketing send gate (EML-03)', () => {
   });
 
   it('shares one DNS check between concurrent sends with a stale verdict', async () => {
-    const { email, domains, dns } = setup();
+    const { email, domains, dns } = await setup();
     await domains.add(DOMAIN, ADMIN);
     publishPlaceholderRecords(dns, DOMAIN);
     const lookups = vi.spyOn(dns, 'resolveTxt');
@@ -109,7 +109,7 @@ describe('marketing send gate (EML-03)', () => {
   });
 
   it('keeps a verified verdict when DNS lookups fail, and checks again on the next send', async () => {
-    const { email, domains, dns, advance } = setup();
+    const { email, domains, dns, advance } = await setup();
     await domains.add(DOMAIN, ADMIN);
     publishPlaceholderRecords(dns, DOMAIN);
     await expect(email.send(message())).resolves.toBeDefined();
@@ -129,7 +129,7 @@ describe('marketing send gate (EML-03)', () => {
   });
 
   it('never trusts a stale verdict for a domain removed while it was being re-checked', async () => {
-    const { email, domains, dns, repository, advance } = setup();
+    const { email, domains, dns, repository, advance } = await setup();
     const { id } = await domains.add(DOMAIN, ADMIN);
     publishPlaceholderRecords(dns, DOMAIN);
     await domains.verify(id);
@@ -143,7 +143,7 @@ describe('marketing send gate (EML-03)', () => {
   });
 
   it('starts the warm-up on first verification and stops at the daily cap (EML-08)', async () => {
-    const { email, domains, dns, advance } = setup();
+    const { email, domains, dns, advance } = await setup();
     const { id } = await domains.add(DOMAIN, ADMIN);
     publishPlaceholderRecords(dns, DOMAIN);
     const verified = await domains.verify(id);
@@ -165,7 +165,7 @@ describe('marketing send gate (EML-03)', () => {
   });
 
   it('lets marketing flow without a cap once the plan is skipped', async () => {
-    const { email, domains, dns } = setup();
+    const { email, domains, dns } = await setup();
     const { id } = await domains.add(DOMAIN, ADMIN);
     publishPlaceholderRecords(dns, DOMAIN);
     await domains.verify(id);
@@ -175,7 +175,7 @@ describe('marketing send gate (EML-03)', () => {
   });
 
   it('does not gate transactional mail', async () => {
-    const { email } = setup();
+    const { email } = await setup();
     await expect(email.send(message({ stream: 'transactional' }))).resolves.toBeDefined();
   });
 });
