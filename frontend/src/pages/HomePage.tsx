@@ -1,3 +1,4 @@
+import { AlertsPanel } from './AlertsPanel';
 import { ArrowClockwise } from '@phosphor-icons/react';
 import { useQuery } from '@tanstack/react-query';
 import { getHealth } from '../lib/api';
@@ -23,6 +24,7 @@ export function HomePage() {
   return (
     <>
       <PageHeader title="Overview" description="Headline tiles and the channel table arrive with Analytics (phase 3)." />
+      <AlertsPanel />
       <div className="grid grid--2">
         <section className="card" aria-labelledby="api-status-heading">
           <div className="card__header">

@@ -43,6 +43,12 @@ const envSchema = z.object({
   // Sender of marketing and confirmation email (PRD 7.1: a named, monitored address on the sending subdomain).
   MAIL_FROM: z.string().min(3).default('Picsart Academy <news@news.academy-domain.invalid>'),
   // Physical address in every marketing email footer (EML-11, NFR-P3).
+  // Shared secret for ESP webhook signatures (EML-04, NFR-S4); the real ESP adapter may use its own scheme.
+  ESP_WEBHOOK_SECRET: z
+    .string()
+    .optional()
+    .transform((value) => (value && value.trim().length > 0 ? value.trim() : undefined))
+    .pipe(z.string().min(32, 'must be at least 32 characters').optional()),
   // Scheduled jobs (sync, sends, pipelines). Default on; off in tests, which run jobs directly.
   JOBS_ENABLED: z.enum(['true', 'false']).optional(),
   // Sending pace (EML-09): stay under the ESP's per-second limit; 10,000 emails in < 30 min needs ≥ 6/s (NFR-F3).
@@ -74,6 +80,8 @@ export type AppConfig = {
   sendRatePerSecond: number;
   sendBatchSize: number;
   seedList: string[];
+  /** null in production without a secret: the webhook endpoint answers 503 instead of trusting anyone. */
+  espWebhookSecret: string | null;
 };
 
 /** Development only: links signed with it stop working on any real deploy, where the secret is required. */
@@ -112,6 +120,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     postalAddress: env.ACADEMY_POSTAL_ADDRESS,
     sendRatePerSecond: env.SEND_RATE_PER_SECOND,
     sendBatchSize: env.SEND_BATCH_SIZE,
+    espWebhookSecret: env.ESP_WEBHOOK_SECRET ?? (env.NODE_ENV === 'production' ? null : 'development-only-esp-webhook-secret-0123456789'),
     seedList: env.SEED_LIST.split(',').map((item) => item.trim()).filter((item) => item.includes('@')),
     jobsEnabled: env.JOBS_ENABLED === undefined ? env.NODE_ENV !== 'test' : env.JOBS_ENABLED === 'true',
   };

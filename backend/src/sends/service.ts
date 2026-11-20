@@ -187,7 +187,7 @@ export class SendService {
       footer: {
         reason: REASON[language](send.topic as Topic),
         postalAddress: this.deps.postalAddress,
-        unsubscribeUrl: this.deps.links.unsubscribePage(contactId),
+        unsubscribeUrl: this.deps.links.unsubscribePage(contactId, send.id),
         preferencesUrl: this.deps.links.preferencesPage(contactId),
       },
     });
@@ -196,7 +196,7 @@ export class SendService {
       subject: personalize(send.subject),
       html: rendered.html,
       text: rendered.text,
-      headers: this.deps.links.unsubscribeHeaders(contactId),
+      headers: this.deps.links.unsubscribeHeaders(contactId, send.id),
     };
   }
 

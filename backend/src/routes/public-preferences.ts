@@ -6,11 +6,15 @@ import { FREQUENCIES, LANGUAGES } from '../contacts/fields.js';
 import type { ContactRepository } from '../contacts/repository.js';
 import { InvalidLinkError, type LinkPurpose, type LinkSigner } from '../links/tokens.js';
 import { rateLimit } from '../public/rate-limit.js';
+import { and, eq, isNull } from 'drizzle-orm';
+import type { AppPgDatabase } from '../db/client.js';
+import { deliveries } from '../db/schema.js';
 
 type PublicPreferencesOptions = {
   consent: ConsentService;
   contacts: Pick<ContactRepository, 'findById' | 'update'>;
   signer: LinkSigner;
+  db: AppPgDatabase;
 };
 
 const tokenQuery = z.object({ t: z.string().min(10).max(1000) });
@@ -34,7 +38,7 @@ const PERSON = { kind: 'person' } as const;
  * Public pages without a password (AUD-09, AUD-11, Flow E). Every request carries a signed, expiring token
  * (NFR-S5) and is rate-limited (NFR-S6). Answers never include the full email address.
  */
-export async function publicPreferenceRoutes(app: FastifyInstance, { consent, contacts, signer }: PublicPreferencesOptions) {
+export async function publicPreferenceRoutes(app: FastifyInstance, { consent, contacts, signer, db }: PublicPreferencesOptions) {
   const limited = rateLimit({ max: 30, windowMs: 60_000 });
 
   async function contactFor(request: FastifyRequest, reply: FastifyReply, purpose: LinkPurpose) {
@@ -44,8 +48,8 @@ export async function publicPreferenceRoutes(app: FastifyInstance, { consent, co
       return null;
     }
     try {
-      const { contactId } = signer.verify(query.data.t, purpose);
-      return { contactId, contact: await contacts.findById(contactId) };
+      const { contactId, ref } = signer.verify(query.data.t, purpose);
+      return { contactId, ref, contact: await contacts.findById(contactId) };
     } catch (error) {
       if (!(error instanceof InvalidLinkError)) throw error;
       await reply
@@ -82,6 +86,13 @@ export async function publicPreferenceRoutes(app: FastifyInstance, { consent, co
     if (contact && contact.status !== 'erased') {
       const oneClick = (request.body as Record<string, unknown> | undefined)?.['List-Unsubscribe'] === 'One-Click';
       await consent.unsubscribeAll(contactId, oneClick ? 'list_unsubscribe' : 'link', PERSON, { ip: request.ip });
+      // Counts in the campaign report (NWS-13) when the link came from a send.
+      if (found.ref) {
+        await db
+          .update(deliveries)
+          .set({ unsubscribedAt: new Date() })
+          .where(and(eq(deliveries.sendId, found.ref), eq(deliveries.contactId, contactId), isNull(deliveries.unsubscribedAt)));
+      }
     }
     return {
       unsubscribed: true,

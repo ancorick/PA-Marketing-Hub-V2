@@ -2,7 +2,7 @@ import { and, asc, count, desc, eq, inArray, isNotNull, isNull, not, or, sql, ty
 import type { Topic } from '../consent/wordings.js';
 import type { Contact } from '../contacts/repository.js';
 import type { AppPgDatabase } from '../db/client.js';
-import { consentRecords, contacts, segmentMembers, segments, type SegmentRow } from '../db/schema.js';
+import { consentRecords, contactImports, contacts, segmentMembers, segments, type SegmentRow } from '../db/schema.js';
 import { ACTIVE_ADMISSION_STAGES } from '../sync/service.js';
 import { compileRule, ruleSchema, type RuleGroup } from './rules.js';
 
@@ -181,7 +181,12 @@ export class SegmentService {
       : undefined;
     return {
       // Status mirrors the suppression list (AUD-12); the send pipeline checks the list itself again per message.
-      reachable: and(eq(contacts.status, 'active'), isNotNull(contacts.email)) as SQL,
+      reachable: and(
+        eq(contacts.status, 'active'),
+        isNotNull(contacts.email),
+        // 7.4: contacts of an import blocked for its bounce rate wait until someone reviews it.
+        sql`not exists (select 1 from ${contactImports} where ${contactImports.id} = ${contacts.importId} and ${contactImports.sendBlockedAt} is not null and ${contactImports.reviewedAt} is null)`,
+      ) as SQL,
       consent,
       admissions: options.excludeActiveAdmissions ? (or(isNull(contacts.crmStage), not(inArray(contacts.crmStage, ACTIVE_ADMISSION_STAGES))) as SQL) : undefined,
     };

@@ -2280,3 +2280,8 @@ th[aria-sort='descending'] .sort-btn {
 .email-preview--dark iframe {
   filter: invert(1) hue-rotate(180deg);
 }
+
+/* A follow-on block after the main page content. */
+.page-section {
+  margin-top: var(--space-8);
+}

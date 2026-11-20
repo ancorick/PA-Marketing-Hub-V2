@@ -500,3 +500,24 @@ export const sendLog = (id: string, offset = 0) => apiFetch<{ total: number; del
 export const getKillSwitch = () => apiFetch<KillSwitchState>('/api/email/kill-switch');
 export const setKillSwitch = (paused: boolean, reason: string | null) =>
   apiFetch<KillSwitchState>('/api/email/kill-switch', { method: 'PUT', body: JSON.stringify({ paused, reason }) });
+
+/* ---------- Alerts and import review (PRD 7.4, 14.4) ---------- */
+
+export type StaffAlert = { id: string; level: 'warning' | 'critical'; title: string; message: string; link: string | null; createdAt: string; resolvedAt: string | null };
+export const listAlerts = () => apiFetch<{ alerts: StaffAlert[] }>('/api/alerts');
+export const resolveAlert = (id: string) => apiFetch<StaffAlert>(`/api/alerts/${encodeURIComponent(id)}/resolve`, { method: 'POST' });
+
+export type ImportRecord = {
+  id: string;
+  fileName: string;
+  actorId: string;
+  rowsTotal: number;
+  created: number;
+  updated: number;
+  invalid: number;
+  sendBlockedAt: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+};
+export const listImports = () => apiFetch<{ imports: ImportRecord[] }>('/api/audience/imports');
+export const reviewImport = (id: string) => apiFetch<ImportRecord>(`/api/audience/imports/${encodeURIComponent(id)}/review`, { method: 'POST' });

@@ -6,7 +6,9 @@ import {
   commitImport,
   IMPORT_FIELDS,
   listChannels,
+  listImports,
   previewImport,
+  reviewImport,
   type ColumnMapping,
   type ImportField,
   type ImportOptions,
@@ -15,7 +17,8 @@ import {
   type Topic,
 } from '../lib/api';
 import { LANGUAGE_LABEL, options, TOPIC_LABEL } from '../lib/contacts';
-import { formatNumber } from '../lib/format';
+import { formatDate, formatNumber } from '../lib/format';
+import { useStaffRole } from '../lib/session';
 import { Alert, Button, ConfirmDialog, DataTable, PageHeader, SelectField, StatTile, StatusBadge, TextField, type Column, type Tone } from '../ui';
 
 const FIELD_LABEL: Record<ImportField, string> = {
@@ -60,6 +63,44 @@ const problemColumns: Column<ImportRow>[] = [
   },
 ];
 
+/** Past imports; an import blocked by the 7.4 bounce guardrail is released here after review. */
+function RecentImports() {
+  const role = useStaffRole();
+  const canReview = role === 'admin' || role === 'marketing_manager';
+  const queryClient = useQueryClient();
+  const imports = useQuery({ queryKey: ['imports', role], queryFn: listImports });
+  const review = useMutation({ mutationFn: reviewImport, onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['imports'] }) });
+  if (!imports.data || imports.data.imports.length === 0) return null;
+  return (
+    <section className="card stack" aria-labelledby="recent-imports-heading">
+      <h2 id="recent-imports-heading">Recent imports</h2>
+      <ul className="list-reset history">
+        {imports.data.imports.slice(0, 10).map((item) => (
+          <li key={item.id} className="history__item">
+            <span className="history__time num">{formatDate(item.createdAt, undefined, { timeStyle: 'short' })}</span>
+            <span className="cluster">
+              <strong>{item.fileName}</strong>
+              <span className="muted num">
+                {formatNumber(item.created)} new, {formatNumber(item.updated)} updated, {formatNumber(item.invalid)} invalid · {item.actorId}
+              </span>
+              {item.sendBlockedAt && !item.reviewedAt && (
+                <>
+                  <StatusBadge tone="danger">Blocked: high bounce rate</StatusBadge>
+                  {canReview && (
+                    <Button size="sm" variant="secondary" loading={review.isPending} onClick={() => review.mutate(item.id)}>
+                      Reviewed: unblock
+                    </Button>
+                  )}
+                </>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /**
  * Audience → Import (PRD 13.6, AUD-03, AUD-04): upload, column mapping, preview of every problem, then commit.
  * Nothing is written until the editor confirms the preview.
@@ -91,6 +132,7 @@ export function ImportPage() {
     onSuccess: () => {
       setConfirming(false);
       void queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      void queryClient.invalidateQueries({ queryKey: ['imports'] });
     },
   });
 
@@ -260,6 +302,10 @@ export function ImportPage() {
             )}
           </section>
         )}
+      </div>
+
+      <div className="stack stack--lg page-section">
+        <RecentImports />
       </div>
 
       <ConfirmDialog

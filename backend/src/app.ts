@@ -20,6 +20,10 @@ import { consentRoutes } from './routes/consent.js';
 import { jobRoutes } from './routes/jobs.js';
 import { segmentRoutes } from './routes/segments.js';
 import { sendRoutes } from './routes/sends.js';
+import { webhookRoutes } from './routes/webhooks.js';
+import { alertRoutes } from './routes/alerts.js';
+import { AlertService } from './alerts/service.js';
+import { EspEventService } from './events/service.js';
 import { SendDispatcher } from './sends/dispatcher.js';
 import { KillSwitch } from './sends/kill-switch.js';
 import { httpLinkChecker, SendService, type LinkChecker } from './sends/service.js';
@@ -58,6 +62,8 @@ declare module 'fastify' {
     sends: SendService;
     dispatcher: SendDispatcher;
     killSwitch: KillSwitch;
+    alerts: AlertService;
+    espEvents: EspEventService;
   }
 }
 
@@ -180,11 +186,20 @@ export async function buildApp({
   await app.register(domainRoutes, { domains, coreEngine: resolvedIntegrations.coreEngine });
   await app.register(contactRoutes, { contacts, coreEngine: resolvedIntegrations.coreEngine });
   await app.register(consentRoutes, { consent, coreEngine: resolvedIntegrations.coreEngine });
-  await app.register(publicPreferenceRoutes, { consent, contacts: contactRepository, signer });
+  await app.register(publicPreferenceRoutes, { consent, contacts: contactRepository, signer, db: database.db });
   await app.register(publicSignupRoutes, { signup });
   const duplicates = new DuplicateService(database.db);
   const imports = new ImportService({ db: database.db, contacts: contactRepository, consentRepository, consent });
-  const jobs = new JobRunner({ db: database.db, logger: app.log });
+  const alerts = new AlertService(database.db, app.log);
+  app.decorate('alerts', alerts);
+  const jobs = new JobRunner({
+    db: database.db,
+    logger: app.log,
+    // 14.4: every scheduled job alerts on failure (ANL-11 for data sources).
+    onFailure: async (job, error) => {
+      await alerts.raise({ level: 'warning', roles: ['admin'], title: `Job failed: ${job.description}`, message: error.message, link: '#/admin', dedupeKey: `job:${job.name}` });
+    },
+  });
   const sync = new SyncService({
     db: database.db,
     contacts: contactRepository,
@@ -226,6 +241,10 @@ export async function buildApp({
   app.decorate('dispatcher', dispatcher);
   jobs.register({ name: 'send_dispatcher', description: 'Sends approved campaigns in batches', intervalMs: 60_000, run: () => dispatcher.tick() });
   await app.register(sendRoutes, { sends: sendService, killSwitch, seedList: config.seedList, coreEngine: resolvedIntegrations.coreEngine });
+  const espEvents = new EspEventService({ db: database.db, consent, touchpoints, alerts, killSwitch, logger: app.log });
+  app.decorate('espEvents', espEvents);
+  await app.register(webhookRoutes, { events: espEvents, secret: config.espWebhookSecret });
+  await app.register(alertRoutes, { alerts, db: database.db, coreEngine: resolvedIntegrations.coreEngine });
   const merge = new MergeService({ db: database.db, coreEngine: resolvedIntegrations.coreEngine, logger: app.log });
   await app.register(importRoutes, { imports, duplicates, merge, contacts, contactRepository, coreEngine: resolvedIntegrations.coreEngine });
 

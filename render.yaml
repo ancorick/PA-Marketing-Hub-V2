@@ -42,6 +42,9 @@ services:
       # links already sent would stop working.
       - key: LINK_SIGNING_SECRET
         generateValue: true
+      # Verifies ESP webhooks (NFR-S4); give the same value to the ESP webhook settings.
+      - key: ESP_WEBHOOK_SECRET
+        generateValue: true
       # Netlify site URL (public unsubscribe/preferences pages) and this service's own HTTPS URL.
       - key: PUBLIC_APP_URL
         sync: false

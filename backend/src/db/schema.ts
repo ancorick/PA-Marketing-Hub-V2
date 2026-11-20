@@ -239,6 +239,10 @@ export const contactImports = pgTable('contact_imports', {
   invalid: integer('invalid').notNull(),
   /** Column mapping and options used, for the record. */
   settings: jsonb('settings').$type<Record<string, unknown>>().notNull(),
+  /** 7.4: more than 10% hard bounces on the import's first send blocks its contacts until reviewed. */
+  sendBlockedAt: timestamp('send_blocked_at', { withTimezone: true }),
+  reviewedBy: text('reviewed_by'),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
   ...timestamps,
 });
 
@@ -437,3 +441,39 @@ export const appSettings = pgTable('app_settings', {
   updatedBy: text('updated_by').notNull(),
   ...timestamps,
 });
+
+/** ESP webhook events already processed (EML-04): providers retry, so each event ID is handled once. */
+export const espEvents = pgTable('esp_events', {
+  id: text('id').primaryKey(),
+  type: text('type').notNull(),
+  messageId: text('message_id'),
+  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+  payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+  ...timestamps,
+});
+
+/**
+ * Alerts for staff (PRD 7.4 guardrails, 14.4 job failures, ANL-11): shown in the app to the roles named;
+ * resolved by a person, never deleted.
+ */
+export const alerts = pgTable(
+  'alerts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** warning | critical */
+    level: text('level').notNull(),
+    roles: text('roles').array().notNull(),
+    title: text('title').notNull(),
+    message: text('message').notNull(),
+    /** In-app link, e.g. #/campaigns/<id>. */
+    link: text('link'),
+    /** Same key while unresolved = same alert, so a repeating problem does not flood the list. */
+    dedupeKey: text('dedupe_key'),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    resolvedBy: text('resolved_by'),
+    ...timestamps,
+  },
+  (table) => [index('alerts_open_idx').on(table.resolvedAt, table.createdAt)],
+);
+
+export type AlertRow = typeof alerts.$inferSelect;

@@ -3,7 +3,8 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 /** What a signed link lets its holder do (NFR-S5). */
 export type LinkPurpose = 'unsubscribe' | 'preferences' | 'confirm' | 'track';
 
-export type LinkClaims = { contactId: string; purpose: LinkPurpose; expiresAt: Date };
+/** `ref`: the send the link came from (a random ID, no personal data), so unsubscribes count per campaign. */
+export type LinkClaims = { contactId: string; purpose: LinkPurpose; expiresAt: Date; ref: string | null };
 
 /** Unsubscribe and preferences links must keep working long after the email (a year); confirmations are short. */
 /** track: the contact token in tagged links (9.2 identity resolution), long-lived like the email itself. */
@@ -28,9 +29,9 @@ export class LinkSigner {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
-  sign(contactId: string, purpose: LinkPurpose): string {
+  sign(contactId: string, purpose: LinkPurpose, ref?: string): string {
     const expires = Math.floor(this.now().getTime() / 1000) + LINK_LIFETIME_DAYS[purpose] * 86_400;
-    const payload = b64(JSON.stringify({ c: contactId, p: purpose, e: expires }));
+    const payload = b64(JSON.stringify({ c: contactId, p: purpose, e: expires, ...(ref && { r: ref }) }));
     return `${payload}.${this.mac(payload)}`;
   }
 
@@ -41,7 +42,7 @@ export class LinkSigner {
     const expected = Buffer.from(this.mac(payload));
     const given = Buffer.from(mac);
     if (expected.length !== given.length || !timingSafeEqual(expected, given)) throw new InvalidLinkError(false);
-    let claims: { c?: unknown; p?: unknown; e?: unknown };
+    let claims: { c?: unknown; p?: unknown; e?: unknown; r?: unknown };
     try {
       claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
     } catch {
@@ -50,7 +51,7 @@ export class LinkSigner {
     if (typeof claims.c !== 'string' || claims.p !== purpose || typeof claims.e !== 'number') throw new InvalidLinkError(false);
     const expiresAt = new Date(claims.e * 1000);
     if (expiresAt <= this.now()) throw new InvalidLinkError(true);
-    return { contactId: claims.c, purpose, expiresAt };
+    return { contactId: claims.c, purpose, expiresAt, ref: typeof claims.r === 'string' ? claims.r : null };
   }
 
   private mac(payload: string) {
@@ -66,8 +67,8 @@ export class ContactLinks {
   ) {}
 
   /** Footer link: the confirmation page that unsubscribes in one click and offers undo (Flow E). */
-  unsubscribePage(contactId: string) {
-    return `${this.urls.app}/#/p/unsubscribe?t=${this.signer.sign(contactId, 'unsubscribe')}`;
+  unsubscribePage(contactId: string, sendId?: string) {
+    return `${this.urls.app}/#/p/unsubscribe?t=${this.signer.sign(contactId, 'unsubscribe', sendId)}`;
   }
 
   preferencesPage(contactId: string) {
@@ -82,8 +83,8 @@ export class ContactLinks {
    * RFC 2369 / RFC 8058 headers: mail clients show a native unsubscribe button and POST
    * "List-Unsubscribe=One-Click" to the HTTPS URL, with no page to load (AUD-10).
    */
-  unsubscribeHeaders(contactId: string): Record<string, string> {
-    const url = `${this.urls.api}/api/public/unsubscribe?t=${this.signer.sign(contactId, 'unsubscribe')}`;
+  unsubscribeHeaders(contactId: string, sendId?: string): Record<string, string> {
+    const url = `${this.urls.api}/api/public/unsubscribe?t=${this.signer.sign(contactId, 'unsubscribe', sendId)}`;
     return { 'List-Unsubscribe': `<${url}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' };
   }
 }
