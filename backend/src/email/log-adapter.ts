@@ -10,6 +10,8 @@ type Logger = { info: (obj: object, msg: string) => void };
 export class LogEmailAdapter implements EmailAdapter {
   readonly name = 'log';
   private readonly sent = new Map<string, EmailSendResult>();
+  /** The latest messages (up to 1,000), for tests and for looking at emails during local work. */
+  readonly outbox: EmailMessage[] = [];
 
   constructor(private readonly logger: Logger) {}
 
@@ -19,6 +21,8 @@ export class LogEmailAdapter implements EmailAdapter {
 
     const result: EmailSendResult = { messageId: `log-${randomUUID()}`, acceptedAt: new Date() };
     this.sent.set(message.idempotencyKey, result);
+    this.outbox.push(message);
+    if (this.outbox.length > 1000) this.outbox.shift();
     this.logger.info(
       {
         email: {

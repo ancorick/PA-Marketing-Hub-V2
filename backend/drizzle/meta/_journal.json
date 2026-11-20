@@ -43,6 +43,13 @@
       "when": 1795209616997,
       "tag": "0005_contact_frequency",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795209954694,
+      "tag": "0006_touchpoints",
+      "breakpoints": true
     }
   ]
 }

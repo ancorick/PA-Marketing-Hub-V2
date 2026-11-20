@@ -28,7 +28,14 @@ export async function testDatabase(): Promise<Database> {
 
 /** Tests never touch public DNS: the resolver defaults to an empty fake zone. */
 export async function buildTestApp(options: Partial<Omit<AppDeps, 'config'>> & { config?: AppDeps['config'] } = {}) {
-  return buildApp({ config: testConfig(), dnsResolver: new FakeDns(), ...options, database: options.database ?? (await testDatabase()) });
+  return buildApp({
+    config: testConfig(),
+    dnsResolver: new FakeDns(),
+    // Every domain accepts mail unless a test says otherwise; no real DNS in tests.
+    mailChecker: { acceptsMail: async (domain) => !domain.endsWith('.invalid') },
+    ...options,
+    database: options.database ?? (await testDatabase()),
+  });
 }
 
 const dnsError = (code: string) => Object.assign(new Error(`queryTxt ${code}`), { code });

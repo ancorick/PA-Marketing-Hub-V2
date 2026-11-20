@@ -40,6 +40,10 @@ const envSchema = z.object({
   // Where people open public pages (frontend) and where mail clients POST one-click unsubscribes (backend).
   PUBLIC_APP_URL: z.url().default('http://localhost:5173'),
   PUBLIC_API_URL: z.url().default('http://localhost:4000'),
+  // Sender of marketing and confirmation email (PRD 7.1: a named, monitored address on the sending subdomain).
+  MAIL_FROM: z.string().min(3).default('Picsart Academy <news@news.academy-domain.invalid>'),
+  // Physical address in every marketing email footer (EML-11, NFR-P3).
+  ACADEMY_POSTAL_ADDRESS: z.string().min(3).default('Picsart Academy, address to be confirmed, Yerevan, Armenia'),
 });
 
 export type AppConfig = {
@@ -57,6 +61,8 @@ export type AppConfig = {
   linkSigningSecret: string;
   publicAppUrl: string;
   publicApiUrl: string;
+  mailFrom: string;
+  postalAddress: string;
 };
 
 /** Development only: links signed with it stop working on any real deploy, where the secret is required. */
@@ -91,5 +97,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     linkSigningSecret: env.LINK_SIGNING_SECRET ?? DEV_LINK_SECRET,
     publicAppUrl: env.PUBLIC_APP_URL.replace(/\/+$/, ''),
     publicApiUrl: env.PUBLIC_API_URL.replace(/\/+$/, ''),
+    mailFrom: env.MAIL_FROM,
+    postalAddress: env.ACADEMY_POSTAL_ADDRESS,
   };
 }

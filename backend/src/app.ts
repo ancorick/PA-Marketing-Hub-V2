@@ -18,6 +18,10 @@ import { createIntegrations, type Integrations } from './integrations/index.js';
 import { ContactLinks, LinkSigner } from './links/tokens.js';
 import { consentRoutes } from './routes/consent.js';
 import { publicPreferenceRoutes } from './routes/public-preferences.js';
+import { publicSignupRoutes } from './routes/public-signup.js';
+import { SignupService } from './signup/service.js';
+import { TouchpointRepository } from './touchpoints/repository.js';
+import { createMailDomainChecker, type MailDomainChecker } from './contacts/address-check.js';
 import { contactRoutes } from './routes/contacts.js';
 import { domainRoutes } from './routes/domains.js';
 import { healthRoutes } from './routes/health.js';
@@ -32,6 +36,8 @@ declare module 'fastify' {
     /** Signed unsubscribe, preferences and confirmation links (NFR-S5). */
     links: ContactLinks;
     signer: LinkSigner;
+    touchpoints: TouchpointRepository;
+    signup: SignupService;
   }
 }
 
@@ -41,8 +47,9 @@ export type AppDeps = {
   database: Database;
   integrations?: Integrations;
   email?: EmailAdapter;
-  /** Override for tests; by default public DNS. */
+  /** Overrides for tests; by default public DNS. */
   dnsResolver?: DnsResolver;
+  mailChecker?: MailDomainChecker;
 };
 
 export async function buildApp({
@@ -51,6 +58,7 @@ export async function buildApp({
   integrations,
   email,
   dnsResolver,
+  mailChecker,
 }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
     logger: {
@@ -98,6 +106,7 @@ export async function buildApp({
     recheckAfterMs: config.domainRecheckMinutes * 60_000,
   });
   app.decorate('domains', domains);
+  app.decorate('email', guardMarketingSends(espAdapter, domains));
   const contactRepository = new DrizzleContactRepository(database.db);
   const consent = new ConsentService({
     consent: new ConsentRepository(database.db),
@@ -115,8 +124,24 @@ export async function buildApp({
   app.decorate('consent', consent);
   const signer = new LinkSigner(config.linkSigningSecret);
   app.decorate('signer', signer);
-  app.decorate('links', new ContactLinks(signer, { app: config.publicAppUrl, api: config.publicApiUrl }));
-  app.decorate('email', guardMarketingSends(espAdapter, domains));
+  const links = new ContactLinks(signer, { app: config.publicAppUrl, api: config.publicApiUrl });
+  app.decorate('links', links);
+  const touchpoints = new TouchpointRepository(database.db);
+  app.decorate('touchpoints', touchpoints);
+  const signup = new SignupService({
+    contacts,
+    contactRepository,
+    consent,
+    touchpoints,
+    email: app.email,
+    links,
+    signer,
+    crm: resolvedIntegrations.navigatorCrm,
+    mailChecker: mailChecker ?? createMailDomainChecker(),
+    mail: { from: config.mailFrom, postalAddress: config.postalAddress },
+    logger: app.log,
+  });
+  app.decorate('signup', signup);
   registerStaffAuth(app);
 
   await app.register(healthRoutes, {
@@ -128,6 +153,7 @@ export async function buildApp({
   await app.register(contactRoutes, { contacts, coreEngine: resolvedIntegrations.coreEngine });
   await app.register(consentRoutes, { consent, coreEngine: resolvedIntegrations.coreEngine });
   await app.register(publicPreferenceRoutes, { consent, contacts: contactRepository, signer });
+  await app.register(publicSignupRoutes, { signup });
 
   return app;
 }

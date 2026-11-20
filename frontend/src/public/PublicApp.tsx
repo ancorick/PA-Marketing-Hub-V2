@@ -5,6 +5,7 @@ import logoUrl from '../assets/picsart-academy-logo.webp';
 import {
   ApiError,
   getPublicPreferences,
+  publicConfirm,
   publicUndoUnsubscribe,
   publicUnsubscribe,
   publicUnsubscribeAll,
@@ -125,6 +126,36 @@ function UnsubscribePage({ token }: { token: string }) {
           </a>
         )}
       </div>
+    </section>
+  );
+}
+
+/** AUD-08: the click in the confirmation email turns pending consent into granted. */
+function ConfirmPage({ token }: { token: string }) {
+  const [, t] = usePublicLanguage();
+  const started = useRef(false);
+  const confirm = useMutation({ mutationFn: () => publicConfirm(token), onSuccess: (result) => suggestPublicLanguage(result.language) });
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    confirm.mutate();
+  }, [confirm]);
+
+  if (confirm.isError) return <LinkProblem error={confirm.error} />;
+  if (!confirm.isSuccess) {
+    return (
+      <section className="card public__card" aria-busy>
+        <p role="status">{t.confirmWorking}</p>
+      </section>
+    );
+  }
+  return (
+    <section className="card public__card stack" aria-live="polite">
+      <span className="icon-tile icon-tile--brand">
+        <CheckCircle size={24} weight="bold" aria-hidden />
+      </span>
+      <h1 className="public__title">{t.confirmDoneTitle}</h1>
+      <p>{t.confirmDoneText}</p>
     </section>
   );
 }
@@ -273,6 +304,7 @@ export function PublicApp({ path }: { path: string }) {
   const token = new URLSearchParams(query).get('t') ?? '';
   let content: ReactNode;
   if (page === '/p/unsubscribe') content = token ? <UnsubscribePage token={token} /> : <LinkProblem error={new ApiError(400, '', null, 'invalid_link')} />;
+  else if (page === '/p/confirm') content = token ? <ConfirmPage token={token} /> : <LinkProblem error={new ApiError(400, '', null, 'invalid_link')} />;
   else if (page === '/p/preferences') content = token ? <PreferencesPage token={token} /> : <LinkProblem error={new ApiError(400, '', null, 'invalid_link')} />;
   else content = <PrivacyPage />;
   return <PublicLayout>{content}</PublicLayout>;

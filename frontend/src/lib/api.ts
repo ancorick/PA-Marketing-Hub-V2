@@ -269,3 +269,6 @@ export const savePublicPreferences = (token: string, change: { topics: Topic[]; 
 
 export const publicUnsubscribeAll = (token: string) =>
   publicFetch<PublicPreferences>(withToken('/api/public/preferences/unsubscribe', token), { method: 'POST' });
+
+export const publicConfirm = (token: string) =>
+  publicFetch<{ confirmed: true; language: Language }>(withToken('/api/public/confirm', token), { method: 'POST' });

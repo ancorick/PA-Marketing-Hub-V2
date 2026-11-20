@@ -180,3 +180,31 @@ export const suppressions = pgTable(
 );
 
 export type SuppressionRow = typeof suppressions.$inferSelect;
+
+/**
+ * Touchpoint (PRD 12.1): one marketing interaction (visit, form, click, open, registration, attendance, chat,
+ * referral). Channel and campaign are slugs (9.3 taxonomy, utm_campaign) until the Channel and Campaign
+ * tables arrive in phase 3. contact_id is null for anonymous touchpoints and after a merge target is gone.
+ */
+export const touchpoints = pgTable(
+  'touchpoints',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    contactId: uuid('contact_id').references(() => contacts.id, { onDelete: 'set null' }),
+    channel: text('channel'),
+    campaign: text('campaign'),
+    type: text('type').notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    /** website, esp, event_hub, crm, chatbot … */
+    sourceSystem: text('source_system').notNull(),
+    /** ID or URL in the source system, for idempotent re-imports. */
+    sourceRef: text('source_ref'),
+    ...timestamps,
+  },
+  (table) => [
+    index('touchpoints_contact_idx').on(table.contactId, table.occurredAt),
+    index('touchpoints_occurred_idx').on(table.occurredAt),
+  ],
+);
+
+export type TouchpointRow = typeof touchpoints.$inferSelect;
