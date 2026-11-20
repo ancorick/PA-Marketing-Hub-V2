@@ -2221,3 +2221,21 @@ th[aria-sort='descending'] .sort-btn {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Segment rule rows (AUD-13): fields wrap on narrow screens; remove sits under the fields. */
+.rule-row {
+  gap: var(--space-3);
+}
+
+/* Segmented controls keep their natural width inside stacked layouts. */
+.segmented {
+  width: fit-content;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.card__header .live-count {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-heavy);
+  line-height: 1;
+}

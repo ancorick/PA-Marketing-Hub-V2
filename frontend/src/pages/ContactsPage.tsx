@@ -148,6 +148,9 @@ export function ContactsPage() {
               <a className="btn btn--ghost" href="#/audience/duplicates">
                 Duplicates
               </a>
+              <a className="btn btn--secondary" href="#/audience/segments">
+                Segments
+              </a>
               <a className="btn btn--secondary" href="#/audience/import">
                 Import CSV
               </a>

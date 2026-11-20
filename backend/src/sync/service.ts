@@ -44,7 +44,7 @@ type SyncDeps = {
   consent: Pick<ConsentService, 'statusForEmail'>;
   coreEngine: Pick<CoreEngineClient, 'listPeopleChangedSince' | 'listOutcomesSince' | 'addMarketingTouches'>;
   crm: Pick<NavigatorCrmClient, 'listLeadsChangedSince' | 'listStageChangesSince'>;
-  alumni: Pick<AlumniTrackerClient, 'listEmploymentChangedSince'>;
+  alumni: Pick<AlumniTrackerClient, 'listEmploymentChangedSince' | 'listReferralsSince'>;
 };
 
 /**
@@ -63,6 +63,7 @@ export class SyncService {
       { name: 'crm_leads', description: 'Navigator CRM leads and stages', intervalMs: every(15), overlapMs: every(60), run: ({ windowFrom }) => this.syncLeads(windowFrom ?? EPOCH) },
       { name: 'crm_stage_changes', description: 'Navigator CRM applications', intervalMs: every(15), overlapMs: every(60), run: ({ windowFrom }) => this.syncStageChanges(windowFrom ?? EPOCH) },
       { name: 'alumni_employment', description: 'Alumni Tracker employment', intervalMs: every(60), overlapMs: every(120), run: ({ windowFrom }) => this.syncEmployment(windowFrom ?? EPOCH) },
+      { name: 'alumni_referrals', description: 'Alumni Tracker referrals as referral touchpoints', intervalMs: every(60), overlapMs: every(120), run: ({ windowFrom }) => this.syncReferrals(windowFrom ?? EPOCH) },
       { name: 'core_touches_push', description: 'Marketing touches written to Core Engine person records', intervalMs: every(15), overlapMs: every(60), run: ({ windowFrom, windowTo }) => this.pushTouches(windowFrom ?? EPOCH, windowTo) },
     ];
   }
@@ -157,6 +158,36 @@ export class SyncService {
       }
     }
     return { rowsIn: records.length, rowsUpserted: upserted };
+  }
+
+  /**
+   * Referrals (12.1 touchpoint type "referral"): stored on the referrer, with the referred email as the
+   * source reference, so the "referral champions" segment (6.4) can check whether they enrolled.
+   */
+  async syncReferrals(since: Date): Promise<JobResult> {
+    const referrals = await this.deps.alumni.listReferralsSince(since);
+    let upserted = 0;
+    for (const referral of referrals) {
+      const referrer = await this.deps.contacts.findByCorePersonId(referral.referrerPersonId);
+      if (!referrer) continue;
+      const ref = referral.referredEmail.trim().toLowerCase();
+      const [existing] = await this.deps.db
+        .select({ id: touchpoints.id })
+        .from(touchpoints)
+        .where(and(eq(touchpoints.sourceSystem, 'alumni_tracker'), eq(touchpoints.sourceRef, ref), eq(touchpoints.type, 'referral')));
+      if (existing) continue;
+      await this.deps.db.insert(touchpoints).values({
+        contactId: referrer.id,
+        channel: 'referrals',
+        campaign: null,
+        type: 'referral',
+        occurredAt: new Date(referral.occurredAt),
+        sourceSystem: 'alumni_tracker',
+        sourceRef: ref,
+      });
+      upserted += 1;
+    }
+    return { rowsIn: referrals.length, rowsUpserted: upserted };
   }
 
   /** Writes touches of linked contacts to the Core Engine person record (idempotent by touch ID). */

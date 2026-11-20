@@ -310,3 +310,39 @@ export const syncRuns = pgTable(
 );
 
 export type SyncRunRow = typeof syncRuns.$inferSelect;
+
+/**
+ * Segment (PRD 12.1, AUD-13 to AUD-15). Dynamic segments store a rule (JSON, validated against a whitelist
+ * and compiled to parameterized SQL, NFR-S7) and are recalculated at send time; static lists store members.
+ */
+export const segments = pgTable('segments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  description: text('description'),
+  /** dynamic | static */
+  type: text('type').notNull(),
+  rule: jsonb('rule').$type<unknown>(),
+  ownerId: text('owner_id').notNull(),
+  /** Members at the last count, for the list screen; the real audience is computed at send time. */
+  lastCount: integer('last_count'),
+  lastCountedAt: timestamp('last_counted_at', { withTimezone: true }),
+  ...timestamps,
+});
+
+export type SegmentRow = typeof segments.$inferSelect;
+
+/** Members of static lists (AUD-15), e.g. guests of a specific event. */
+export const segmentMembers = pgTable(
+  'segment_members',
+  {
+    segmentId: uuid('segment_id')
+      .notNull()
+      .references(() => segments.id, { onDelete: 'cascade' }),
+    contactId: uuid('contact_id')
+      .notNull()
+      .references(() => contacts.id, { onDelete: 'cascade' }),
+    addedBy: text('added_by').notNull(),
+    ...timestamps,
+  },
+  (table) => [primaryKey({ columns: [table.segmentId, table.contactId] }), index('segment_members_contact_idx').on(table.contactId)],
+);

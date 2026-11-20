@@ -64,6 +64,13 @@
       "when": 1795210691639,
       "tag": "0008_sync_outcomes",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795210922196,
+      "tag": "0009_segments",
+      "breakpoints": true
     }
   ]
 }

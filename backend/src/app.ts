@@ -18,6 +18,8 @@ import { createIntegrations, type Integrations } from './integrations/index.js';
 import { ContactLinks, LinkSigner } from './links/tokens.js';
 import { consentRoutes } from './routes/consent.js';
 import { jobRoutes } from './routes/jobs.js';
+import { segmentRoutes } from './routes/segments.js';
+import { SegmentService } from './segments/service.js';
 import { JobRunner } from './jobs/runner.js';
 import { SyncService } from './sync/service.js';
 import { importRoutes } from './routes/imports.js';
@@ -48,6 +50,7 @@ declare module 'fastify' {
     /** Scheduled jobs; server.ts starts the timers when JOBS_ENABLED. */
     jobs: JobRunner;
     sync: SyncService;
+    segments: SegmentService;
   }
 }
 
@@ -181,6 +184,9 @@ export async function buildApp({
   app.decorate('sync', sync);
   app.addHook('onClose', async () => jobs.stop());
   await app.register(jobRoutes, { jobs, coreEngine: resolvedIntegrations.coreEngine });
+  const segments = new SegmentService(database.db);
+  app.decorate('segments', segments);
+  await app.register(segmentRoutes, { segments, contacts, coreEngine: resolvedIntegrations.coreEngine });
   const merge = new MergeService({ db: database.db, coreEngine: resolvedIntegrations.coreEngine, logger: app.log });
   await app.register(importRoutes, { imports, duplicates, merge, contacts, contactRepository, coreEngine: resolvedIntegrations.coreEngine });
 

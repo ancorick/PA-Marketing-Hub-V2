@@ -368,3 +368,58 @@ export type JobStatus = {
 export const listJobs = () => apiFetch<{ jobs: JobStatus[] }>('/api/admin/jobs');
 
 export const runJob = (name: string) => apiFetch<SyncRun>(`/api/admin/jobs/${encodeURIComponent(name)}/run`, { method: 'POST' });
+
+/* ---------- Audience: segments (AUD-13 to AUD-15, AUD-17) ---------- */
+
+export type TouchType = 'visit' | 'form' | 'click' | 'open' | 'registration' | 'attendance' | 'chat' | 'referral';
+export type OutcomeType = 'lead' | 'applied' | 'enrolled' | 'completed' | 'hired';
+
+export type SegmentCondition =
+  | { kind: 'attribute'; field: 'type' | 'language' | 'sourceChannel' | 'sourceCampaign' | 'employmentStatus'; operator: 'in' | 'not_in'; values: string[] }
+  | { kind: 'tag'; operator: 'has' | 'has_not'; value: string }
+  | { kind: 'course'; operator: 'in' | 'contains'; values: string[] }
+  | { kind: 'group'; operator: 'in'; values: string[] }
+  | { kind: 'touch'; touchType: TouchType; operator: 'did' | 'did_not'; withinDays?: number; channel?: string; campaignContains?: string }
+  | { kind: 'outcome'; outcomeType: OutcomeType; operator: 'did' | 'did_not'; withinDays?: number }
+  | { kind: 'date'; field: 'firstTouchAt' | 'createdAt'; operator: 'within_days' | 'older_than_days'; days: number }
+  | { kind: 'consent'; topic: Topic; state: ConsentState; olderThanDays?: number }
+  | { kind: 'admissions'; operator: 'active' | 'not_active' }
+  | { kind: 'referred_enrolled' };
+
+export type SegmentRule = { op: 'and' | 'or'; conditions: (SegmentCondition | SegmentRule)[] };
+
+export type Segment = {
+  id: string;
+  name: string;
+  description: string | null;
+  type: 'dynamic' | 'static';
+  rule: SegmentRule | null;
+  ownerId: string;
+  lastCount: number | null;
+  lastCountedAt: string | null;
+  updatedAt: string;
+};
+
+export type SegmentContact = { id: string; email: string | null; firstName: string | null; lastName: string | null; type: ContactType; language: Language; status: ContactStatus };
+
+export const listSegments = () => apiFetch<{ segments: Segment[] }>('/api/audience/segments');
+export const getSegment = (id: string) => apiFetch<Segment>(`/api/audience/segments/${encodeURIComponent(id)}`);
+export const createSegment = (input: { name: string; description?: string | null; type: 'dynamic' | 'static'; rule?: SegmentRule }) =>
+  apiFetch<Segment>('/api/audience/segments', { method: 'POST', body: JSON.stringify(input) });
+export const updateSegment = (id: string, input: { name?: string; description?: string | null; rule?: SegmentRule }) =>
+  apiFetch<Segment>(`/api/audience/segments/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) });
+export const deleteSegment = (id: string) => apiFetch<void>(`/api/audience/segments/${encodeURIComponent(id)}`, { method: 'DELETE' });
+export const countSegmentRule = (rule: SegmentRule) =>
+  apiFetch<{ count: number; sample: SegmentContact[] }>('/api/audience/segments/count', { method: 'POST', body: JSON.stringify({ rule }) });
+export const listSegmentMembers = (id: string, offset = 0) =>
+  apiFetch<{ total: number; contacts: SegmentContact[] }>(`/api/audience/segments/${encodeURIComponent(id)}/members?limit=25&offset=${offset}`);
+export const addSegmentMembers = (id: string, emails: string[]) =>
+  apiFetch<{ added: number; notFound: string[] }>(`/api/audience/segments/${encodeURIComponent(id)}/members`, { method: 'POST', body: JSON.stringify({ emails }) });
+export const removeSegmentMembers = (id: string, contactIds: string[]) =>
+  apiFetch<{ removed: number }>(`/api/audience/segments/${encodeURIComponent(id)}/members`, { method: 'DELETE', body: JSON.stringify({ contactIds }) });
+
+export type AudienceBreakdown = { matching: number; notReachable: number; noConsent: number; activeAdmissions: number; eligible: number };
+export const segmentBreakdown = (id: string, topic?: Topic, excludeActiveAdmissions = true) =>
+  apiFetch<AudienceBreakdown>(
+    `/api/audience/segments/${encodeURIComponent(id)}/breakdown?excludeActiveAdmissions=${excludeActiveAdmissions}${topic ? `&topic=${topic}` : ''}`,
+  );

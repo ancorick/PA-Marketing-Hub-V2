@@ -13,6 +13,8 @@ const DesignSystemPage = lazy(() => import('./pages/DesignSystemPage').then((mod
 const ContactsPage = lazy(() => import('./pages/ContactsPage').then((mod) => ({ default: mod.ContactsPage })));
 const ContactPage = lazy(() => import('./pages/ContactPage').then((mod) => ({ default: mod.ContactPage })));
 const AdminPage = lazy(() => import('./pages/AdminPage').then((mod) => ({ default: mod.AdminPage })));
+const SegmentsPage = lazy(() => import('./pages/SegmentsPage').then((mod) => ({ default: mod.SegmentsPage })));
+const SegmentPage = lazy(() => import('./pages/SegmentsPage').then((mod) => ({ default: mod.SegmentPage })));
 const ImportPage = lazy(() => import('./pages/ImportPage').then((mod) => ({ default: mod.ImportPage })));
 const DuplicatesPage = lazy(() => import('./pages/DuplicatesPage').then((mod) => ({ default: mod.DuplicatesPage })));
 /** Pages for contacts (unsubscribe, preferences, privacy): no staff shell, no staff session. */
@@ -38,7 +40,9 @@ export function App() {
   }
   const placeholder = PLACEHOLDERS[path];
   const contactId = path.match(/^\/audience\/contacts\/([^/]+)$/)?.[1];
-  const audience = path === '/audience' || path === '/audience/import' || path === '/audience/duplicates' || contactId !== undefined;
+  const segmentId = path.match(/^\/audience\/segments\/([^/]+)$/)?.[1];
+  const audience =
+    ['/audience', '/audience/import', '/audience/duplicates', '/audience/segments'].includes(path) || contactId !== undefined || segmentId !== undefined;
   const known = placeholder || audience || path === '/design-system' || path === '/email-settings' || path === '/admin' ? path : '/';
 
   let page;
@@ -48,6 +52,8 @@ export function App() {
   else if (path === '/audience') page = <ContactsPage />;
   else if (path === '/audience/import') page = <ImportPage />;
   else if (path === '/audience/duplicates') page = <DuplicatesPage />;
+  else if (path === '/audience/segments') page = <SegmentsPage />;
+  else if (segmentId !== undefined) page = <SegmentPage key={segmentId} id={segmentId === 'new' ? null : decodeURIComponent(segmentId)} />;
   else if (contactId === 'new') page = <NewContactPage />;
   else if (contactId !== undefined) page = <ContactPage key={contactId} id={decodeURIComponent(contactId)} />;
   else if (placeholder) page = <PlaceholderPage title={placeholder.title} phase={placeholder.phase} />;
