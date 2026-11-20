@@ -5,12 +5,15 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { registerStaffAuth } from './auth/staff.js';
 import type { AppConfig } from './config/env.js';
 import type { Database } from './db/client.js';
+import { DrizzleContactRepository, InMemoryContactRepository, type ContactRepository } from './contacts/repository.js';
+import { ContactService } from './contacts/service.js';
 import { DrizzleDomainRepository, InMemoryDomainRepository, type DomainRepository } from './domains/repository.js';
 import { guardMarketingSends } from './domains/send-gate.js';
 import { DomainService } from './domains/service.js';
 import { createDnsResolver, type DnsResolver } from './domains/verify.js';
 import { createEmailAdapter, type EmailAdapter } from './email/index.js';
 import { createIntegrations, type Integrations } from './integrations/index.js';
+import { contactRoutes } from './routes/contacts.js';
 import { domainRoutes } from './routes/domains.js';
 import { healthRoutes } from './routes/health.js';
 
@@ -29,6 +32,7 @@ export type AppDeps = {
   email?: EmailAdapter;
   /** Overrides for tests; by default chosen from `database` and public DNS. */
   domainRepository?: DomainRepository;
+  contactRepository?: ContactRepository;
   dnsResolver?: DnsResolver;
 };
 
@@ -38,6 +42,7 @@ export async function buildApp({
   integrations,
   email,
   domainRepository,
+  contactRepository,
   dnsResolver,
 }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
@@ -76,7 +81,7 @@ export async function buildApp({
   const resolvedIntegrations =
     integrations ?? createIntegrations(config.integrationsMode, { allowMockSignIn: config.allowMockSignIn });
 
-  // Without DATABASE_URL (local work) domains live in memory until restart.
+  // Without DATABASE_URL (local work) domains and contacts live in memory until restart.
   const domains = new DomainService({
     repository: domainRepository ?? (database ? new DrizzleDomainRepository(database.db) : new InMemoryDomainRepository()),
     resolver: dnsResolver ?? createDnsResolver(),
@@ -87,6 +92,12 @@ export async function buildApp({
     recheckAfterMs: config.domainRecheckMinutes * 60_000,
   });
   app.decorate('domains', domains);
+  const contacts = new ContactService({
+    repository:
+      contactRepository ?? (database ? new DrizzleContactRepository(database.db) : new InMemoryContactRepository()),
+    coreEngine: resolvedIntegrations.coreEngine,
+    logger: app.log,
+  });
   app.decorate('email', guardMarketingSends(espAdapter, domains));
   registerStaffAuth(app);
 
@@ -96,6 +107,7 @@ export async function buildApp({
     email: app.email,
   });
   await app.register(domainRoutes, { domains, coreEngine: resolvedIntegrations.coreEngine });
+  await app.register(contactRoutes, { contacts, coreEngine: resolvedIntegrations.coreEngine });
 
   return app;
 }

@@ -8,6 +8,8 @@ export class ApiError extends Error {
     readonly requestId: string | null,
     /** Machine-readable code from the API body, e.g. "invalid_domain". */
     readonly code: string | null = null,
+    /** Extra error fields: the input to fix (`field`) or the record that already exists (`existingId`). */
+    readonly details: { field?: string | null; existingId?: string | null } = {},
   ) {
     super(message);
     this.name = 'ApiError';
@@ -25,12 +27,18 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const requestId = response.headers.get('x-request-id');
   if (!response.ok) {
     // The API answers errors as {error, message}; the message is written for staff.
-    const body = (await response.json().catch(() => null)) as { error?: string; message?: string } | null;
+    const body = (await response.json().catch(() => null)) as {
+      error?: string;
+      message?: string;
+      field?: string | null;
+      existingId?: string | null;
+    } | null;
     throw new ApiError(
       response.status,
       body?.message ?? `${init.method ?? 'GET'} ${path} failed with ${response.status}`,
       requestId,
       body?.error ?? null,
+      { field: body?.field, existingId: body?.existingId },
     );
   }
   if (response.status === 204) return undefined as T;
@@ -107,3 +115,83 @@ export const updateWarmup = (id: string, change: { days: WarmupLength } | { skip
 
 export const removeDomain = (id: string) =>
   apiFetch<void>(`/api/email/domains/${encodeURIComponent(id)}`, { method: 'DELETE' });
+
+/* ---------- Audience: contacts (AUD-01, AUD-02) ---------- */
+
+export type Language = 'hy' | 'en' | 'ru';
+export type ContactType = 'subscriber' | 'lead' | 'applicant' | 'student' | 'alumnus';
+export type ContactStatus = 'active' | 'unsubscribed' | 'bounced' | 'complained' | 'erased';
+
+export type Contact = {
+  id: string;
+  corePersonId: string | null;
+  email: string | null;
+  phone: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  language: Language;
+  type: ContactType;
+  /** core_engine: the type mirrors the Core Engine lifecycle and is not editable here. */
+  typeSource: 'core_engine' | 'marketing_hub';
+  sourceChannel: string | null;
+  sourceCampaign: string | null;
+  firstTouchAt: string;
+  tags: string[];
+  status: ContactStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ContactDetail = Contact & {
+  history: { action: string; actorId: string; fields: string[]; at: string }[];
+};
+
+export type ContactPage = { contacts: Contact[]; total: number; limit: number; offset: number };
+
+export type ContactFilters = {
+  q?: string;
+  type?: ContactType;
+  language?: Language;
+  tag?: string;
+  limit?: number;
+  offset?: number;
+};
+
+/** What staff can set; `firstTouchAt` is a date ("2026-03-01") or an ISO date-time. */
+export type ContactInput = {
+  email: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  phone?: string | null;
+  language: Language;
+  type?: ContactType;
+  sourceChannel: string;
+  sourceCampaign?: string | null;
+  firstTouchAt?: string;
+  tags?: string[];
+  corePersonId?: string;
+};
+
+export type Channel = { id: string; name: string };
+
+export const listChannels = () => apiFetch<{ channels: Channel[] }>('/api/audience/channels');
+
+export function listContacts(filters: ContactFilters) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== '') params.set(key, String(value));
+  }
+  const query = params.toString();
+  return apiFetch<ContactPage>(`/api/audience/contacts${query ? `?${query}` : ''}`);
+}
+
+export const getContact = (id: string) => apiFetch<ContactDetail>(`/api/audience/contacts/${encodeURIComponent(id)}`);
+
+export const createContact = (input: ContactInput) =>
+  apiFetch<Contact>('/api/audience/contacts', { method: 'POST', body: JSON.stringify(input) });
+
+export const updateContact = (id: string, changes: Partial<ContactInput>) =>
+  apiFetch<Contact>(`/api/audience/contacts/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(changes),
+  });

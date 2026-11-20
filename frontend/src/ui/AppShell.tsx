@@ -81,7 +81,8 @@ export function AppShell({
     return () => document.removeEventListener('keydown', onKey);
   }, [menuOpen]);
 
-  const current = (path: string) => (currentPath === path ? 'page' : undefined);
+  // A section stays highlighted on its sub-pages ("/audience/contacts/…" → Audience).
+  const current = (path: string) => (currentPath === path || currentPath.startsWith(`${path}/`) ? 'page' : undefined);
   const close = () => setMenuOpen(false);
 
   return (

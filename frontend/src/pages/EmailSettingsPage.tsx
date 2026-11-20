@@ -1,4 +1,4 @@
-import { ArrowClockwise, GlobeSimple, LockSimple, Trash } from '@phosphor-icons/react';
+import { ArrowClockwise, GlobeSimple, Trash } from '@phosphor-icons/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import {
@@ -16,6 +16,8 @@ import { formatDate } from '../lib/format';
 import { useStaffRole } from '../lib/session';
 import { WarmupSection } from './WarmupSection';
 import {
+  AccessNotice,
+  accessProblem,
   Alert,
   Button,
   ConfirmDialog,
@@ -27,6 +29,7 @@ import {
   StatusBadge,
   Tag,
   TextField,
+  retryServerErrors,
   type Column,
   type Tone,
 } from '../ui';
@@ -344,13 +347,11 @@ export function EmailSettingsPage() {
   const domains = useQuery({
     queryKey: [...DOMAINS_KEY, role],
     queryFn: listDomains,
-    // A 4xx answer (no session, wrong role) will not change on retry.
-    retry: (failures, error) => !(error instanceof ApiError && error.status < 500) && failures < 1,
+    retry: retryServerErrors,
   });
   const data = domains.data;
 
-  const unauthorized = domains.error instanceof ApiError && domains.error.status === 401;
-  const forbidden = unauthorized || (domains.error instanceof ApiError && domains.error.status === 403);
+  const access = accessProblem(domains.error);
 
   return (
     <>
@@ -359,24 +360,15 @@ export function EmailSettingsPage() {
         accent="settings"
         description="Sending domains and their DNS records, checked live against public DNS."
       />
-      {forbidden ? (
-        <section className="card">
-          {unauthorized ? (
-            <EmptyState title="Sign-in is not available yet" icon={<LockSimple size={28} weight="bold" aria-hidden />}>
-              Staff sign-in arrives with the Core Engine. Until then this API only accepts mock roles where
-              ALLOW_MOCK_SIGN_IN is on (local development).
-            </EmptyState>
-          ) : (
-            <EmptyState title="Email settings are for admins and marketing managers" icon={<LockSimple size={28} weight="bold" aria-hidden />}>
-              Your role cannot view sending domains. Ask an admin if you need access.
-            </EmptyState>
-          )}
-        </section>
+      {access ? (
+        <AccessNotice problem={access} title="Email settings are for admins and marketing managers">
+          Your role cannot view sending domains. Ask an admin if you need access.
+        </AccessNotice>
       ) : (
         <div className="stack stack--lg">
           {canManage && <AddDomainForm />}
           {domains.isPending && <SkeletonCard />}
-          {domains.isError && !forbidden && (
+          {domains.isError && !access && (
             <Alert
               tone="danger"
               title="Sending domains could not be loaded"

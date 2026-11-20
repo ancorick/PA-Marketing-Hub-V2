@@ -1,0 +1,36 @@
+import type { Contact, ContactStatus, ContactType, Language } from './api';
+import type { Tone } from '../ui';
+
+export const LANGUAGE_LABEL: Record<Language, string> = { hy: 'Armenian', en: 'English', ru: 'Russian' };
+
+export const TYPE_LABEL: Record<ContactType, string> = {
+  subscriber: 'Subscriber',
+  lead: 'Lead',
+  applicant: 'Applicant',
+  student: 'Student',
+  alumnus: 'Alumnus',
+};
+
+export const STATUS: Record<ContactStatus, { tone: Tone; label: string }> = {
+  active: { tone: 'success', label: 'Active' },
+  unsubscribed: { tone: 'neutral', label: 'Unsubscribed' },
+  bounced: { tone: 'danger', label: 'Bounced' },
+  complained: { tone: 'danger', label: 'Complained' },
+  erased: { tone: 'neutral', label: 'Erased' },
+};
+
+export const options = <K extends string>(labels: Record<K, string>) =>
+  (Object.entries(labels) as [K, string][]).map(([value, label]) => ({ value, label }));
+
+/** "Anna Petrosyan", or null when the contact has no name. */
+export function fullName(contact: Pick<Contact, 'firstName' | 'lastName'>): string | null {
+  const name = [contact.firstName, contact.lastName].filter(Boolean).join(' ');
+  return name === '' ? null : name;
+}
+
+/** Calendar date in Yerevan, the Academy's calendar: "2026-03-01". Matches what the API reads back. */
+export function yerevanDate(iso: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yerevan' }).format(new Date(iso));
+}
+
+export const contactPath = (id: string) => `#/audience/contacts/${encodeURIComponent(id)}`;
