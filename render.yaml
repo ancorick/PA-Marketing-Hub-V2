@@ -1,0 +1,45 @@
+# Render Blueprint: deploys only backend/ (Fastify API). Frontend lives on Netlify (netlify.toml).
+# Database: Neon Postgres (free, Frankfurt), not Render Postgres; DATABASE_URL is entered in the dashboard.
+#
+# Free plan limits (development only): the service sleeps after 15 min without traffic and takes
+# ~1 min to wake. Before the first real send move to an always-on plan (PRD 14.4: unsubscribe 99.9%,
+# webhooks < 1 min, scheduled sends and the nightly pipeline need a service that does not sleep).
+
+services:
+  - type: web
+    name: marketing-hub-api
+    runtime: node
+    rootDir: backend
+    plan: free
+    region: frankfurt
+    # --include=dev: TypeScript and build tools are devDependencies; NODE_ENV=production would skip them.
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: EMAIL_ADAPTER
+        value: log
+      - key: INTEGRATIONS_MODE
+        value: mock
+      # Netlify site URL(s), comma-separated, e.g. https://<site>.netlify.app
+      - key: CORS_ORIGINS
+        sync: false
+      # Neon connection string with sslmode=require
+      - key: DATABASE_URL
+        sync: false
+
+  # Nightly analytics pipeline (PRD 9.2, NFR-F6, 07:00 Yerevan = 03:00 UTC) is added in phase 3
+  # as a cron service (cron jobs are paid on Render), for example:
+  # - type: cron
+  #   name: marketing-hub-etl
+  #   runtime: node
+  #   rootDir: backend
+  #   schedule: "0 3 * * *"
+  #   buildCommand: npm ci --include=dev && npm run build
+  #   startCommand: node dist/jobs/nightly-pipeline.js
