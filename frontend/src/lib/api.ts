@@ -69,13 +69,27 @@ export type SendingDomain = {
   canSendMarketing: boolean;
   blockedReason: string | null;
   dmarcPolicy: 'none' | 'quarantine' | 'reject' | null;
-  warmupStage: number;
+  warmup: Warmup;
   esp: { provider: string; placeholder: boolean };
   records: DomainRecord[];
   lastCheckedAt: string | null;
   verifiedAt: string | null;
   createdAt: string;
 };
+
+/** EML-08: the plan, today's cap and how much of it is used. */
+export type Warmup = {
+  status: 'not_started' | 'active' | 'complete' | 'skipped';
+  days: number;
+  day: number | null;
+  todayCap: number | null;
+  sentToday: number;
+  plan: number[];
+  startedAt: string | null;
+  skippedAt: string | null;
+};
+
+export type WarmupLength = 14 | 21 | 28;
 
 export const listDomains = () => apiFetch<{ domains: SendingDomain[] }>('/api/email/domains');
 
@@ -84,6 +98,12 @@ export const addDomain = (domain: string) =>
 
 export const verifyDomain = (id: string) =>
   apiFetch<SendingDomain>(`/api/email/domains/${encodeURIComponent(id)}/verify`, { method: 'POST' });
+
+export const updateWarmup = (id: string, change: { days: WarmupLength } | { skip: true }) =>
+  apiFetch<SendingDomain>(`/api/email/domains/${encodeURIComponent(id)}/warmup`, {
+    method: 'PATCH',
+    body: JSON.stringify(change),
+  });
 
 export const removeDomain = (id: string) =>
   apiFetch<void>(`/api/email/domains/${encodeURIComponent(id)}`, { method: 'DELETE' });

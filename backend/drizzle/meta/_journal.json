@@ -8,6 +8,20 @@
       "when": 1795195443166,
       "tag": "0000_sending_domains",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795207751673,
+      "tag": "0001_drop_warmup_stage",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795207762604,
+      "tag": "0002_warmup_plan",
+      "breakpoints": true
     }
   ]
 }

@@ -18,14 +18,26 @@ export const STAFF_ROLES: { value: StaffRole; label: string }[] = [
  */
 const STORAGE_KEY = 'mh-mock-role';
 const listeners = new Set<() => void>();
+/** Fallback when the browser blocks storage (sandboxed frames, strict privacy settings). */
+let memoryRole: StaffRole = 'admin';
 
 function read(): StaffRole {
-  const saved = sessionStorage.getItem(STORAGE_KEY);
+  let saved: string | null = memoryRole;
+  try {
+    saved = sessionStorage.getItem(STORAGE_KEY) ?? memoryRole;
+  } catch {
+    // storage blocked: keep the in-memory role
+  }
   return STAFF_ROLES.some((role) => role.value === saved) ? (saved as StaffRole) : 'admin';
 }
 
 export function setMockRole(role: StaffRole) {
-  sessionStorage.setItem(STORAGE_KEY, role);
+  memoryRole = role;
+  try {
+    sessionStorage.setItem(STORAGE_KEY, role);
+  } catch {
+    // storage blocked: the in-memory role is used for this page load
+  }
   listeners.forEach((listener) => listener());
 }
 

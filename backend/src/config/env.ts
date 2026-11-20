@@ -27,6 +27,8 @@ const envSchema = z.object({
     .optional()
     .transform((value) => (value && value.trim().length > 0 ? value.trim() : undefined))
     .pipe(z.email().optional()),
+  // Accept the public "mock-<role>" staff tokens. Default: on, except NODE_ENV=production.
+  ALLOW_MOCK_SIGN_IN: z.enum(['true', 'false']).optional(),
   // How old a "verified" verdict may be before a marketing send re-checks DNS live (EML-03).
   DOMAIN_RECHECK_MINUTES: z.coerce.number().int().min(1).max(1440).default(60),
 });
@@ -41,6 +43,8 @@ export type AppConfig = {
   integrationsMode: 'mock';
   dmarcReportEmail: string | undefined;
   domainRecheckMinutes: number;
+  /** Mock sign-in with fixed tokens; never on in production unless explicitly enabled. */
+  allowMockSignIn: boolean;
 };
 
 /** Reads and validates configuration; fails fast with a readable message on bad values. */
@@ -63,5 +67,8 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     integrationsMode: env.INTEGRATIONS_MODE,
     dmarcReportEmail: env.DMARC_REPORT_EMAIL,
     domainRecheckMinutes: env.DOMAIN_RECHECK_MINUTES,
+    allowMockSignIn:
+      env.INTEGRATIONS_MODE === 'mock' &&
+      (env.ALLOW_MOCK_SIGN_IN === undefined ? env.NODE_ENV !== 'production' : env.ALLOW_MOCK_SIGN_IN === 'true'),
   };
 }

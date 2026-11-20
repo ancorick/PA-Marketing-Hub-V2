@@ -10,22 +10,23 @@ export class SendBlockedError extends Error {
   }
 }
 
-type MarketingSendPolicy = { checkMarketingSend(domain: string): Promise<SendVerdict> };
+type MarketingSendPolicy = { authorizeMarketingSend(domain: string): Promise<SendVerdict> };
 
 /**
  * EML-03: wraps the ESP adapter so no marketing email leaves from a domain that does not pass
- * SPF, DKIM and DMARC. Every sending path (campaigns, newsletter, test sends) goes through it.
+ * SPF, DKIM and DMARC, and (EML-08) none goes past the domain's warm-up cap for the day. Every sending path (campaigns, newsletter, test sends) goes through it.
  * Transactional mail is not governed by Marketing Hub (PRD 3.4) and passes through unchanged.
  */
 export function guardMarketingSends(adapter: EmailAdapter, policy: MarketingSendPolicy): EmailAdapter {
   return {
     name: adapter.name,
     registerDomain: (domain) => adapter.registerDomain(domain),
+    deregisterDomain: (domain) => adapter.deregisterDomain(domain),
     async send(message) {
       if (message.stream === 'marketing') {
         const domain = fromDomain(message.from);
         if (!domain) throw new SendBlockedError(`"${message.from}" has no sender domain`);
-        const verdict = await policy.checkMarketingSend(domain);
+        const verdict = await policy.authorizeMarketingSend(domain);
         if (!verdict.allowed) throw new SendBlockedError(verdict.reason);
       }
       return adapter.send(message);

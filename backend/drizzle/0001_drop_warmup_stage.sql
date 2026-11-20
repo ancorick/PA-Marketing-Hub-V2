@@ -1,0 +1,1 @@
+ALTER TABLE "sending_domains" DROP COLUMN "warmup_stage";

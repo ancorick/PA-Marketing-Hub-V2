@@ -1,9 +1,11 @@
 import type { FastifyInstance } from 'fastify';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createIntegrations } from '../src/integrations/index.js';
 import type { MockCoreEngineClient } from '../src/integrations/core-engine/mock.js';
 import type { DomainView } from '../src/domains/service.js';
-import { bearer, buildTestApp, FakeDns, publishPlaceholderRecords } from './helpers.js';
+import { buildApp } from '../src/app.js';
+import { LogEmailAdapter } from '../src/email/log-adapter.js';
+import { bearer, buildTestApp, FakeDns, publishPlaceholderRecords, testConfig } from './helpers.js';
 
 const DOMAIN = 'news.academy.example';
 let app: FastifyInstance;
@@ -18,6 +20,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await app.close();
 });
 
@@ -75,6 +78,10 @@ describe('domain setup (EML-02)', () => {
     ]);
   });
 
+  it('accepts internationalized TLDs in punycode', async () => {
+    expect((await addDomain('news.academy.xn--y9a3aq')).statusCode).toBe(201);
+  });
+
   it('rejects malformed and duplicate domains', async () => {
     for (const bad of ['https://news.academy.example', 'news@academy.example', 'localhost', '-bad.example', '']) {
       const response = await addDomain(bad);
@@ -83,9 +90,12 @@ describe('domain setup (EML-02)', () => {
     }
     expect((await app.inject({ method: 'POST', url: '/api/email/domains', headers: bearer('admin'), payload: {} })).statusCode).toBe(400);
     await addDomain();
+    const register = vi.spyOn(LogEmailAdapter.prototype, 'registerDomain');
     const duplicate = await addDomain('NEWS.academy.example');
     expect(duplicate.statusCode).toBe(409);
     expect(duplicate.json()).toMatchObject({ error: 'domain_exists' });
+    // The ESP is not asked to register the domain a second time.
+    expect(register).not.toHaveBeenCalled();
   });
 
   it('verifies live: action needed until SPF, DKIM and DMARC pass, then verified', async () => {
@@ -117,5 +127,62 @@ describe('domain setup (EML-02)', () => {
     expect(coreEngine.activityLog.map((entry) => entry.action)).toEqual(['sending_domain.added', 'sending_domain.removed']);
     const malformed = await app.inject({ method: 'POST', url: '/api/email/domains/not-a-uuid/verify', headers: bearer('admin') });
     expect(malformed.statusCode).toBe(404);
+  });
+});
+
+describe('warm-up settings (EML-08)', () => {
+  const patch = (id: string, payload: object, role = 'admin') =>
+    app.inject({ method: 'PATCH', url: `/api/email/domains/${id}/warmup`, headers: bearer(role), payload });
+
+  it('shows the plan and lets only admins change its length or skip it', async () => {
+    const created = (await addDomain()).json<DomainView>();
+    expect(created.warmup).toMatchObject({ status: 'not_started', days: 21, sentToday: 0, startedAt: null });
+    expect(created.warmup.plan).toHaveLength(21);
+
+    expect((await patch(created.id, { days: 14 }, 'marketing_manager')).statusCode).toBe(403);
+    const shorter = await patch(created.id, { days: 14 });
+    expect(shorter.statusCode).toBe(200);
+    expect(shorter.json<DomainView>().warmup).toMatchObject({ days: 14 });
+    expect(shorter.json<DomainView>().warmup.plan).toHaveLength(14);
+
+    for (const bad of [{ days: 10 }, {}, { skip: false }, { days: 14, extra: 1 }]) {
+      expect((await patch(created.id, bad)).statusCode, JSON.stringify(bad)).toBe(400);
+    }
+
+    const skipped = await patch(created.id, { skip: true });
+    expect(skipped.json<DomainView>().warmup).toMatchObject({ status: 'skipped', todayCap: null });
+    expect(skipped.json<DomainView>().warmup.skippedAt).not.toBeNull();
+    const locked = await patch(created.id, { days: 28 });
+    expect(locked.statusCode).toBe(409);
+    expect(locked.json()).toMatchObject({ error: 'warmup_locked' });
+
+    expect(coreEngine.activityLog.map((entry) => entry.action)).toEqual([
+      'sending_domain.added',
+      'sending_domain.warmup_changed',
+      'sending_domain.warmup_skipped',
+    ]);
+    expect((await patch('00000000-0000-4000-8000-000000000000', { days: 14 })).statusCode).toBe(404);
+  });
+});
+
+describe('domain changes when the Core Engine activity log is down', () => {
+  it('still answers with the committed change instead of an error the admin would retry', async () => {
+    vi.spyOn(coreEngine, 'writeActivityLog').mockRejectedValue(new Error('Core Engine timeout'));
+    const response = await addDomain();
+    expect(response.statusCode).toBe(201);
+    const { id } = response.json<DomainView>();
+    expect((await app.inject({ method: 'DELETE', url: `/api/email/domains/${id}`, headers: bearer('admin') })).statusCode).toBe(204);
+  });
+});
+
+describe('mock sign-in on a deployed API', () => {
+  it('rejects the public mock tokens in production unless explicitly allowed', async () => {
+    const production = await buildApp({ config: testConfig({ NODE_ENV: 'production' }), dnsResolver: new FakeDns() });
+    try {
+      const response = await production.inject({ method: 'GET', url: '/api/email/domains', headers: bearer('admin') });
+      expect(response.statusCode).toBe(401);
+    } finally {
+      await production.close();
+    }
   });
 });

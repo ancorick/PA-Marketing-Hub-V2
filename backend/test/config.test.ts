@@ -25,6 +25,13 @@ describe('loadConfig', () => {
     expect(config.port).toBe(10000);
   });
 
+  it('turns mock sign-in off in production unless explicitly allowed', () => {
+    expect(loadConfig({}).allowMockSignIn).toBe(true);
+    expect(loadConfig({ NODE_ENV: 'production' }).allowMockSignIn).toBe(false);
+    expect(loadConfig({ NODE_ENV: 'production', ALLOW_MOCK_SIGN_IN: 'true' }).allowMockSignIn).toBe(true);
+    expect(loadConfig({ ALLOW_MOCK_SIGN_IN: 'false' }).allowMockSignIn).toBe(false);
+  });
+
   it('fails fast on invalid values', () => {
     expect(() => loadConfig({ CORS_ORIGINS: 'not a url' })).toThrow(/CORS_ORIGINS/);
     expect(() => loadConfig({ EMAIL_ADAPTER: 'smtp' })).toThrow(/EMAIL_ADAPTER/);

@@ -51,4 +51,8 @@ export class LogEmailAdapter implements EmailAdapter {
       trackingTarget: 'track.esp-not-chosen.invalid',
     };
   }
+
+  async deregisterDomain(): Promise<void> {
+    // Nothing is registered anywhere in log mode.
+  }
 }

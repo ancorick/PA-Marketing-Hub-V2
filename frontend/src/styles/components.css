@@ -1911,6 +1911,11 @@ th[aria-sort='descending'] .sort-btn {
   font-weight: var(--weight-medium);
 }
 
+/* Status badges in the narrow last column stay on one line. */
+.dns-status .badge {
+  white-space: nowrap;
+}
+
 .dns-problems {
   margin: 0;
   padding-left: var(--space-4);
@@ -1935,4 +1940,55 @@ th[aria-sort='descending'] .sort-btn {
   position: relative;
   display: inline-flex;
   flex: none;
+}
+
+/* Warm-up plan (EML-08) */
+.warmup {
+  display: grid;
+  gap: var(--space-5);
+}
+
+@media (min-width: 768px) {
+  .warmup {
+    grid-template-columns: minmax(0, 1fr) minmax(12rem, 16rem);
+    align-items: start;
+  }
+}
+
+.warmup__day {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-heavy);
+  line-height: var(--leading-tight);
+}
+
+.warmup__note {
+  font-size: var(--text-sm);
+}
+
+.warmup__controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.warmup__controls .field {
+  align-self: stretch;
+}
+
+/* Decorative usage bar; the numbers next to it carry the meaning (14.5). */
+.usage-bar {
+  display: block;
+  max-inline-size: 24rem;
+  block-size: 0.5rem;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-chip);
+}
+
+.usage-bar__fill {
+  display: block;
+  block-size: 100%;
+  border-radius: inherit;
+  background: var(--color-secondary);
 }

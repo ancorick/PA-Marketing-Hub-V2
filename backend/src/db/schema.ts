@@ -1,6 +1,6 @@
 // Drizzle schema for Marketing Hub (PRD section 12). Names are logical in the PRD; physical names below.
 // Change a table here, then `npm run db:generate` (writes drizzle/*.sql) and `npm run db:migrate`.
-import { integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { date, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import type { DnsCheckResult, EspDomainIdentity } from '../domains/types.js';
 
 /** Every table has created_at and updated_at (PRD 12.4). */
@@ -31,9 +31,30 @@ export const sendingDomains = pgTable('sending_domains', {
   lastCheckedAt: timestamp('last_checked_at', { withTimezone: true }),
   /** Set while SPF, DKIM and DMARC all pass; cleared when a later check fails (EML-03). */
   verifiedAt: timestamp('verified_at', { withTimezone: true }),
-  /** Warm-up plan stage (EML-08); 0 = not started. */
-  warmupStage: integer('warmup_stage').notNull().default(0),
+  /** Warm-up plan (EML-08): length in days (14, 21 or 28). */
+  warmupDays: integer('warmup_days').notNull().default(21),
+  /** Day 1 of the plan: set when the domain first passes verification. */
+  warmupStartedAt: timestamp('warmup_started_at', { withTimezone: true }),
+  /** Set when an admin skips the plan for a domain that already has a sending reputation. */
+  warmupSkippedAt: timestamp('warmup_skipped_at', { withTimezone: true }),
   ...timestamps,
 });
 
 export type SendingDomainRow = typeof sendingDomains.$inferSelect;
+
+/**
+ * Marketing messages per domain per Yerevan calendar day, for the warm-up daily cap (EML-08).
+ * A slot is reserved atomically before each send, so concurrent batches cannot pass the cap.
+ */
+export const domainDailySends = pgTable(
+  'domain_daily_sends',
+  {
+    domainId: uuid('domain_id')
+      .notNull()
+      .references(() => sendingDomains.id, { onDelete: 'cascade' }),
+    day: date('day').notNull(),
+    sent: integer('sent').notNull().default(0),
+    ...timestamps,
+  },
+  (table) => [primaryKey({ columns: [table.domainId, table.day] })],
+);

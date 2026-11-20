@@ -73,13 +73,15 @@ export async function buildApp({
   });
 
   const espAdapter = email ?? createEmailAdapter(config.emailAdapter, app.log);
-  const resolvedIntegrations = integrations ?? createIntegrations(config.integrationsMode);
+  const resolvedIntegrations =
+    integrations ?? createIntegrations(config.integrationsMode, { allowMockSignIn: config.allowMockSignIn });
 
   // Without DATABASE_URL (local work) domains live in memory until restart.
   const domains = new DomainService({
     repository: domainRepository ?? (database ? new DrizzleDomainRepository(database.db) : new InMemoryDomainRepository()),
     resolver: dnsResolver ?? createDnsResolver(),
     email: espAdapter,
+    logger: app.log,
     coreEngine: resolvedIntegrations.coreEngine,
     dmarcReportEmail: config.dmarcReportEmail,
     recheckAfterMs: config.domainRecheckMinutes * 60_000,

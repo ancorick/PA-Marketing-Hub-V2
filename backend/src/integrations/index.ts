@@ -17,12 +17,15 @@ export type Integrations = {
  * Builds the clients for Projects 1, 2 and 11. Only "mock" exists today;
  * an "http" mode is added per project once its API is available (manual task 7).
  */
-export function createIntegrations(mode: AppConfig['integrationsMode']): Integrations {
+export function createIntegrations(
+  mode: AppConfig['integrationsMode'],
+  options: { allowMockSignIn?: boolean } = {},
+): Integrations {
   switch (mode) {
     case 'mock':
       return {
         mode,
-        coreEngine: new MockCoreEngineClient(),
+        coreEngine: new MockCoreEngineClient({ acceptStaffTokens: options.allowMockSignIn ?? true }),
         navigatorCrm: new MockNavigatorCrmClient(),
         alumniTracker: new MockAlumniTrackerClient(),
       };

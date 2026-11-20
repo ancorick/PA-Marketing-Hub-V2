@@ -13,16 +13,19 @@ function setup() {
   const dns = new FakeDns();
   const logger = { info: vi.fn() };
   const esp = createEmailAdapter('log', logger);
+  const repository = new InMemoryDomainRepository();
   const domains = new DomainService({
-    repository: new InMemoryDomainRepository(),
+    repository,
     resolver: dns,
     email: esp,
+    logger: { error: vi.fn() },
     coreEngine: { writeActivityLog: async () => {} },
     recheckAfterMs: 60 * 60_000,
     now: () => now,
   });
   return {
     dns,
+    repository,
     logger,
     domains,
     email: guardMarketingSends(esp, domains),
@@ -48,6 +51,15 @@ describe('marketing send gate (EML-03)', () => {
     expect(fromDomain('Academy <News@News.Academy.Example>')).toBe(DOMAIN);
     expect(fromDomain(`news@${DOMAIN}`)).toBe(DOMAIN);
     expect(fromDomain('no-address')).toBeNull();
+  });
+
+  it('ignores addresses inside a quoted display name and refuses several addresses', () => {
+    expect(fromDomain('"Academy <news@news.verified.am>" <promo@unverified.am>')).toBe('unverified.am');
+    expect(fromDomain('"Escaped \\" <x@a.am>" <promo@unverified.am>')).toBe('unverified.am');
+    expect(fromDomain('Academy <news@a.am>, promo@b.am')).toBeNull();
+    expect(fromDomain('<news@a.am>, <promo@b.am>')).toBeNull();
+    expect(fromDomain('news@a.am, promo@b.am')).toBeNull();
+    expect(fromDomain('Academy <news@a.am')).toBeNull();
   });
 
   it('blocks marketing from an unregistered domain and from a From without a domain', async () => {
@@ -94,6 +106,72 @@ describe('marketing send gate (EML-03)', () => {
     await Promise.all(Array.from({ length: 20 }, () => email.send(message())));
     // SPF, its include, DKIM key and DMARC: one check, not twenty.
     expect(lookups.mock.calls.length).toBeLessThanOrEqual(4);
+  });
+
+  it('keeps a verified verdict when DNS lookups fail, and checks again on the next send', async () => {
+    const { email, domains, dns, advance } = setup();
+    await domains.add(DOMAIN, ADMIN);
+    publishPlaceholderRecords(dns, DOMAIN);
+    await expect(email.send(message())).resolves.toBeDefined();
+    const [verified] = await domains.list();
+
+    advance(61);
+    dns.failing.add(`_dmarc.${DOMAIN}`);
+    await expect(email.send(message())).resolves.toBeDefined();
+    const [afterTimeout] = await domains.list();
+    expect(afterTimeout).toMatchObject({ canSendMarketing: true, verifiedAt: verified!.verifiedAt, lastCheckedAt: verified!.lastCheckedAt });
+    expect(afterTimeout!.records.find((record) => record.kind === 'dmarc')?.status).toBe('error');
+
+    // The DNS server recovers and the record is really gone: the next send sees it.
+    dns.failing.clear();
+    dns.txt.delete(`_dmarc.${DOMAIN}`);
+    await expect(email.send(message())).rejects.toThrow('DMARC does not pass verification');
+  });
+
+  it('never trusts a stale verdict for a domain removed while it was being re-checked', async () => {
+    const { email, domains, dns, repository, advance } = setup();
+    const { id } = await domains.add(DOMAIN, ADMIN);
+    publishPlaceholderRecords(dns, DOMAIN);
+    await domains.verify(id);
+    advance(61);
+    const resolveTxt = dns.resolveTxt.bind(dns);
+    vi.spyOn(dns, 'resolveTxt').mockImplementation(async (host) => {
+      await repository.delete(id);
+      return resolveTxt(host);
+    });
+    await expect(email.send(message())).rejects.toThrow('is not a registered sending domain');
+  });
+
+  it('starts the warm-up on first verification and stops at the daily cap (EML-08)', async () => {
+    const { email, domains, dns, advance } = setup();
+    const { id } = await domains.add(DOMAIN, ADMIN);
+    publishPlaceholderRecords(dns, DOMAIN);
+    const verified = await domains.verify(id);
+    expect(verified?.warmup).toMatchObject({ status: 'active', day: 1, todayCap: 50, sentToday: 0 });
+    expect(await domains.remainingToday(DOMAIN)).toBe(50);
+
+    const results = await Promise.allSettled(Array.from({ length: 60 }, () => email.send(message())));
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(50);
+    const rejected = results.find((result) => result.status === 'rejected') as PromiseRejectedResult;
+    expect(rejected.reason).toBeInstanceOf(SendBlockedError);
+    expect(rejected.reason.message).toMatch(/warm-up day 1 of 21, today's cap of 50 marketing emails is reached/);
+    expect(await domains.remainingToday(DOMAIN)).toBe(0);
+    // Transactional mail is not counted against the cap.
+    await expect(email.send(message({ stream: 'transactional' }))).resolves.toBeDefined();
+
+    advance(24 * 60);
+    expect((await domains.get(id))?.warmup).toMatchObject({ day: 2, sentToday: 0 });
+    await expect(email.send(message())).resolves.toBeDefined();
+  });
+
+  it('lets marketing flow without a cap once the plan is skipped', async () => {
+    const { email, domains, dns } = setup();
+    const { id } = await domains.add(DOMAIN, ADMIN);
+    publishPlaceholderRecords(dns, DOMAIN);
+    await domains.verify(id);
+    await domains.updateWarmup(id, { skip: true }, ADMIN);
+    await Promise.all(Array.from({ length: 60 }, () => email.send(message())));
+    expect(await domains.remainingToday(DOMAIN)).toBeNull();
   });
 
   it('does not gate transactional mail', async () => {

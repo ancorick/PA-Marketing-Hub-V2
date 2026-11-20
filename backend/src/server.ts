@@ -4,9 +4,25 @@ import { createDatabase } from './db/client.js';
 
 const config = loadConfig();
 const database = config.databaseUrl ? createDatabase(config.databaseUrl) : undefined;
-// Render free has no pre-deploy step, so pending migrations run on boot (drizzle tracks applied ones).
-await database?.migrate();
 const app = await buildApp({ config, database });
+
+/**
+ * Render free has no pre-deploy step, so pending migrations run on boot (drizzle tracks applied ones).
+ * A cold or unreachable database must not crash the service: /api/health reports "degraded" while
+ * failed migrations retry in the background with backoff (30 s doubling to 5 min).
+ */
+async function migrate(delayMs = 30_000): Promise<void> {
+  if (!database) return;
+  try {
+    await database.migrate();
+    app.log.info('database migrations applied');
+  } catch (error) {
+    app.log.error({ err: error, retryInMs: delayMs }, 'database migrations failed; retrying');
+    setTimeout(() => void migrate(Math.min(delayMs * 2, 300_000)), delayMs).unref();
+  }
+}
+// The first attempt runs before listening, so requests never meet a half-migrated schema.
+await migrate();
 
 if (!database) app.log.warn('DATABASE_URL is not set: running without a database');
 if (config.integrationsMode === 'mock') {

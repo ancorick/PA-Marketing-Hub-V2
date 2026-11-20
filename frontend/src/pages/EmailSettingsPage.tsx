@@ -14,6 +14,7 @@ import {
 } from '../lib/api';
 import { formatDate } from '../lib/format';
 import { useStaffRole } from '../lib/session';
+import { WarmupSection } from './WarmupSection';
 import {
   Alert,
   Button,
@@ -65,7 +66,7 @@ const formatTime = (iso: string) => formatDate(iso, undefined, { timeStyle: 'sho
 function RecordStatus({ record }: { record: DomainRecord }) {
   const status = CHECK[record.status];
   return (
-    <div className="stack stack--xs">
+    <div className="stack stack--xs dns-status">
       <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
       {record.problems.length > 0 && (
         <ul className="dns-problems">
@@ -239,10 +240,11 @@ function DomainCard({ domain, canManage }: { domain: SendingDomain; canManage: b
         appear. Raise DMARC from <code>p=none</code> to quarantine after two clean weeks of reports (PRD 7.2).
       </p>
 
+      <WarmupSection domain={domain} canManage={canManage} onUpdated={replace} />
+
       <ConfirmDialog
         open={confirmRemove}
         title={`Remove ${domain.domain}?`}
-        affected={{ count: 0, noun: 'scheduled sends' }}
         confirmLabel="Remove domain"
         busy={remove.isPending}
         onConfirm={() => remove.mutate()}
@@ -251,6 +253,7 @@ function DomainCard({ domain, canManage }: { domain: SendingDomain; canManage: b
         <p>
           Marketing Hub stops sending from {domain.domain} and forgets its DNS check results. The records at your DNS
           host stay as they are; remove them there if the domain is no longer used.
+          {/* When campaigns exist (phase 1), show the number of scheduled sends from this domain here. */}
         </p>
         {remove.isError && (
           <Alert tone="danger" title="Could not remove the domain">
@@ -331,17 +334,23 @@ function AddDomainForm() {
 
 /**
  * Email settings (PRD 13.6): sending domains with the exact DNS records and their live status (EML-02),
- * and whether marketing email may leave from each domain (EML-03). Warm-up (EML-08) and the kill switch
- * (EML-14) join this screen later. Admins manage domains; marketing managers view and re-check.
+ * whether marketing email may leave from each domain (EML-03) and its warm-up plan (EML-08).
+ * The kill switch (EML-14) joins this screen later. Admins manage domains; marketing managers view and re-check.
  */
 export function EmailSettingsPage() {
   const role = useStaffRole();
   const canManage = role === 'admin';
   // The role is part of the key: switching the mock role refetches with the new token.
-  const domains = useQuery({ queryKey: [...DOMAINS_KEY, role], queryFn: listDomains, retry: 1 });
+  const domains = useQuery({
+    queryKey: [...DOMAINS_KEY, role],
+    queryFn: listDomains,
+    // A 4xx answer (no session, wrong role) will not change on retry.
+    retry: (failures, error) => !(error instanceof ApiError && error.status < 500) && failures < 1,
+  });
   const data = domains.data;
 
-  const forbidden = domains.error instanceof ApiError && (domains.error.status === 403 || domains.error.status === 401);
+  const unauthorized = domains.error instanceof ApiError && domains.error.status === 401;
+  const forbidden = unauthorized || (domains.error instanceof ApiError && domains.error.status === 403);
 
   return (
     <>
@@ -352,9 +361,16 @@ export function EmailSettingsPage() {
       />
       {forbidden ? (
         <section className="card">
-          <EmptyState title="Email settings are for admins and marketing managers" icon={<LockSimple size={28} weight="bold" aria-hidden />}>
-            Your role cannot view sending domains. Ask an admin if you need access.
-          </EmptyState>
+          {unauthorized ? (
+            <EmptyState title="Sign-in is not available yet" icon={<LockSimple size={28} weight="bold" aria-hidden />}>
+              Staff sign-in arrives with the Core Engine. Until then this API only accepts mock roles where
+              ALLOW_MOCK_SIGN_IN is on (local development).
+            </EmptyState>
+          ) : (
+            <EmptyState title="Email settings are for admins and marketing managers" icon={<LockSimple size={28} weight="bold" aria-hidden />}>
+              Your role cannot view sending domains. Ask an admin if you need access.
+            </EmptyState>
+          )}
         </section>
       ) : (
         <div className="stack stack--lg">

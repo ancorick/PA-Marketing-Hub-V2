@@ -109,11 +109,17 @@ async function checkSpf(resolver: DnsResolver, record: ExpectedRecord, spfInclud
   const terms = spf.trim().toLowerCase().split(/\s+/);
   const problems: string[] = [];
   const include = spfInclude.toLowerCase();
-  // `redirect=` to the ESP's record authorizes it just like `include:`.
-  if (!terms.some((term) => term.replace(/^\+/, '') === `include:${include}` || term === `redirect=${include}`)) {
-    problems.push(`Does not authorize the email service: add include:${spfInclude}`);
+  // Receivers evaluate left to right and stop at "all", so the include must come before it;
+  // redirect= is ignored when the record has an "all" term (RFC 7208 §6.1).
+  const allIndex = terms.findIndex((term) => /^[+\-~?]?all$/.test(term));
+  const beforeAll = allIndex === -1 ? terms : terms.slice(0, allIndex);
+  const authorized =
+    beforeAll.some((term) => term.replace(/^\+/, '') === `include:${include}`) ||
+    (allIndex === -1 && terms.includes(`redirect=${include}`));
+  if (!authorized) {
+    problems.push(`Does not authorize the email service: add include:${spfInclude} before the "all" rule`);
   }
-  const all = terms.find((term) => /^[+\-~?]?all$/.test(term));
+  const all = allIndex === -1 ? undefined : terms[allIndex];
   if (!all && !terms.some((term) => term.startsWith('redirect='))) {
     problems.push('Must end with -all (or ~all) so other servers cannot send as this domain');
   } else if (all && !['-all', '~all'].includes(all)) {

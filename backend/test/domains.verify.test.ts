@@ -111,6 +111,15 @@ describe('live DNS check (EML-02)', () => {
       expect(await problemsOf(dns, 'spf')).toEqual([]);
     });
 
+    it('requires the ESP include before the "all" rule, and ignores redirect= next to "all"', async () => {
+      expect(await problemsOf(publishAll().setTxt(DOMAIN, 'v=spf1 -all include:spf.esp.example'), 'spf')).toEqual([
+        expect.stringMatching(/before the "all" rule/),
+      ]);
+      expect(await problemsOf(publishAll().setTxt(DOMAIN, 'v=spf1 redirect=spf.esp.example -all'), 'spf')).toEqual([
+        expect.stringMatching(/Does not authorize the email service/),
+      ]);
+    });
+
     it('accepts a soft fail (~all)', async () => {
       const dns = publishAll().setTxt(DOMAIN, 'v=spf1 include:spf.esp.example ~all');
       expect(await problemsOf(dns, 'spf')).toEqual([]);

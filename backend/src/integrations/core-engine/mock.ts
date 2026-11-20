@@ -30,7 +30,14 @@ export class MockCoreEngineClient implements CoreEngineClient {
   /** Entries written by Marketing Hub, kept for inspection in tests. */
   readonly activityLog: ActivityLogEntry[] = [];
 
+  /**
+   * acceptStaffTokens=false rejects every "mock-<role>" token: the fixed tokens are public, so on a
+   * deployed API they would let anyone act as admin (ALLOW_MOCK_SIGN_IN, off in production by default).
+   */
+  constructor(private readonly options: { acceptStaffTokens: boolean } = { acceptStaffTokens: true }) {}
+
   async verifyStaffToken(token: string): Promise<StaffSession | null> {
+    if (!this.options.acceptStaffTokens) return null;
     const role = ROLES.find((candidate) => token === mockStaffToken(candidate));
     if (!role) return null;
     return { userId: `staff-${role}`, email: `${role}@staff.example.test`, name: `Mock ${role}`, roles: [role] };

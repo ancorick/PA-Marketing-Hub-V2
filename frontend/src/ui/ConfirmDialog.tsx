@@ -8,8 +8,8 @@ type ConfirmDialogProps = {
   title: string;
   /** Exactly what will happen (PRD 13.7). */
   children: ReactNode;
-  /** How many people are affected; always shown. */
-  affected: { count: number; noun: string };
+  /** How many people are affected. Required whenever people are affected; omit only when none can be. */
+  affected?: { count: number; noun: string };
   /** Repeats the verb: "Send to 1,240 contacts". */
   confirmLabel: string;
   tone?: 'primary' | 'danger';
@@ -61,9 +61,11 @@ export function ConfirmDialog({
         <h2 id={titleId}>{title}</h2>
         <div id={descId} className="stack">
           <div>{children}</div>
-          <p className="dialog__impact">
-            Affects <strong className="num">{formatNumber(affected.count, locale)}</strong> {affected.noun}.
-          </p>
+          {affected && (
+            <p className="dialog__impact">
+              Affects <strong className="num">{formatNumber(affected.count, locale)}</strong> {affected.noun}.
+            </p>
+          )}
         </div>
       </div>
       <div className="dialog__actions">

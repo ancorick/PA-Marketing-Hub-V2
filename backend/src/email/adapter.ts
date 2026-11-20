@@ -47,4 +47,6 @@ export interface EmailAdapter {
   send(message: EmailMessage): Promise<EmailSendResult>;
   /** Registers a sending domain with the ESP and returns the DNS records it expects. */
   registerDomain(domain: string): Promise<EspDomainIdentity>;
+  /** Removes a sending domain from the ESP, so no identity is left behind when it is removed here. */
+  deregisterDomain(domain: string): Promise<void>;
 }

@@ -32,7 +32,7 @@ afterAll(async () => {
 describe('DrizzleDomainRepository on the migrated schema', () => {
   it('stores, finds, updates and deletes a sending domain', async () => {
     const created = await repository.insert({ domain: 'news.academy.example', espIdentity: identity });
-    expect(created).toMatchObject({ spfStatus: 'pending', warmupStage: 0, verifiedAt: null, espIdentity: identity });
+    expect(created).toMatchObject({ spfStatus: 'pending', warmupDays: 21, warmupStartedAt: null, verifiedAt: null, espIdentity: identity });
     expect(await repository.findByDomain('news.academy.example')).toEqual(created);
 
     const checkedAt = new Date('2026-11-20T10:00:00Z');
@@ -46,6 +46,7 @@ describe('DrizzleDomainRepository on the migrated schema', () => {
       lastCheck,
       lastCheckedAt: checkedAt,
       verifiedAt: checkedAt,
+      warmupStartedAt: checkedAt,
     });
     expect(updated).toMatchObject({ spfStatus: 'verified', trackingStatus: 'missing', lastCheck, verifiedAt: checkedAt });
     expect(await repository.list()).toHaveLength(1);
@@ -60,5 +61,29 @@ describe('DrizzleDomainRepository on the migrated schema', () => {
     await expect(repository.insert({ domain: 'mail.academy.example', espIdentity: identity })).rejects.toBeInstanceOf(
       DuplicateDomainError,
     );
+  });
+});
+
+describe('warm-up on the migrated schema (EML-08)', () => {
+  it('never lets concurrent reservations pass the daily cap', async () => {
+    const domain = await repository.insert({ domain: 'warm.academy.example', espIdentity: identity });
+    const results = await Promise.all(Array.from({ length: 25 }, () => repository.reserveDailySend(domain.id, '2026-11-21', 10)));
+    expect(results.filter(Boolean)).toHaveLength(10);
+    expect(await repository.sentOn(domain.id, '2026-11-21')).toBe(10);
+    // A new day starts from zero.
+    expect(await repository.reserveDailySend(domain.id, '2026-11-22', 10)).toBe(true);
+    expect(await repository.sentOn(domain.id, '2026-11-22')).toBe(1);
+  });
+
+  it('stores plan changes and drops counters with the domain', async () => {
+    const domain = await repository.insert({ domain: 'plan.academy.example', espIdentity: identity });
+    const skippedAt = new Date('2026-11-21T08:00:00Z');
+    expect(await repository.updateWarmup(domain.id, { warmupDays: 14, warmupSkippedAt: skippedAt })).toMatchObject({
+      warmupDays: 14,
+      warmupSkippedAt: skippedAt,
+    });
+    await repository.reserveDailySend(domain.id, '2026-11-21', 5);
+    await repository.delete(domain.id);
+    expect(await repository.sentOn(domain.id, '2026-11-21')).toBe(0);
   });
 });
