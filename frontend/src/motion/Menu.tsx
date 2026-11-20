@@ -9,7 +9,20 @@ export type MenuItem = { label: string; icon?: ReactNode; onSelect: () => void; 
  * arrows move, Home/End jump, Escape closes and returns focus, Tab or a click outside closes.
  * Grows from the trigger (scale + fade), exit faster than enter.
  */
-export function Menu({ label, trigger, items }: { label: string; trigger: ReactNode; items: MenuItem[] }) {
+export function Menu({
+  label,
+  trigger,
+  items,
+  triggerLabel,
+  iconOnly = false,
+}: {
+  label: string;
+  trigger: ReactNode;
+  items: MenuItem[];
+  /** Accessible name for an icon-only trigger. */
+  triggerLabel?: string;
+  iconOnly?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -66,7 +79,9 @@ export function Menu({ label, trigger, items }: { label: string; trigger: ReactN
       <button
         ref={buttonRef}
         type="button"
-        className="btn btn--secondary"
+        className={iconOnly ? 'btn btn--secondary btn--icon' : 'btn btn--secondary'}
+        aria-label={triggerLabel}
+        title={triggerLabel}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}

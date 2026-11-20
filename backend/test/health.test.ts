@@ -29,6 +29,7 @@ describe('GET /api/health', () => {
         ping: async () => {
           throw new Error('connection refused');
         },
+        migrate: async () => {},
         close: async () => {},
       },
     });

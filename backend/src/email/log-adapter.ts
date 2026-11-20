@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { EmailAdapter, EmailMessage, EmailSendResult } from './adapter.js';
+import type { EmailAdapter, EmailMessage, EmailSendResult, EspDomainIdentity } from './adapter.js';
 
 type Logger = { info: (obj: object, msg: string) => void };
 
@@ -35,5 +35,20 @@ export class LogEmailAdapter implements EmailAdapter {
       'email (log adapter, not sent)',
     );
     return result;
+  }
+
+  /**
+   * No ESP is chosen yet (PRD 16.3, question 1), so the identity is a placeholder under the
+   * reserved `.invalid` TLD (RFC 2606): it can never resolve, so publishing it by mistake does nothing.
+   */
+  async registerDomain(): Promise<EspDomainIdentity> {
+    return {
+      provider: 'log',
+      placeholder: true,
+      spfInclude: 'spf.esp-not-chosen.invalid',
+      dkim: [{ selector: 'mh1', type: 'CNAME', value: 'mh1.dkim.esp-not-chosen.invalid' }],
+      trackingLabel: 'click',
+      trackingTarget: 'track.esp-not-chosen.invalid',
+    };
   }
 }

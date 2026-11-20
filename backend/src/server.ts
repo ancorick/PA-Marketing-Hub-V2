@@ -4,6 +4,8 @@ import { createDatabase } from './db/client.js';
 
 const config = loadConfig();
 const database = config.databaseUrl ? createDatabase(config.databaseUrl) : undefined;
+// Render free has no pre-deploy step, so pending migrations run on boot (drizzle tracks applied ones).
+await database?.migrate();
 const app = await buildApp({ config, database });
 
 if (!database) app.log.warn('DATABASE_URL is not set: running without a database');

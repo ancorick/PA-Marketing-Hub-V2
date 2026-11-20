@@ -25,7 +25,26 @@ export type EmailSendResult = {
   acceptedAt: Date;
 };
 
+/**
+ * What the ESP needs published in DNS for a sending domain (PRD 7.2, EML-02).
+ * Returned by the ESP when the domain is registered with it; stored on the SendingDomain.
+ */
+export type EspDomainIdentity = {
+  provider: string;
+  /** True when the values are stand-ins (no real ESP yet): they must not be published. */
+  placeholder: boolean;
+  /** Host the SPF record must `include:` to authorize the ESP's servers. */
+  spfInclude: string;
+  /** DKIM records under `<selector>._domainkey.<domain>`: CNAME to the ESP or TXT with the public key. */
+  dkim: { selector: string; type: 'TXT' | 'CNAME'; value: string }[];
+  /** Branded tracking host label (e.g. "click" → click.<domain>) and the ESP target it points to (7.1). */
+  trackingLabel: string;
+  trackingTarget: string;
+};
+
 export interface EmailAdapter {
   readonly name: string;
   send(message: EmailMessage): Promise<EmailSendResult>;
+  /** Registers a sending domain with the ESP and returns the DNS records it expects. */
+  registerDomain(domain: string): Promise<EspDomainIdentity>;
 }
