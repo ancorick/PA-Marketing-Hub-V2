@@ -636,7 +636,7 @@ export const collectIssue = (id: string) => apiFetch<Issue>(`/api/newsletter/iss
 export type BlockInput = { title?: string; body?: string; imageUrl?: string | null; imageAlt?: string | null; buttonLabel?: string | null; buttonUrl?: string | null };
 export type IssueEdit = { id: string; blockId: string | null; actorId: string; action: string; field: string | null; before: string | null; after: string | null; createdAt: string };
 const issuePath = (id: string) => `/api/newsletter/issues/${encodeURIComponent(id)}`;
-export const updateIssue = (id: string, changes: { subject?: string; preheader?: string | null }) =>
+export const updateIssue = (id: string, changes: { subject?: string; preheader?: string | null; subjectFromAi?: boolean }) =>
   apiFetch<Issue>(issuePath(id), { method: 'PATCH', body: JSON.stringify(changes) });
 export const updateBlock = (id: string, blockId: string, changes: BlockInput & { acceptAi?: boolean }) =>
   apiFetch<IssueBlock>(`${issuePath(id)}/blocks/${encodeURIComponent(blockId)}`, { method: 'PATCH', body: JSON.stringify(changes) });
@@ -649,3 +649,7 @@ export const swapBlockItem = (id: string, blockId: string, removeItemId: string,
 export const issueEdits = (id: string) => apiFetch<{ edits: IssueEdit[] }>(`${issuePath(id)}/edits`);
 export const uploadImage = (file: File) =>
   apiFetch<{ id: string; url: string; size: number; contentType: string }>('/api/uploads/images', { method: 'POST', body: file, headers: { 'Content-Type': 'application/octet-stream' } });
+
+/** NWS-07: AI writing assist (off without ANTHROPIC_API_KEY on the backend). */
+export const aiStatus = () => apiFetch<{ enabled: boolean }>('/api/newsletter/ai');
+export const aiDraftIssue = (id: string) => apiFetch<{ subjectLines: string[]; blocks: number }>(`${issuePath(id)}/ai-draft`, { method: 'POST' });

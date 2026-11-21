@@ -30,6 +30,7 @@ import { NewsletterService } from './newsletter/service.js';
 import { IssueEditor } from './newsletter/editor.js';
 import { Notifier } from './notify/notifier.js';
 import { UploadService } from './uploads/service.js';
+import { createWritingAssistant, type WritingAssistant } from './ai/writing-assistant.js';
 import { DmarcService } from './dmarc/service.js';
 import { PrivacyService } from './privacy/service.js';
 import { AlertService } from './alerts/service.js';
@@ -94,6 +95,7 @@ export type AppDeps = {
   dnsResolver?: DnsResolver;
   mailChecker?: MailDomainChecker;
   linkChecker?: LinkChecker;
+  writingAssistant?: WritingAssistant;
   /** Tests skip the pause between batches. */
   sleep?: (ms: number) => Promise<void>;
 };
@@ -107,6 +109,7 @@ export async function buildApp({
   mailChecker,
   linkChecker,
   sleep,
+  writingAssistant,
 }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
     logger: {
@@ -308,7 +311,7 @@ export async function buildApp({
       }),
   });
   const uploadService = new UploadService(database.db, config.publicApiUrl);
-  const issueEditor = new IssueEditor(database.db, newsletter);
+  const issueEditor = new IssueEditor(database.db, newsletter, writingAssistant ?? createWritingAssistant(config));
   app.decorate('issueEditor', issueEditor);
   app.decorate('uploads', uploadService);
   app.decorate('newsletter', newsletter);

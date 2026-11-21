@@ -48,6 +48,9 @@ services:
       # Slack incoming webhook for "newsletter draft ready" (NWS-04); create it in Slack (manual).
       - key: SLACK_WEBHOOK_URL
         sync: false
+      # NWS-07 AI writing assist (optional): Claude API key; empty keeps the feature off.
+      - key: ANTHROPIC_API_KEY
+        sync: false
       # Netlify site URL (public unsubscribe/preferences pages) and this service's own HTTPS URL.
       - key: PUBLIC_APP_URL
         sync: false

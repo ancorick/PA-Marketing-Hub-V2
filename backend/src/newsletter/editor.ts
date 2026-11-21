@@ -6,6 +6,7 @@ import { extractUrls } from '../sends/markup.js';
 import type { CollectedItem } from './collectors.js';
 import { itemLine, localTitle } from './draft.js';
 import { NewsletterError, type NewsletterService } from './service.js';
+import type { WritingAssistant } from '../ai/writing-assistant.js';
 
 export type BlockChanges = Partial<Pick<IssueBlockRow, 'title' | 'body' | 'imageUrl' | 'imageAlt' | 'buttonLabel' | 'buttonUrl'>>;
 
@@ -21,9 +22,51 @@ export class IssueEditor {
   constructor(
     private readonly db: AppPgDatabase,
     private readonly newsletter: NewsletterService,
+    private readonly assistant?: WritingAssistant,
   ) {}
 
-  async updateIssue(issueId: string, changes: { subject?: string; preheader?: string | null }, actorId: string) {
+  get aiEnabled() {
+    return this.assistant?.enabled ?? false;
+  }
+
+  /**
+   * NWS-07: the AI drafts an introduction for each item block and three subject lines, from the collected
+   * facts only. Blocks a person already edited are left alone; drafted blocks stay marked until accepted.
+   */
+  async aiDraft(issueId: string, actorId: string): Promise<{ subjectLines: string[]; blocks: number }> {
+    const issue = await this.editable(issueId);
+    if (!this.assistant) throw new NewsletterError('invalid_state', 'AI writing assist is not configured');
+    const language = issue.language as Language;
+    const blocks = (await this.newsletter.blocks(issueId)).filter((block) => block.itemIds.length > 0 && (block.editedBy === null || block.aiDrafted));
+    const items = await this.newsletter.itemsByIds(blocks.flatMap((block) => block.itemIds));
+    const byId = new Map(items.map((item) => [item.id, item]));
+    const facts = (block: IssueBlockRow) =>
+      block.itemIds.flatMap((id) => {
+        const item = byId.get(id);
+        if (!item) return [];
+        const details = Object.entries(item.payload)
+          .filter(([key, value]) => ['startDate', 'startsAt', 'graduates', 'role', 'company', 'seats', 'eventType', 'tags'].includes(key) && value !== null && value !== undefined)
+          .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : String(value)}`);
+        return [`${localTitle(item, language)}${details.length > 0 ? ` (${details.join('; ')})` : ''}, ${item.occurredAt.toISOString().slice(0, 10)}`];
+      });
+    const edition = new Intl.DateTimeFormat({ en: 'en-GB', hy: 'hy-AM', ru: 'ru-RU' }[language], { month: 'long', year: 'numeric', timeZone: 'Asia/Yerevan' }).format(new Date(issue.plannedSendAt));
+    const result = await this.assistant.draft({ language, edition, blocks: blocks.map((block) => ({ id: block.id, type: block.type, title: block.title, facts: facts(block) })) });
+
+    let updated = 0;
+    for (const summary of result.summaries) {
+      const block = blocks.find((candidate) => candidate.id === summary.blockId);
+      if (!block) continue;
+      const lines = block.itemIds.map((id) => byId.get(id)).filter((item): item is CollectedItem => Boolean(item)).map((item) => itemLine(item, language));
+      const body = [summary.text.replace(/[[\]]/g, ''), ...lines].join('\n\n');
+      await this.db.update(issueBlocks).set({ body, aiDrafted: true }).where(eq(issueBlocks.id, block.id));
+      await this.log(issueId, block.id, actorId, 'ai_draft', [{ field: 'body', before: block.body, after: body }]);
+      updated += 1;
+    }
+    await this.afterEdit(issueId);
+    return { subjectLines: result.subjectLines, blocks: updated };
+  }
+
+  async updateIssue(issueId: string, changes: { subject?: string; preheader?: string | null }, actorId: string, options: { subjectFromAi?: boolean } = {}) {
     const issue = await this.editable(issueId);
     const logs = [];
     if (changes.subject !== undefined && changes.subject !== issue.subject) logs.push({ field: 'subject', before: issue.subject, after: changes.subject });
@@ -31,7 +74,8 @@ export class IssueEditor {
     if (logs.length === 0) return issue;
     await this.db
       .update(issues)
-      .set({ ...changes, ...(changes.subject !== undefined && { subjectAiDrafted: false }) })
+      // A subject picked from the AI options stays marked until a person types their own (NWS-07).
+      .set({ ...changes, ...(changes.subject !== undefined && { subjectAiDrafted: options.subjectFromAi === true }) })
       .where(eq(issues.id, issueId));
     await this.log(issueId, null, actorId, 'subject', logs);
     return this.afterEdit(issueId);

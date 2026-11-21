@@ -1,8 +1,10 @@
-import { ArrowDown, ArrowUp, PencilSimple, Plus, Swap, Trash } from '@phosphor-icons/react';
+import { ArrowDown, ArrowUp, MagicWand, PencilSimple, Plus, Swap, Trash } from '@phosphor-icons/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ChangeEvent } from 'react';
 import {
   addBlock,
+  aiDraftIssue,
+  aiStatus,
   issueEdits,
   removeBlock,
   reorderBlocks,
@@ -158,6 +160,55 @@ function BlockCard({ issueId, block, index, count, items, readOnly, onMove }: { 
   );
 }
 
+/** NWS-07: AI drafts block intros and subject options; everything it writes stays marked until accepted. */
+function AiAssist({ issueId, readOnly }: { issueId: string; readOnly: boolean }) {
+  const refresh = useRefresh(issueId);
+  const status = useQuery({ queryKey: ['ai-status'], queryFn: aiStatus, staleTime: 60_000 });
+  const draft = useMutation({ mutationFn: () => aiDraftIssue(issueId), onSuccess: refresh });
+  const pick = useMutation({ mutationFn: (subject: string) => updateIssue(issueId, { subject, subjectFromAi: true }), onSuccess: refresh });
+  if (readOnly || !status.data) return null;
+  return (
+    <section className="card stack" aria-labelledby="ai-heading">
+      <div className="cluster">
+        <span className="icon-tile icon-tile--sm icon-tile--brand">
+          <MagicWand size={20} weight="bold" aria-hidden />
+        </span>
+        <h2 id="ai-heading">AI writing assist</h2>
+      </div>
+      {status.data.enabled ? (
+        <>
+          <p className="muted">
+            Drafts a short introduction for each block from its collected items, and three subject lines. Blocks you already edited are
+            left alone. AI text is marked until you edit or accept it; check every fact before approving.
+          </p>
+          <div>
+            <Button variant="secondary" icon={<MagicWand size={18} weight="bold" aria-hidden />} loading={draft.isPending} onClick={() => draft.mutate()}>
+              Draft with AI
+            </Button>
+          </div>
+          <div role="status" aria-live="polite" className="stack stack--sm">
+            {draft.isError && <Alert tone="danger" title="No AI draft">{draft.error.message}</Alert>}
+            {draft.data && (
+              <>
+                <p>{draft.data.blocks} blocks drafted. Subject options:</p>
+                <div className="cluster">
+                  {draft.data.subjectLines.map((line) => (
+                    <Button key={line} size="sm" variant="ghost" loading={pick.isPending && pick.variables === line} onClick={() => pick.mutate(line)}>
+                      {line}
+                    </Button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </>
+      ) : (
+        <p className="muted">Off: the backend has no ANTHROPIC_API_KEY. Everything else works without it.</p>
+      )}
+    </section>
+  );
+}
+
 /** NWS-05 and NWS-17 for one issue: subject, blocks, custom blocks and the edit log. */
 export function IssueEditor({ data }: { data: IssueDetail }) {
   const { issue, blocks, items } = data;
@@ -195,6 +246,7 @@ export function IssueEditor({ data }: { data: IssueDetail }) {
           </div>
         )}
       </section>
+      <AiAssist issueId={issue.id} readOnly={readOnly} />
       {reorder.isError && <Alert tone="danger" title="Order not saved">{reorder.error.message}</Alert>}
       {blocks.map((block, index) => (
         <BlockCard key={block.id} issueId={issue.id} block={block} index={index} count={blocks.length} items={items} readOnly={readOnly} onMove={move} />

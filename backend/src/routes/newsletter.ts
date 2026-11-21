@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireRole } from '../auth/staff.js';
 import { LANGUAGES } from '../contacts/fields.js';
 import type { CoreEngineClient } from '../integrations/core-engine/contract.js';
+import { AssistUnavailableError } from '../ai/writing-assistant.js';
 import type { IssueEditor } from '../newsletter/editor.js';
 import { NewsletterError, type NewsletterService } from '../newsletter/service.js';
 import { UploadError, type UploadService } from '../uploads/service.js';
@@ -24,7 +25,7 @@ const blockBody = z
 const addBody = z
   .object({ title: z.string().trim().min(1).max(200), body: z.string().max(20_000), imageUrl: optionalText(2000), imageAlt: optionalText(300), buttonLabel: optionalText(60), buttonUrl: optionalText(2000), position: z.number().int().min(0).optional() })
   .strict();
-const issueBody = z.object({ subject: z.string().trim().min(1).max(200).optional(), preheader: optionalText(200) }).strict();
+const issueBody = z.object({ subject: z.string().trim().min(1).max(200).optional(), preheader: optionalText(200), subjectFromAi: z.boolean().optional() }).strict();
 const orderBody = z.object({ blockIds: z.array(z.uuid()).min(1).max(50) }).strict();
 const swapBody = z.object({ removeItemId: z.uuid(), addItemId: z.uuid() }).strict();
 const cadenceBody = z
@@ -107,7 +108,9 @@ export async function newsletterRoutes(app: FastifyInstance, { newsletter, edito
   // Block editor (NWS-05) with the edit log (NWS-17).
   app.patch('/api/newsletter/issues/:id', { preHandler: canEdit }, withId(async (id, request, reply) => {
     const body = issueBody.safeParse(request.body);
-    return body.success ? editor.updateIssue(id, body.data, request.staff!.userId) : invalid(reply, body.error);
+    if (!body.success) return invalid(reply, body.error);
+    const { subjectFromAi, ...changes } = body.data;
+    return editor.updateIssue(id, changes, request.staff!.userId, { subjectFromAi });
   }));
   app.patch('/api/newsletter/issues/:id/blocks/:blockId', { preHandler: canEdit }, withBlock(async (id, blockId, request, reply) => {
     const body = blockBody.safeParse(request.body);
@@ -132,6 +135,16 @@ export async function newsletterRoutes(app: FastifyInstance, { newsletter, edito
   app.post('/api/newsletter/issues/:id/blocks/:blockId/swap', { preHandler: canEdit }, withBlock(async (id, blockId, request, reply) => {
     const body = swapBody.safeParse(request.body);
     return body.success ? editor.swapItem(id, blockId, body.data.removeItemId, body.data.addItemId, request.staff!.userId) : invalid(reply, body.error);
+  }));
+  // NWS-07: AI writing assist; answers 503 when no API key is configured or the AI service fails.
+  app.get('/api/newsletter/ai', { preHandler: canEdit }, async () => ({ enabled: editor.aiEnabled }));
+  app.post('/api/newsletter/issues/:id/ai-draft', { preHandler: canEdit }, withId(async (id, request, reply) => {
+    try {
+      return await editor.aiDraft(id, request.staff!.userId);
+    } catch (error) {
+      if (error instanceof AssistUnavailableError) return reply.code(503).send({ error: 'ai_unavailable', message: error.message });
+      throw error;
+    }
   }));
   app.get('/api/newsletter/issues/:id/edits', { preHandler: canEdit }, withId(async (id) => ({ edits: await editor.edits(id) })));
 
