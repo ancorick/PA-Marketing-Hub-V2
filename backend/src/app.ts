@@ -56,6 +56,7 @@ import { contactRoutes } from './routes/contacts.js';
 import { domainRoutes } from './routes/domains.js';
 import { healthRoutes } from './routes/health.js';
 import { analyticsRoutes } from './routes/analytics.js';
+import { commandCenterRoutes } from './routes/command-center.js';
 import { AnalyticsPipeline } from './analytics/pipeline.js';
 import { ChannelTaxonomy } from './analytics/taxonomy.js';
 import { LinkBuilder } from './analytics/links.js';
@@ -397,6 +398,7 @@ export async function buildApp({
   const detail = new DetailService({ db: database.db, attribution, costs });
   app.decorate('detail', detail);
   await app.register(analyticsRoutes, { pipeline, taxonomy, links: linkBuilder, costs, attribution, overview, detail, health: new DataHealth({ jobs, pipeline, taxonomy }), coreEngine: resolvedIntegrations.coreEngine });
+  await app.register(commandCenterRoutes, { overview, detail, apiKey: config.commandCenterApiKey });
   await app.register(importRoutes, { imports, duplicates, merge, contacts, contactRepository, coreEngine: resolvedIntegrations.coreEngine });
 
   return app;

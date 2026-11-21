@@ -62,6 +62,12 @@ const envSchema = z.object({
     .optional()
     .transform((value) => (value && value.trim().length > 0 ? value.trim() : undefined))
     .pipe(z.string().min(32, 'must be at least 32 characters').optional()),
+  // API key of Command Center (Project 15) for aggregate metrics (ANL-13); unset = endpoint answers 503.
+  COMMAND_CENTER_API_KEY: z
+    .string()
+    .optional()
+    .transform((value) => (value && value.trim().length > 0 ? value.trim() : undefined))
+    .pipe(z.string().min(32, 'must be at least 32 characters').optional()),
   // Scheduled jobs (sync, sends, pipelines). Default on; off in tests, which run jobs directly.
   JOBS_ENABLED: z.enum(['true', 'false']).optional(),
   // Sending pace (EML-09): stay under the ESP's per-second limit; 10,000 emails in < 30 min needs ≥ 6/s (NFR-F3).
@@ -97,6 +103,7 @@ export type AppConfig = {
   seedList: string[];
   /** null in production without a secret: the webhook endpoint answers 503 instead of trusting anyone. */
   espWebhookSecret: string | null;
+  commandCenterApiKey: string | null;
   dmarcKnownSources: string[];
   admissionsUrl: string | null;
   slackWebhookUrl: string | null;
@@ -144,6 +151,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     postalAddress: env.ACADEMY_POSTAL_ADDRESS,
     sendRatePerSecond: env.SEND_RATE_PER_SECOND,
     sendBatchSize: env.SEND_BATCH_SIZE,
+    commandCenterApiKey: env.COMMAND_CENTER_API_KEY ?? null,
     espWebhookSecret: env.ESP_WEBHOOK_SECRET ?? (env.NODE_ENV === 'production' ? null : 'development-only-esp-webhook-secret-0123456789'),
     admissionsUrl: env.ADMISSIONS_URL ?? null,
     slackWebhookUrl: env.SLACK_WEBHOOK_URL ?? null,
