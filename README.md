@@ -48,6 +48,6 @@ addresses, and the Claude API key for the newsletter writing assistant.
 
 ## What still needs people
 
-See "Что нужно от пользователя" in `docs/progress.md`: the email service and DNS for the sending domain, API
+See "Что нужно от пользователя" under "Ручные задачи пользователя" in `docs/progress.md`: the email service and DNS for the sending domain, API
 access to ad and analytics platforms, the real APIs of Projects 1, 2, 11 and 13, deploy on paid always-on plans,
 legal review and answers to the open questions in PRD 16.3.
