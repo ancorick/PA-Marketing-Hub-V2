@@ -8,7 +8,7 @@ import {
 } from "../../lib/api";
 import { formatAmd, formatNumber, formatPercent } from "../../lib/format";
 import { useStaffRole } from "../../lib/session";
-import { BarChart } from "../../motion";
+import { SimpleBarChart } from '../../charts';
 import {
   AccessNotice,
   accessProblem,
@@ -154,7 +154,7 @@ export function ChannelSection({ channel }: { channel: string }) {
             <h3 id="channel-trend-heading">Last 12 months</h3>
             {trendChartable ? (
               <div className="chart-narrow">
-                <BarChart
+                <SimpleBarChart
                   data={data.trend.map((month) => ({
                     label: monthLabel(month.month),
                     value: month.enrolled as number,

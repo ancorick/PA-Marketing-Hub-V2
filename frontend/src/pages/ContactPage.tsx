@@ -29,7 +29,7 @@ import { ContactForm } from './ContactForm';
 const formatTime = (iso: string) => formatDate(iso, undefined, { timeStyle: 'short' });
 
 const backLink = (
-  <a className="back-link" href="#/audience">
+  <a className="back-link" href="#/contacts">
     <ArrowLeft size={16} weight="bold" aria-hidden />
     All contacts
   </a>
@@ -50,7 +50,7 @@ export function NewContactPage() {
       {backLink}
       <PageHeader title="Add" accent="contact" description="Marketing Hub keeps one record per person, matched by email and Core Engine person." />
       <section className="card">
-        <ContactForm onSaved={saved} onCancel={() => (window.location.hash = '#/audience')} />
+        <ContactForm onSaved={saved} onCancel={() => (window.location.hash = '#/contacts')} />
       </section>
     </>
   );

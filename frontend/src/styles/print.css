@@ -21,7 +21,9 @@
     print-color-adjust: exact;
   }
 
-  .header,
+  .sidebar,
+  .sidebar-scrim,
+  .topbar,
   .skip-link,
   .no-print,
   .tooltip__trigger,
@@ -32,6 +34,10 @@
   }
 
   .print-only {
+    display: block;
+  }
+
+  .shell {
     display: block;
   }
 

@@ -68,7 +68,7 @@ export function CampaignsPage() {
   const sends = useQuery({ queryKey: ['sends', role], queryFn: listSends, retry: retryServerErrors });
   const access = accessProblem(sends.error);
   const columns: Column<Send>[] = [
-    { key: 'name', header: 'Campaign', render: (s) => <a href={`#/campaigns/${s.id}`}>{s.name}</a>, sortValue: (s) => s.name },
+    { key: 'name', header: 'Campaign', render: (s) => <a href={`#/campaign-emails/${s.id}`}>{s.name}</a>, sortValue: (s) => s.name },
     { key: 'status', header: 'Status', render: (s) => <StatusBadge tone={SEND_STATUS[s.status].tone}>{SEND_STATUS[s.status].label}</StatusBadge> },
     { key: 'topic', header: 'Topic', render: (s) => `${TOPIC_LABEL[s.topic]} · ${LANGUAGE_LABEL[s.language]}` },
     { key: 'when', header: 'Scheduled', render: (s) => (s.scheduledAt ? <span className="num">{formatTime(s.scheduledAt)}</span> : <span className="muted">Not yet</span>), sortValue: (s) => s.scheduledAt ?? '' },
@@ -82,7 +82,7 @@ export function CampaignsPage() {
         description="Write, check, test and send campaigns to a segment. A marketing manager approves every send."
         actions={
           !access && (
-            <a className="btn btn--primary" href="#/campaigns/new">
+            <a className="btn btn--primary" href="#/campaign-emails/new">
               <Plus size={18} weight="bold" aria-hidden />
               New campaign
             </a>
@@ -242,7 +242,7 @@ export function CampaignPage({ id }: { id: string | null }) {
     onSuccess: (saved) => {
       setDraft(null);
       refresh(saved);
-      if (!current) window.location.hash = `#/campaigns/${saved.id}`;
+      if (!current) window.location.hash = `#/campaign-emails/${saved.id}`;
     },
   });
   const test = useMutation({ mutationFn: () => testSend(current!.id, testEmails.split(/[\s,;]+/).filter(Boolean)) });
@@ -271,13 +271,13 @@ export function CampaignPage({ id }: { id: string | null }) {
     mutationFn: () => deleteSend(current!.id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['sends'] });
-      window.location.hash = '#/campaigns';
+      window.location.hash = '#/campaign-emails';
     },
   });
 
   const access = accessProblem(send.error ?? segments.error);
   const back = (
-    <a className="back-link" href="#/campaigns">
+    <a className="back-link" href="#/campaign-emails">
       <ArrowLeft size={16} weight="bold" aria-hidden />
       All campaigns
     </a>

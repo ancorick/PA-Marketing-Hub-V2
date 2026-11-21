@@ -4,7 +4,7 @@
 >
 > Code: tokens `src/styles/tokens.css`, base `src/styles/base.css`, components `src/styles/components.css` + `src/ui/*`. Live preview: `#/design-system`.
 
-v2.1 (2026-11-20): motion and interaction (section 6), brighter colors, official logo. v2 (2026-11-20) replaces the first "Swiss minimal blue" system at the user's request. It follows the references in `docs/references/` (`concept.png`, `tables.png`, brand colors, logo): style and principles, not a pixel copy. Built with `ui-ux-pro-max` (typography and font lookups, UX and chart rules) and checked against PRD 9.6, 13.6, 13.7 and 14.5.
+v3 (2026-11-22, RESTRUCTURE R1): the same visual style in a dense analytics layout: left grouped navigation, full-width 12-column pages, filter panel, chart cards with a Table view, one chart library (Recharts). Structure follows `docs/references/analytics-ref/`; its blue accent is not used. v2.1 (2026-11-20): motion and interaction (section 6), brighter colors, official logo. v2 (2026-11-20) replaces the first "Swiss minimal blue" system at the user's request. It follows the references in `docs/references/` (`concept.png`, `tables.png`, brand colors, logo): style and principles, not a pixel copy. Built with `ui-ux-pro-max` (typography and font lookups, UX and chart rules) and checked against PRD 9.6, 13.6, 13.7 and 14.5.
 
 ## 1. Direction
 
@@ -72,6 +72,8 @@ Yellow is the brand primary, so **warning is orange**, never yellow. Status is a
 
 Gridlines `--chart-grid`. Bars and lines in the brand colors on dark cards, like the "Growth" card in `tables.png`. Every chart has a table alternative and a one-sentence summary.
 
+**Library:** Recharts 3 for every chart (`src/charts`: bar vertical and horizontal, multi-line, funnel, donut ≤6 slices, sparkline). Colours only from these tokens, so both themes stay checked; lines also differ by dash; the funnel prints values and conversion as text; the donut lists value and share. The module is loaded only by lazy pages (never in the main bundle); animation follows reduced motion.
+
 ## 3. Typography
 
 - **Manrope Variable** (Latin, Cyrillic) → **Noto Sans Armenian Variable** (Armenian) → system UI. Self-hosted via `@fontsource-variable/*`, no Google Fonts CDN (NFR-P7). No single Google font covers Latin + Cyrillic + Armenian; Manrope is the closest geometric match to the concept, Noto Sans Armenian renders Armenian.
@@ -98,10 +100,13 @@ Gridlines `--chart-grid`. Bars and lines in the brand colors on dark cards, like
 
 ## 5. Layout and navigation
 
-- Sticky **header**: wordmark left ("Picsart Academy" + aqua "MARKETING HUB"), **pill navigation** in a raised capsule (PRD 9.6 order: Overview, Audience, Campaigns, Newsletter, Events, Analytics, Email settings | Admin; the design-system preview is linked from Admin to keep the bar within 1280px), theme switch right. Active item = yellow pill with ink text, `aria-current="page"`.
-- Below 1280px the pill nav collapses into a menu button and a full-width drawer (Escape closes it). Verified: fits at 1280 and 1366, no horizontal scroll at 375.
-- Content max 1440px. Page: title (+ optional gradient accent word) → optional highlight row → filters → content.
-- Logo: official cube from `docs/references/picsart-academy-logo.webp` (transparent), copied to `src/assets/` and `public/favicon.webp`. Shown at 40px next to the text "Picsart Academy / MARKETING HUB" (its built-in wordmark is unreadable at that size), `alt=""` because the text names it. Below 420px only the cube shows.
+- **Left sidebar** (RESTRUCTURE §3), groups in this order: MEASURE (Overview, Cohorts, Costs, Campaigns & links, Data health), REACH (Contacts, Segments, Audience health, Events), SEND (Newsletter, Campaign emails, Dev inbox only in dev/demo), SETTINGS (Email settings, Alerts with a count badge of unresolved alerts, Admin). Config: `src/lib/routes.ts`; old addresses (`#/audience…`, `#/campaigns…`, `#/analytics/…`) redirect there.
+- Top of the sidebar: logo + "Picsart Academy / MARKETING HUB" and the collapse toggle. Bottom: role (mock sign-in until the Core Engine), language (Հայերեն / English / Русский), theme, Sign out (disabled until the Core Engine sign-in). Active item = yellow fill with ink text, filled icon, `aria-current="page"`.
+- Collapsed (remembered in `localStorage`): icons only with their names as titles, group labels become dividers, the alerts badge sits on the icon. Below 1024px the sidebar becomes a slide-in menu behind a burger in the top bar (scrim, Escape closes, focus returns to the burger).
+- Thin sticky **top bar**: links "Public sign-up form" (when `VITE_PUBLIC_SIGNUP_URL` is set) and "Newsletter archive", both open in a new tab.
+- Content: full width up to 1680px on a 12-column grid (`.grid-12`, `.span-3/4/6/8/12`), stacked on narrow screens. Page: gradient title + one-line description + actions right → sticky filter panel → tiles → tables and chart cards.
+- Shell and new component strings exist in hy, en and ru (`src/lib/i18n.ts`); older page texts are translated when their step rebuilds them.
+- Logo: official cube from `docs/references/picsart-academy-logo.webp` (transparent), copied to `src/assets/` and `public/favicon.webp`. Shown next to the text "Picsart Academy / MARKETING HUB" (its built-in wordmark is unreadable at that size), `alt=""` because the text names it. Below 420px only the cube shows.
 
 ## 6. Motion and interaction
 
@@ -158,8 +163,11 @@ No React re-render on pointer move (CSS variables + Motion values) or during cou
 | `AppShell`, `PageHeader`, `SectionTitle` | As in section 5. `PageHeader accent` renders one gradient word. `SectionTitle` = 28px heavy title + optional yellow counter badge, divider below. Focus moves to `<main>` on route change; skip link first. |
 | `HighlightCard` | Brand-filled (`yellow`, `aqua`, `magenta`) link card: brand badge, big title (the link, whole card clickable), one-line description, round arrow. Max one row of 2–4 per page. |
 | Card (`.card`) | Surface, 1px border, radius 24, padding 24. Brand variants `.card--yellow/aqua/magenta` switch all text to ink (white on magenta). Anatomy for item cards: badge row → icon tile + eyebrow + title → text → tags → `.inset` box with status and action → footer strip. |
-| `StatTile` | Label + definition tooltip (hover **and** focus, Escape closes), 36px value, delta pill (sign + arrow + text for screen readers), "See data" link (ANL-15), "fewer than 3" for small numbers (ANL-14). `tone="yellow"` for the single most important tile. |
-| `DataTable` | Real `<table>` with caption; uppercase 11px headers on the surface; first column bold white, numbers right-aligned tabular; 44px rows, hover raised; total row in `tfoot` on raised surface; sortable headers as buttons with `aria-sort`, active sort in yellow; scroll wrapper (radius 18) on narrow screens; loading/empty/error inside the body. |
+| `StatTile` | Label + definition tooltip (hover **and** focus, Escape closes), 36px value, optional caption under it (what the number covers) and sparkline, delta pill (sign + arrow + text for screen readers), "See data" link (ANL-15), "fewer than 3" for small numbers (ANL-14). `tone="yellow"` for the single most important tile. |
+| `FilterBar` + `PeriodFilter`, `AttributionFilter`, `ViewToggle` | Sticky panel under the top bar. Presets 30 days, 90 days, Last quarter, This year, 12 months, Custom (two dates); attribution First touch / Last touch before application / Position-based 40/20/40; Period / Cohort switch with its explanation. |
+| `ChartCard` | Card with title, optional definition (i), Chart / Table switch showing the same data as a `DataTable`, one-sentence summary as `figcaption`; skeleton of the chart's height while loading, empty state instead of an empty axis frame. |
+| `Modal`, `Drawer` | Native `<dialog>`: title, close button, Escape and backdrop close, focus returns to the trigger. Modal for short tasks; drawer slides in from the right for details and forms that keep the list in view. |
+| `DataTable` | Real `<table>` with caption; uppercase 11px headers on the surface; first column bold white, numbers right-aligned tabular; 44px rows, hover raised; total row in `tfoot` on raised surface (`totals` builds it from the columns); optional inline bar next to the key metric (`bar`), scaled to the largest row; `pageSize` splits long lists into pages; sortable headers as buttons with `aria-sort`, active sort in yellow; scroll wrapper (radius 18) on narrow screens; loading/empty/error inside the body. |
 | `Button` | Pills. `primary` yellow/ink (one per view), `secondary` raised + strong border, `ghost`, `danger`. Inside brand cards `primary` becomes an ink pill with yellow text. `loading` = spinner + disabled. |
 | `Chip` / `Tag` | Chip = toggle button (`aria-pressed`), selected = aqua. Tag = non-interactive pill (`#courses`, rule summaries). |
 | `SearchField` | The main search: animated rainbow border (sliding full-spectrum gradient) + blurred halo, yellow icon square. `role="search"`, `aria-label`. Focus is shown by the standard ring, not by the rainbow. |
@@ -175,7 +183,7 @@ No React re-render on pointer move (CSS variables + Motion values) or during cou
 | `AnimatedNumber` (`src/motion`) | Count-up once when visible; used by `StatTile countTo`. |
 | `Disclosure` (`src/motion`) | Button with `aria-expanded`, animated panel (height + fade). Used for "Show data as a table" under charts and advanced filters. |
 | `Menu` (`src/motion`) | WAI-ARIA menu button: ArrowDown opens, arrows/Home/End move, Escape closes and returns focus, click outside closes. |
-| `BarChart`, `LineChart` (`src/motion`) | SVG, brand chart tokens, direct label on the last value, `figcaption` summary and a table in a `Disclosure`. Grow/draw once when visible. |
+| Chart kit (`src/charts`) | Recharts 3: `BarChart` (vertical / horizontal with value labels), `LineChart` (several series, dashes), `FunnelChart`, `DonutChart`, `Sparkline`; `SimpleBarChart` / `SimpleLineChart` keep the one-series form with a table in a `Disclosure`. Custom tooltip and legend on tokens; keyboard layer on. |
 | `MotionProvider` (`src/motion`) | `LazyMotion` + `MotionConfig`, OS reduced-motion + preview override, `data-motion` on `<html>`. |
 
 ## 8. Formatting

@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 /**
- * Minimal hash routing for the scaffold ("#/audience" → "/audience").
+ * Minimal hash routing for the scaffold ("#/contacts" → "/audience").
  * A real router is chosen in PLAYBOOK step 4 together with the first module screens.
  */
 function subscribe(callback: () => void) {

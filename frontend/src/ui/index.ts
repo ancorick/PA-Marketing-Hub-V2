@@ -1,6 +1,6 @@
 export { AccessNotice, accessProblem, retryServerErrors } from './AccessNotice';
 export { Alert } from './Alert';
-export { AppShell, PageHeader, PRIMARY_NAV, SECONDARY_NAV, SectionTitle } from './AppShell';
+export { AppShell, PageHeader, SectionTitle } from './AppShell';
 export { Button } from './Button';
 export { ConfirmDialog } from './ConfirmDialog';
 export { CopyButton } from './CopyButton';
@@ -16,3 +16,6 @@ export { RoleSwitcher } from './RoleSwitcher';
 export { Chip, Tag } from './Chip';
 export { HighlightCard, type BrandTone } from './HighlightCard';
 export { SearchField } from './SearchField';
+export { ChartCard } from './ChartCard';
+export { Drawer, Modal } from './Dialog';
+export { AttributionFilter, FilterBar, PeriodFilter, ViewToggle, type AttributionModel, type ViewMode } from './FilterBar';

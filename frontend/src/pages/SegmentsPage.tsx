@@ -40,7 +40,7 @@ import {
 import { defaultCondition, SegmentRuleEditor } from './SegmentRuleEditor';
 
 const backLink = (
-  <a className="back-link" href="#/audience/segments">
+  <a className="back-link" href="#/segments">
     <ArrowLeft size={16} weight="bold" aria-hidden />
     All segments
   </a>
@@ -60,14 +60,14 @@ export function SegmentsPage() {
   const segments = useQuery({ queryKey: ['segments', role], queryFn: listSegments, retry: retryServerErrors });
   const access = accessProblem(segments.error);
   const columns: Column<Segment>[] = [
-    { key: 'name', header: 'Segment', render: (s) => <a href={`#/audience/segments/${s.id}`}>{s.name}</a>, sortValue: (s) => s.name },
+    { key: 'name', header: 'Segment', render: (s) => <a href={`#/segments/${s.id}`}>{s.name}</a>, sortValue: (s) => s.name },
     { key: 'type', header: 'Kind', render: (s) => (s.type === 'dynamic' ? 'Dynamic rule' : 'Static list') },
     { key: 'count', header: 'People', numeric: true, render: (s) => <span className="num">{s.lastCount === null ? '—' : formatNumber(s.lastCount)}</span>, sortValue: (s) => s.lastCount ?? 0 },
     { key: 'updated', header: 'Updated', render: (s) => formatDate(s.updatedAt), sortValue: (s) => s.updatedAt },
   ];
   return (
     <>
-      <a className="back-link" href="#/audience">
+      <a className="back-link" href="#/contacts">
         <ArrowLeft size={16} weight="bold" aria-hidden />
         All contacts
       </a>
@@ -77,7 +77,7 @@ export function SegmentsPage() {
         description="Dynamic segments recount at send time; static lists keep hand-picked people."
         actions={
           !access && (
-            <a className="btn btn--primary" href="#/audience/segments/new">
+            <a className="btn btn--primary" href="#/segments/new">
               <Plus size={18} weight="bold" aria-hidden />
               New segment
             </a>
@@ -256,14 +256,14 @@ export function SegmentPage({ id }: { id: string | null }) {
       queryClient.setQueryData(['segment', saved.id, role], saved);
       setName(null);
       setRule(null);
-      if (!segment) window.location.hash = `#/audience/segments/${saved.id}`;
+      if (!segment) window.location.hash = `#/segments/${saved.id}`;
     },
   });
   const remove = useMutation({
     mutationFn: () => deleteSegment(segment!.id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['segments'] });
-      window.location.hash = '#/audience/segments';
+      window.location.hash = '#/segments';
     },
   });
 

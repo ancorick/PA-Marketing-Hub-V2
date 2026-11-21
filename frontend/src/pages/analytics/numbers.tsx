@@ -18,7 +18,7 @@ export const countValue = (value: Count) => (value === 'fewer_than_3' ? 1.5 : va
 
 /** Hash link to the people behind a count (ANL-15). */
 export const peoplePath = (stage: Stage, channel: string, campaign?: string) =>
-  `#/analytics/people/${stage}/${encodeURIComponent(channel)}${campaign ? `/${encodeURIComponent(campaign)}` : ''}`;
+  `#/people/${stage}/${encodeURIComponent(channel)}${campaign ? `/${encodeURIComponent(campaign)}` : ''}`;
 
 /** A count cell: "fewer than 3" when suppressed; a link to the people behind it for marketing roles. */
 export function CountCell({ value, href, label }: { value: Count; href?: string | null; label: string }) {

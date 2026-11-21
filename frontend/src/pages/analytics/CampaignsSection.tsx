@@ -62,7 +62,7 @@ export function CampaignSection({ campaign }: { campaign: string }) {
   return (
     <div className="stack stack--lg">
       <div className="cluster spread">
-        <a className="cluster" href="#/analytics/campaigns">
+        <a className="cluster" href="#/campaigns-links">
           <ArrowLeft size={16} aria-hidden /> All campaigns
         </a>
         <ModelSwitch model={model} onChange={setModel} />

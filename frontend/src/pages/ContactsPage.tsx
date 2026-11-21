@@ -145,16 +145,16 @@ export function ContactsPage() {
         actions={
           !access && (
             <>
-              <a className="btn btn--ghost" href="#/audience/duplicates">
+              <a className="btn btn--ghost" href="#/contacts/duplicates">
                 Duplicates
               </a>
-              <a className="btn btn--secondary" href="#/audience/segments">
+              <a className="btn btn--secondary" href="#/segments">
                 Segments
               </a>
-              <a className="btn btn--secondary" href="#/audience/import">
+              <a className="btn btn--secondary" href="#/contacts/import">
                 Import CSV
               </a>
-              <a className="btn btn--primary" href="#/audience/contacts/new">
+              <a className="btn btn--primary" href="#/contacts/new">
                 <Plus size={18} weight="bold" aria-hidden />
                 Add contact
               </a>

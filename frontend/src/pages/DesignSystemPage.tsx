@@ -19,7 +19,9 @@ import { AnimatePresence, m } from 'motion/react';
 import { useState, type ReactNode } from 'react';
 import { formatAmd, formatNumber, formatPercent, SMALL_NUMBER_TEXT, suppressSmall } from '../lib/format';
 import { duration, ease } from '../lib/motion';
-import { BarChart, Disclosure, LineChart, Menu, Reveal, Stagger, StaggerItem, Tilt, useMotionPreference } from '../motion';
+import { SimpleBarChart, SimpleLineChart } from '../charts';
+import { AnalyticsKitDemo } from './AnalyticsKitDemo';
+import { Disclosure, Menu, Reveal, Stagger, StaggerItem, Tilt, useMotionPreference } from '../motion';
 import {
   Alert,
   BrandBadge,
@@ -195,7 +197,7 @@ export function DesignSystemPage() {
       <PageHeader
         title="Marketing Hub"
         accent="Design system"
-        description="Picsart Academy brand: dark surfaces, yellow, aqua and magenta, big radii, pill controls and purposeful motion. Switch the theme at the top right."
+        description="Picsart Academy brand: dark surfaces, yellow, aqua and magenta, big radii, pill controls and purposeful motion. Switch the theme and language at the bottom of the sidebar."
         actions={
           <Chip
             selected={reduced}
@@ -230,7 +232,7 @@ export function DesignSystemPage() {
               badge={<BrandBadge icon={<UsersThree size={14} weight="bold" aria-hidden />}>Audience</BrandBadge>}
               title="12,480 subscribers"
               description="+412 this month, consent recorded for 98%"
-              href="#/audience"
+              href="#/contacts"
             />
           </StaggerItem>
           <StaggerItem>
@@ -257,6 +259,10 @@ export function DesignSystemPage() {
             </div>
           </div>
         </Reveal>
+
+        <Section id="ds-analytics" title="Analytics kit">
+          <AnalyticsKitDemo />
+        </Section>
 
         <Section id="ds-tiles" title="Headline tiles">
           <div className="cluster">
@@ -289,7 +295,7 @@ export function DesignSystemPage() {
                   countTo={{ value: 12480, format: countInt }}
                   delta={0.034}
                   definition="Contacts with active marketing consent on the last day of the range."
-                  href="#/audience"
+                  href="#/contacts"
                 />
                 <StatTile
                   label="Newsletter click rate"
@@ -305,7 +311,7 @@ export function DesignSystemPage() {
                   countTo={{ value: 2683, format: countInt }}
                   delta={0}
                   definition="People whose first touch falls in the range. Model: first touch."
-                  href="#/analytics"
+                  href="#/campaigns-links"
                 />
                 <StatTile label="Hired from Referral" value={suppressSmall(1)} definition="Shown as 'fewer than 3' in shared views to protect individuals." />
               </m.div>
@@ -320,7 +326,7 @@ export function DesignSystemPage() {
                 <h3>New leads per month</h3>
                 <StatusBadge tone="success">+10.6% vs October</StatusBadge>
               </div>
-              <BarChart
+              <SimpleBarChart
                 data={LEADS_BY_MONTH}
                 unit="Leads"
                 summary="Leads grew for three months in a row and reached 334 in November, the highest in the year."
@@ -331,7 +337,7 @@ export function DesignSystemPage() {
                 <h3>Subscribers</h3>
                 <StatusBadge tone="info">12-month trend</StatusBadge>
               </div>
-              <LineChart
+              <SimpleLineChart
                 data={SUBSCRIBERS_BY_MONTH}
                 unit="Subscribers"
                 summary="Subscribers rose steadily from 9,120 to 12,480 over 12 months, faster since August."
@@ -495,7 +501,7 @@ export function DesignSystemPage() {
               ) : undefined
             }
             empty={
-              <EmptyState title="No channel data yet" action={<a href="#/analytics">Open Data health</a>}>
+              <EmptyState title="No channel data yet" action={<a href="#/campaigns-links">Open Data health</a>}>
                 Connect an ad account on the Data health page, then wait for the nightly pull.
               </EmptyState>
             }
@@ -608,7 +614,7 @@ export function DesignSystemPage() {
               <Alert tone="success" title="Import finished">
                 1,180 contacts added, 42 merged as duplicates.
               </Alert>
-              <Alert tone="danger" title="Ad account disconnected" action={<a href="#/analytics">Reconnect in Data health</a>}>
+              <Alert tone="danger" title="Ad account disconnected" action={<a href="#/campaigns-links">Reconnect in Data health</a>}>
                 Meta Ads has not answered since 2026-11-18.
               </Alert>
             </div>

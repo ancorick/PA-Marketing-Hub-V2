@@ -33,7 +33,7 @@ export function yerevanDate(iso: string): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yerevan' }).format(new Date(iso));
 }
 
-export const contactPath = (id: string) => `#/audience/contacts/${encodeURIComponent(id)}`;
+export const contactPath = (id: string) => `#/contacts/${encodeURIComponent(id)}`;
 
 export const TOPIC_LABEL: Record<import('./api').Topic, string> = {
   newsletter: 'Newsletter',

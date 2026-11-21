@@ -167,7 +167,7 @@ export function ImportPage() {
 
   return (
     <>
-      <a className="back-link" href="#/audience">
+      <a className="back-link" href="#/contacts">
         <ArrowLeft size={16} weight="bold" aria-hidden />
         All contacts
       </a>
@@ -284,7 +284,7 @@ export function ImportPage() {
                   tone="success"
                   title={`Imported: ${formatNumber(commit.data.created)} new, ${formatNumber(commit.data.updated)} updated`}
                   action={
-                    <a className="btn btn--secondary btn--sm" href="#/audience/duplicates">
+                    <a className="btn btn--secondary btn--sm" href="#/contacts/duplicates">
                       Review duplicates
                     </a>
                   }

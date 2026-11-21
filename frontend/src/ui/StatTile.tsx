@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowUp, Minus } from '@phosphor-icons/react';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { formatPercent, SMALL_NUMBER_TEXT } from '../lib/format';
 import { AnimatedNumber } from '../motion/AnimatedNumber';
 import { Tilt } from '../motion/Tilt';
@@ -22,9 +23,16 @@ type StatTileProps = {
   tone?: BrandTone;
   /** Count up to this number when the tile appears (KPI tiles only). `value` stays the fallback. */
   countTo?: { value: number; format: (n: number) => string };
+  /** Short line under the value that says what the number covers ("Active, with newsletter consent"). */
+  caption?: ReactNode;
+  /** Recent values for a mini trend line; the caption or delta carries the numbers. */
+  spark?: number[];
 };
 
-export function StatTile({ label, value, delta, higherIsBetter = true, definition, href, locale, tone, countTo }: StatTileProps) {
+/** The chart kit loads with the first tile that has a trend line, never in the main bundle. */
+const Sparkline = lazy(() => import('../charts').then((mod) => ({ default: mod.Sparkline })));
+
+export function StatTile({ label, value, delta, higherIsBetter = true, definition, href, locale, tone, countTo, caption, spark }: StatTileProps) {
   let deltaNode = null;
   if (delta !== undefined) {
     const direction = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat';
@@ -51,6 +59,14 @@ export function StatTile({ label, value, delta, higherIsBetter = true, definitio
         <span className="tile__value tile__value--suppressed">{SMALL_NUMBER_TEXT}</span>
       ) : (
         <span className="tile__value">{countTo ? <AnimatedNumber value={countTo.value} format={countTo.format} /> : value}</span>
+      )}
+      {caption && <span className="tile__caption">{caption}</span>}
+      {spark && spark.length > 1 && (
+        <span className="tile__spark">
+          <Suspense fallback={<span className="tile__spark-placeholder" />}>
+            <Sparkline values={spark} label={`${label}: trend`} color={tone ? 'currentColor' : undefined} />
+          </Suspense>
+        </span>
       )}
       {(deltaNode || href) && (
         <span className="tile__footer">

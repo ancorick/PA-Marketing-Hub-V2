@@ -1,6 +1,7 @@
-import { CaretDown, CaretUp, CaretUpDown, DownloadSimple } from '@phosphor-icons/react';
+import { CaretDown, CaretLeft, CaretRight, CaretUp, CaretUpDown, DownloadSimple } from '@phosphor-icons/react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { csvFile } from '../lib/csv';
+import { useT } from '../lib/i18n';
 import { Button } from './Button';
 import { Tooltip } from './Tooltip';
 
@@ -17,6 +18,8 @@ export type Column<Row> = {
   definition?: string;
   /** Value written to the CSV export; defaults to sortValue; columns with neither are left out. */
   csv?: (row: Row) => string | number | null;
+  /** Inline bar next to the value, scaled to the largest row (RESTRUCTURE §4: key metric at a glance). */
+  bar?: (row: Row) => number | null;
 };
 
 /** CSV of the rows as sorted (ANL-12): columns with a csv value (or a sort value); others are left out. */
@@ -52,6 +55,10 @@ type DataTableProps<Row> = {
   initialSort?: { key: string; direction: 'ascending' | 'descending' };
   /** File name for "Download CSV" (ANL-12); no button without it. */
   exportFile?: string;
+  /** Total row built from the columns: cell content per column key; the first column says "Total". */
+  totals?: Partial<Record<string, ReactNode>>;
+  /** Long lists are shown page by page; CSV still exports every row. */
+  pageSize?: number;
 };
 
 /** Accessible data table: real <table>, sortable headers with aria-sort, scroll wrapper on narrow screens. */
@@ -67,8 +74,12 @@ export function DataTable<Row>({
   footer,
   initialSort,
   exportFile,
+  totals,
+  pageSize,
 }: DataTableProps<Row>) {
+  const t = useT();
   const [sort, setSort] = useState(initialSort ?? null);
+  const [page, setPage] = useState(0);
 
   const sorted = useMemo(() => {
     const column = sort && columns.find((c) => c.key === sort.key);
@@ -82,6 +93,16 @@ export function DataTable<Row>({
       return String(va).localeCompare(String(vb)) * factor;
     });
   }, [rows, columns, sort]);
+
+  const pages = pageSize ? Math.max(1, Math.ceil(sorted.length / pageSize)) : 1;
+  const currentPage = Math.min(page, pages - 1);
+  const visible = pageSize ? sorted.slice(currentPage * pageSize, (currentPage + 1) * pageSize) : sorted;
+  // Bars are scaled to the largest value of the whole list, so pages stay comparable.
+  const barMax = useMemo(() => {
+    const max: Record<string, number> = {};
+    for (const c of columns) if (c.bar) max[c.key] = Math.max(0, ...rows.map((row) => c.bar!(row) ?? 0));
+    return max;
+  }, [rows, columns]);
 
   const toggleSort = (key: string, numeric: boolean) => {
     setSort((current) => {
@@ -121,14 +142,25 @@ export function DataTable<Row>({
       </tr>
     );
   } else {
-    body = sorted.map((row) => (
+    body = visible.map((row) => (
       <tr key={rowKey(row)}>
         {columns.map((c, index) => {
           const content = c.render ? c.render(row) : String((row as Record<string, unknown>)[c.key] ?? '');
           const Cell = index === 0 ? 'th' : 'td';
+          const value = c.bar?.(row);
+          const max = barMax[c.key] ?? 0;
           return (
             <Cell key={c.key} scope={index === 0 ? 'row' : undefined} className={c.numeric ? 'is-num' : undefined}>
-              {content}
+              {c.bar ? (
+                <span className="inline-bar">
+                  <span className="inline-bar__value">{content}</span>
+                  <span className="inline-bar__track" aria-hidden>
+                    <span className="inline-bar__fill" style={{ width: `${value && max > 0 ? Math.max((value / max) * 100, 2) : 0}%` }} />
+                  </span>
+                </span>
+              ) : (
+                content
+              )}
             </Cell>
           );
         })}
@@ -167,11 +199,45 @@ export function DataTable<Row>({
           </tr>
         </thead>
         <tbody>{body}</tbody>
-        {footer && !loading && !error && sorted.length > 0 && <tfoot>{footer}</tfoot>}
+        {!loading && !error && sorted.length > 0 && (footer || totals) && (
+          <tfoot>
+            {footer ?? (
+              <tr>
+                {columns.map((c, index) =>
+                  index === 0 ? (
+                    <th key={c.key} scope="row">
+                      {totals?.[c.key] ?? t('table.total')}
+                    </th>
+                  ) : (
+                    <td key={c.key} className={c.numeric ? 'is-num' : undefined}>
+                      {totals?.[c.key] ?? ''}
+                    </td>
+                  ),
+                )}
+              </tr>
+            )}
+          </tfoot>
+        )}
       </table>
     </div>
   );
-  if (!exportFile) return table;
+  const pager = pageSize && sorted.length > pageSize && (
+    <nav className="pager" aria-label={caption}>
+      <span className="muted num" role="status">
+        {t('table.range', { from: currentPage * pageSize + 1, to: Math.min((currentPage + 1) * pageSize, sorted.length), total: sorted.length })}
+      </span>
+      <Button size="sm" variant="ghost" iconOnly aria-label={t('table.previous')} icon={<CaretLeft size={16} weight="bold" aria-hidden />} disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)} />
+      <Button size="sm" variant="ghost" iconOnly aria-label={t('table.next')} icon={<CaretRight size={16} weight="bold" aria-hidden />} disabled={currentPage >= pages - 1} onClick={() => setPage(currentPage + 1)} />
+    </nav>
+  );
+  if (!exportFile && !pager) return table;
+  if (!exportFile)
+    return (
+      <div className="stack stack--sm">
+        {table}
+        {pager}
+      </div>
+    );
   return (
     <div className="stack stack--sm">
       <div className="table-tools no-print">
@@ -180,6 +246,7 @@ export function DataTable<Row>({
         </Button>
       </div>
       {table}
+      {pager}
     </div>
   );
 }

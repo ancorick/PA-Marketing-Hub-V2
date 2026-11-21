@@ -42,7 +42,7 @@ export function HomePage() {
         row.channel in { unmapped: 1, unattributed: 1 } ? (
           <span className="muted nowrap">{channelLabel(row.channel, channels.data?.channels)}</span>
         ) : (
-          <a className="nowrap" href={`#/analytics/channels/${row.channel}`}>{channelLabel(row.channel, channels.data?.channels)}</a>
+          <a className="nowrap" href={`#/channels/${row.channel}`}>{channelLabel(row.channel, channels.data?.channels)}</a>
         ),
       sortValue: (row) => channelLabel(row.channel, channels.data?.channels),
     },
@@ -110,7 +110,7 @@ export function HomePage() {
               label="Subscribers"
               value={tileValue(data.tiles.subscribers)}
               definition={definitions.subscribers ?? ''}
-              href={marketing ? '#/audience' : undefined}
+              href={marketing ? '#/contacts' : undefined}
             />
             <StatTile
               label="Newsletter click rate"
@@ -169,7 +169,7 @@ export function HomePage() {
             />
             {marketing && (
               <p className="no-print">
-                <a href="#/analytics/costs">Enter manual costs</a>
+                <a href="#/costs">Enter manual costs</a>
               </p>
             )}
           </section>

@@ -139,7 +139,11 @@
   --z-toast: 1000;
 
   /* Layout */
-  --content-max: 1440px;
+  /* Full-width analytics layout (RESTRUCTURE §4): wide screens use the space instead of leaving it empty. */
+  --content-max: 1680px;
+  --sidebar-width: 15.5rem;
+  --sidebar-width-collapsed: 4.75rem;
+  --topbar-height: 3.25rem;
   --header-height: 4.5rem;
   --control-height: 2.5rem;
   --row-height: 2.75rem;

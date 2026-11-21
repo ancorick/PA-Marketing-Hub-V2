@@ -152,7 +152,7 @@ export function HealthSection() {
             </ul>
           )}
           <p>
-            <a href="#/analytics/taxonomy">Review in Channel taxonomy</a>
+            <a href="#/campaigns-links">Review in Channel taxonomy</a>
           </p>
         </section>
       </div>

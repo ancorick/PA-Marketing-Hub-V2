@@ -12,7 +12,7 @@ export function campaignColumns(definitions: { modelNote: string; marketing: boo
     {
       key: 'campaign',
       header: 'Campaign',
-      render: (row) => (row.campaign === '(no campaign)' ? <span className="muted">No campaign</span> : <a href={`#/analytics/campaigns/${encodeURIComponent(row.campaign)}`}>{row.campaign}</a>),
+      render: (row) => (row.campaign === '(no campaign)' ? <span className="muted">No campaign</span> : <a href={`#/campaigns-links/${encodeURIComponent(row.campaign)}`}>{row.campaign}</a>),
       sortValue: (row) => row.campaign,
     },
     ...(['lead', 'applied', 'enrolled'] as const).map(

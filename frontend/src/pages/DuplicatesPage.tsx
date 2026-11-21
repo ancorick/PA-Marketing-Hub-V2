@@ -114,7 +114,7 @@ export function DuplicatesPage() {
 
   return (
     <>
-      <a className="back-link" href="#/audience">
+      <a className="back-link" href="#/contacts">
         <ArrowLeft size={16} weight="bold" aria-hidden />
         All contacts
       </a>
