@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { CsvRowError, type AnalyticsPipeline } from '../analytics/pipeline.js';
 import { RULE_KINDS, TaxonomyError, type ChannelTaxonomy } from '../analytics/taxonomy.js';
+import { ATTRIBUTION_MODELS, MODEL_LABEL, type AttributionService } from '../analytics/attribution.js';
 import { COST_CURRENCIES, CostError, type CostService } from '../analytics/costs.js';
 import { CHANNEL_MEDIUM, CHANNEL_SOURCES, LinkBuilderError, type LinkBuilder } from '../analytics/links.js';
 import { requireRole } from '../auth/staff.js';
@@ -38,10 +39,21 @@ const periodQuery = z
   .object({ from: day, to: day })
   .refine((value) => value.from <= value.to, { message: 'from must not be after to', path: ['to'] })
   .refine((value) => Date.parse(value.to) - Date.parse(value.from) <= 800 * 86_400_000, { message: 'At most 24 months at a time', path: ['to'] });
+const attributionQuery = z.object({
+  model: z.enum(ATTRIBUTION_MODELS).default('first_touch'),
+  by: z.enum(['channel', 'campaign']).default('channel'),
+  channel: z.string().max(60).optional(),
+});
 const csvBody = z.object({ platform: z.enum(['meta_ads', 'google_ads']), csv: z.string().min(1).max(5_000_000) });
 
 /** Analytics pipeline (PRD 9.1, 9.2): re-runs of a date range (admin) and the ad spend CSV fallback. */
-export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy, links, costs, coreEngine }: { pipeline: AnalyticsPipeline; taxonomy: ChannelTaxonomy; links: LinkBuilder; costs: CostService; coreEngine: Pick<CoreEngineClient, 'verifyStaffToken'> }) {
+export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy, links, costs, attribution, coreEngine }: {
+    pipeline: AnalyticsPipeline;
+    taxonomy: ChannelTaxonomy;
+    links: LinkBuilder;
+    costs: CostService;
+    attribution: AttributionService;
+    coreEngine: Pick<CoreEngineClient, 'verifyStaffToken'> }) {
   const admin = requireRole(coreEngine, ['admin']);
   const managers = requireRole(coreEngine, ['admin', 'marketing_manager']);
   const anyStaff = requireRole(coreEngine, ['viewer', 'editor', 'marketing_manager', 'admin', 'leadership']);
@@ -58,6 +70,24 @@ export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy
     if (error instanceof CostError) return reply.code(400).send({ error: 'invalid_request', message: error.message, field: error.field });
     throw error;
   };
+
+  // Attribution (9.4, ANL-06, ANL-07): aggregates for every role; one model per answer, named in it.
+  app.get('/api/analytics/attribution', { preHandler: anyStaff }, async (request, reply) => {
+    const period = periodQuery.safeParse(request.query);
+    if (!period.success) return invalid(reply, period.error);
+    const options = attributionQuery.safeParse(request.query);
+    if (!options.success) return invalid(reply, options.error);
+    const { model, by, channel } = options.data;
+    const rows = by === 'campaign' ? await attribution.byCampaign(period.data, model, channel) : await attribution.byChannel(period.data, model);
+    return { model, modelLabel: MODEL_LABEL[model], lookbackDays: 365, period: period.data, by, rows };
+  });
+
+  // One person's credits under every model: individual data, so the marketing team only (4.3).
+  app.get('/api/analytics/attribution/contacts/:id', { preHandler: marketing }, async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    if (!params.success) return reply.code(404).send({ error: 'not_found', message: 'Unknown contact' });
+    return attribution.forContact(params.data.id);
+  });
 
   // The taxonomy's channel list (9.3) for every analytics view.
   app.get('/api/analytics/channels', { preHandler: anyStaff }, async () => ({ channels: CHANNELS }));

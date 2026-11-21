@@ -20,6 +20,7 @@ import {
   ConfirmDialog,
   TextField,
 } from '../ui';
+import { ContactAttribution } from './ContactAttribution';
 import { ConsentSection } from './ConsentSection';
 import { DuplicatePair } from './DuplicatesPage';
 import { ContactForm } from './ContactForm';
@@ -233,6 +234,7 @@ export function ContactPage({ id }: { id: string }) {
             Only an anonymous row remains for totals, and the address stays on the suppression list so it is never emailed again (AUD-18).
           </Alert>
         )}
+        {data.status !== 'erased' && <ContactAttribution contactId={data.id} channels={channels.data?.channels ?? []} version={data.updatedAt} />}
         <section className="card stack" aria-labelledby="history-heading">
           <h2 id="history-heading">Timeline</h2>
           <p className="muted">Consent changes, emails, opens and clicks, events, outcomes and record changes. Record changes name the fields, not their values.</p>

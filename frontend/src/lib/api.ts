@@ -797,3 +797,21 @@ export const createCost = (cost: CostInput) => apiFetch<ManualCost>('/api/analyt
 export const updateCost = (id: string, cost: CostInput) => apiFetch<ManualCost>(`/api/analytics/costs/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(cost) });
 export const deleteCost = (id: string) => apiFetch<void>(`/api/analytics/costs/${encodeURIComponent(id)}`, { method: 'DELETE' });
 export const listAnalyticsChannels = () => apiFetch<{ channels: Channel[] }>('/api/analytics/channels');
+
+/* ---------- Analytics: attribution (ANL-06, ANL-07) ---------- */
+
+export type AttributionModel = 'first_touch' | 'last_touch' | 'position_based';
+export const MODEL_LABEL: Record<AttributionModel, string> = {
+  first_touch: 'First touch',
+  last_touch: 'Last touch (before application)',
+  position_based: 'Position-based (40/20/40)',
+};
+export type Credit = { channel: string; campaign: string | null; share: number };
+export type Stage = 'lead' | 'applied' | 'enrolled' | 'completed' | 'hired';
+export type AttributionRow = { key: string; channel: string } & Record<Stage, number>;
+export type Attribution = { model: AttributionModel; modelLabel: string; lookbackDays: number; period: Period; by: 'channel' | 'campaign'; rows: AttributionRow[] };
+
+export const getAttribution = (period: Period, model: AttributionModel, by: 'channel' | 'campaign' = 'channel', channel?: string) =>
+  apiFetch<Attribution>(`/api/analytics/attribution?${periodQuery(period)}&model=${model}&by=${by}${channel ? `&channel=${encodeURIComponent(channel)}` : ''}`);
+export const contactAttribution = (id: string) =>
+  apiFetch<{ anchor: string | null; models: Record<AttributionModel, Credit[]> }>(`/api/analytics/attribution/contacts/${encodeURIComponent(id)}`);
