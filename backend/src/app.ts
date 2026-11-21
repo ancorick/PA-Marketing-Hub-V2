@@ -65,6 +65,7 @@ import { AttributionService } from './analytics/attribution.js';
 import { OverviewService } from './analytics/overview.js';
 import { DetailService } from './analytics/detail.js';
 import { DataHealth } from './analytics/health.js';
+import { SelfReportedService } from './analytics/self-reported.js';
 import type { AnalyticsSources } from './analytics/sources/contract.js';
 import { createMockAnalyticsSources } from './analytics/sources/mock.js';
 
@@ -397,7 +398,9 @@ export async function buildApp({
   app.decorate('overview', overview);
   const detail = new DetailService({ db: database.db, attribution, costs });
   app.decorate('detail', detail);
-  await app.register(analyticsRoutes, { pipeline, taxonomy, links: linkBuilder, costs, attribution, overview, detail, health: new DataHealth({ jobs, pipeline, taxonomy }), coreEngine: resolvedIntegrations.coreEngine });
+  await app.register(analyticsRoutes, { pipeline, taxonomy, links: linkBuilder, costs, attribution, overview, detail, health: new DataHealth({ jobs, pipeline, taxonomy }),
+    selfReported: new SelfReportedService({ db: database.db, attribution }),
+    coreEngine: resolvedIntegrations.coreEngine });
   await app.register(commandCenterRoutes, { overview, detail, apiKey: config.commandCenterApiKey });
   await app.register(importRoutes, { imports, duplicates, merge, contacts, contactRepository, coreEngine: resolvedIntegrations.coreEngine });
 

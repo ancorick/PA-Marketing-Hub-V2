@@ -6,6 +6,7 @@ import { ATTRIBUTION_MODELS, MODEL_LABEL, STAGES, type AttributionService } from
 import { suppress, type OverviewService } from '../analytics/overview.js';
 import type { DetailService } from '../analytics/detail.js';
 import type { DataHealth } from '../analytics/health.js';
+import type { SelfReportedService } from '../analytics/self-reported.js';
 import type { StaffSession } from '../integrations/core-engine/contract.js';
 import { COST_CURRENCIES, CostError, type CostService } from '../analytics/costs.js';
 import { CHANNEL_MEDIUM, CHANNEL_SOURCES, LinkBuilderError, type LinkBuilder } from '../analytics/links.js';
@@ -59,7 +60,7 @@ const isShared = (staff: StaffSession | null) => !staff?.roles.some((role) => ro
 const csvBody = z.object({ platform: z.enum(['meta_ads', 'google_ads']), csv: z.string().min(1).max(5_000_000) });
 
 /** Analytics pipeline (PRD 9.1, 9.2): re-runs of a date range (admin) and the ad spend CSV fallback. */
-export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy, links, costs, attribution, overview, detail, health, coreEngine }: {
+export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy, links, costs, attribution, overview, detail, health, selfReported, coreEngine }: {
     pipeline: AnalyticsPipeline;
     taxonomy: ChannelTaxonomy;
     links: LinkBuilder;
@@ -68,6 +69,7 @@ export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy
     overview: OverviewService;
     detail: DetailService;
     health: DataHealth;
+    selfReported: SelfReportedService;
     coreEngine: Pick<CoreEngineClient, 'verifyStaffToken'> }) {
   const admin = requireRole(coreEngine, ['admin']);
   const managers = requireRole(coreEngine, ['admin', 'marketing_manager']);
@@ -152,6 +154,13 @@ export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy
     const channel = options.data.channel ? channelOrUnmapped.safeParse(options.data.channel) : null;
     if (channel && !channel.success) return reply.code(400).send({ error: 'invalid_request', message: 'Unknown channel', field: 'channel' });
     return detail.cohorts(options.data.model, isShared(request.staff), channel?.data);
+  });
+
+  // Self-reported source against tracked first touch (9.4, ANL-16): a check on tracking gaps.
+  app.get('/api/analytics/self-reported', { preHandler: anyStaff }, async (request, reply) => {
+    const period = periodQuery.safeParse(request.query);
+    if (!period.success) return invalid(reply, period.error);
+    return selfReported.compare(period.data, isShared(request.staff));
   });
 
   // The contacts behind a number (ANL-15): marketing roles only, as they are individual records (4.3).

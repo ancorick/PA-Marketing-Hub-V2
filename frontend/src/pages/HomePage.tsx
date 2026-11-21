@@ -7,6 +7,7 @@ import { AccessNotice, accessProblem, Alert, Button, DataTable, PageHeader, Stat
 import { AlertsPanel } from './AlertsPanel';
 import { channelLabel, CountCell, countCsv, countText, peoplePath } from './analytics/numbers';
 import { ModelSwitch, PeriodPicker, useModel, usePeriod } from './analytics/period';
+import { SelfReportedCard } from './analytics/SelfReportedCard';
 
 function tone(value: string): Tone {
   if (value === 'ok') return 'success';
@@ -172,6 +173,7 @@ export function HomePage() {
               </p>
             )}
           </section>
+          <SelfReportedCard period={period} />
         </div>
       )}
 

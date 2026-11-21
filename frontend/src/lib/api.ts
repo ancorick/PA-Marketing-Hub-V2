@@ -924,3 +924,18 @@ export const rerunSource = (source: string, range: Period, mode: 'pull' | 'rebui
   apiFetch<{ rowsIn: number; rowsUpserted: number }>(`/api/analytics/pipeline/${encodeURIComponent(source)}/rerun`, { method: 'POST', body: JSON.stringify({ ...range, mode }) });
 export const uploadAdSpendCsv = (platform: 'meta_ads' | 'google_ads', csv: string) =>
   apiFetch<{ rowsIn: number; rowsUpserted: number; range: Period | null }>('/api/analytics/ad-spend/csv', { method: 'POST', body: JSON.stringify({ platform, csv }) });
+
+/* ---------- Analytics: self-reported source check (ANL-16) ---------- */
+
+export type SelfReported = {
+  period: Period;
+  compared: Count;
+  agreed: Count;
+  agreementRate: number | null;
+  withoutAnswer: Count;
+  unrecognisedAnswers: Count;
+  untracked: Count;
+  matrix: { reported: string; tracked: string; count: Count }[];
+  groups: Record<string, string>;
+};
+export const getSelfReported = (period: Period) => apiFetch<SelfReported>(`/api/analytics/self-reported?${periodQuery(period)}`);
