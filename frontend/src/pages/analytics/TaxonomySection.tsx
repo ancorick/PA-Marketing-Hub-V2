@@ -78,13 +78,18 @@ export function TaxonomySection() {
 
   const unmappedColumns: Column<UnmappedValue>[] = [
     { key: 'value', header: 'Value', render: (row) => <code>{row.value}</code>, sortValue: (row) => row.value },
-    { key: 'source', header: 'Seen in', render: (row) => SOURCE_LABEL[row.source] ?? row.source },
+    { key: 'source', header: 'Seen in', render: (row) => SOURCE_LABEL[row.source] ?? row.source, csv: (row) => SOURCE_LABEL[row.source] ?? row.source },
     { key: 'count', header: 'Times seen', numeric: true, render: (row) => formatNumber(row.count), sortValue: (row) => row.count },
     { key: 'last', header: 'Last seen', render: (row) => <span className="num">{formatDate(row.lastSeenAt)}</span>, sortValue: (row) => row.lastSeenAt },
-    { key: 'channel', header: 'Channel', render: (row) => <ResolveCell value={row} channels={channels} canEdit={canEdit} onDone={refresh} /> },
+    {
+      key: 'channel',
+      header: 'Channel',
+      render: (row) => <ResolveCell value={row} channels={channels} canEdit={canEdit} onDone={refresh} />,
+      csv: (row) => (row.resolvedChannelId ? channelName(row.resolvedChannelId) : 'unmapped'),
+    },
   ];
   const ruleColumns: Column<ChannelRule>[] = [
-    { key: 'kind', header: 'Matches', render: (row) => KIND_LABEL[row.kind] },
+    { key: 'kind', header: 'Matches', render: (row) => KIND_LABEL[row.kind], csv: (row) => KIND_LABEL[row.kind] },
     { key: 'value', header: 'Value', render: (row) => <code>{row.value}</code>, sortValue: (row) => row.value },
     { key: 'channel', header: 'Channel', render: (row) => channelName(row.channel), sortValue: (row) => channelName(row.channel) },
     {
@@ -123,6 +128,7 @@ export function TaxonomySection() {
           columns={unmappedColumns}
           rows={unmapped}
           rowKey={(row) => row.id}
+          exportFile="unmapped-values"
           empty="Nothing to review: every value seen so far maps to a channel."
         />
         {!canEdit && open.length > 0 && <p className="muted">A marketing manager or admin maps these values.</p>}
@@ -163,7 +169,7 @@ export function TaxonomySection() {
           </form>
         )}
         {add.isError && addError?.details.field !== 'value' && <Alert tone="danger" title="Rule not added">{add.error.message}</Alert>}
-        <DataTable caption="Channel rules" captionHidden columns={ruleColumns} rows={rules} rowKey={(row) => row.id ?? `${row.kind}:${row.value}`} />
+        <DataTable caption="Channel rules" captionHidden columns={ruleColumns} rows={rules} rowKey={(row) => row.id ?? `${row.kind}:${row.value}`} exportFile="channel-rules" />
       </section>
     </div>
   );

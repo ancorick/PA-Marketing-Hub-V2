@@ -144,6 +144,7 @@ export function ChannelSection({ channel }: { channel: string }) {
               rowKey={(row) => row.campaign}
               initialSort={{ key: "lead", direction: "descending" }}
               empty="No campaign results or spend in this period."
+              exportFile={`${channel}-campaigns-${period.from}-${period.to}-${model}`}
             />
           </section>
           <section

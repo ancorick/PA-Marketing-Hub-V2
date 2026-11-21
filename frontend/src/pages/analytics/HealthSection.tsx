@@ -74,6 +74,7 @@ export function HealthSection() {
     {
       key: 'last',
       header: 'Last run',
+      csv: (row) => (row.lastRun ? `${row.lastRun.startedAt} ${row.lastRun.status} ${row.lastRun.rowsIn} in ${row.lastRun.rowsUpserted} saved${row.lastRun.error ? ` ${row.lastRun.error}` : ''}` : ''),
       render: (row) =>
         row.lastRun ? (
           <div className="stack stack--xs">
@@ -114,7 +115,7 @@ export function HealthSection() {
           <h2 id="sources-heading">Sources</h2>
           <span className="muted num">Checked {time(data.checkedAt)}</span>
         </div>
-        <DataTable caption="Data sources" captionHidden columns={columns} rows={data.sources} rowKey={(row) => row.name} />
+        <DataTable caption="Data sources" captionHidden columns={columns} rows={data.sources} rowKey={(row) => row.name} exportFile="data-health" />
       </section>
 
       <div className="grid grid--2">

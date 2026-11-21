@@ -1,11 +1,11 @@
-import { ArrowClockwise } from '@phosphor-icons/react';
+import { ArrowClockwise, FilePdf } from '@phosphor-icons/react';
 import { useQuery } from '@tanstack/react-query';
 import { getHealth, getOverview, listAnalyticsChannels, type Count, type OverviewRow } from '../lib/api';
 import { formatAmd, formatPercent } from '../lib/format';
 import { useStaffRole } from '../lib/session';
 import { AccessNotice, accessProblem, Alert, Button, DataTable, PageHeader, StatTile, StatusBadge, type Column, type Tone } from '../ui';
 import { AlertsPanel } from './AlertsPanel';
-import { channelLabel, CountCell, countText, peoplePath } from './analytics/numbers';
+import { channelLabel, CountCell, countCsv, countText, peoplePath } from './analytics/numbers';
 import { ModelSwitch, PeriodPicker, useModel, usePeriod } from './analytics/period';
 
 function tone(value: string): Tone {
@@ -52,6 +52,7 @@ export function HomePage() {
         numeric: true,
         definition: `${definitions[stage] ?? ''}${modelNote}`,
         render: (row) => <CountCell value={row[stage]} href={people(stage, row)} label={stage} />,
+        csv: (row) => countCsv(row[stage]),
         sortValue: (row) => (row[stage] === 'fewer_than_3' ? 1.5 : (row[stage] as number)),
       }),
     ),
@@ -63,18 +64,37 @@ export function HomePage() {
       definition: `${definitions.costPerEnrolled ?? ''}${modelNote}`,
       render: (row) => (row.costPerEnrolled === null ? <span className="muted">—</span> : <strong>{formatAmd(row.costPerEnrolled)}</strong>),
       sortValue: (row) => row.costPerEnrolled ?? -1,
+      csv: (row) => row.costPerEnrolled,
     },
   ];
 
   const access = accessProblem(overview.error);
   return (
     <>
-      <PageHeader title="Overview" description="Who the marketing brings in, who enrolls and who gets hired, and what each channel costs." />
-      <AlertsPanel />
-      <div className="cluster cluster--md page-section">
+      <PageHeader
+        title="Overview"
+        description="Who the marketing brings in, who enrolls and who gets hired, and what each channel costs."
+        actions={
+          <Button className="no-print" variant="secondary" icon={<FilePdf size={18} aria-hidden />} disabled={!overview.data} onClick={() => window.print()}>
+            Export PDF
+          </Button>
+        }
+      />
+      {data && (
+        <p className="print-only">
+          Picsart Academy Marketing Hub · {data.period.from} to {data.period.to} · {data.modelLabel} · costs in AMD · printed {new Date().toISOString().slice(0, 10)}
+          {data.shared && ' · counts of one or two people shown as “fewer than 3”'}
+        </p>
+      )}
+      <div className="no-print">
+        <AlertsPanel />
+      </div>
+      <div className="cluster cluster--md page-section no-print">
         <ModelSwitch model={model} onChange={setModel} />
       </div>
-      <PeriodPicker period={period} onChange={setPeriod} />
+      <div className="no-print">
+        <PeriodPicker period={period} onChange={setPeriod} />
+      </div>
       {access && (
         <AccessNotice problem={access} title="Sign in to see the Overview">
           Every staff role sees the Overview; sign in through the Core Engine.
@@ -132,6 +152,7 @@ export function HomePage() {
               rows={data.channels}
               rowKey={(row) => row.channel}
               initialSort={{ key: 'lead', direction: 'descending' }}
+              exportFile={`overview-channels-${data.period.from}-${data.period.to}-${data.model}`}
               footer={
                 <tr>
                   <th scope="row">Total</th>
@@ -146,7 +167,7 @@ export function HomePage() {
               }
             />
             {marketing && (
-              <p>
+              <p className="no-print">
                 <a href="#/analytics/costs">Enter manual costs</a>
               </p>
             )}
@@ -155,7 +176,7 @@ export function HomePage() {
       )}
 
       {role === 'admin' && (
-        <section className="card page-section" aria-labelledby="api-status-heading">
+        <section className="card page-section no-print" aria-labelledby="api-status-heading">
           <div className="card__header">
             <h2 id="api-status-heading">API status</h2>
             <Button variant="ghost" size="sm" icon={<ArrowClockwise size={16} aria-hidden />} loading={health.isFetching} onClick={() => void health.refetch()}>

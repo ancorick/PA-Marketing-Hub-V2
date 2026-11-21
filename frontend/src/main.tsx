@@ -5,6 +5,10 @@ import { App } from './App';
 import { MotionProvider } from './motion/MotionProvider';
 import './styles/base.css';
 import './styles/components.css';
+import './styles/print.css';
+import { installPrintTheme } from './lib/print';
+
+installPrintTheme();
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },

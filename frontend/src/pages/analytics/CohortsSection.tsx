@@ -4,7 +4,7 @@ import { getCohorts, listAnalyticsChannels, type CohortRow } from '../../lib/api
 import { formatAmd } from '../../lib/format';
 import { useStaffRole } from '../../lib/session';
 import { AccessNotice, accessProblem, Alert, DataTable, SelectField, StatusBadge, type Column } from '../../ui';
-import { CountCell, countValue } from './numbers';
+import { CountCell, countCsv, countValue } from './numbers';
 import { ModelSwitch, useModel } from './period';
 
 const monthLabel = (month: string) => new Date(`${month}-01T00:00:00Z`).toLocaleString('en', { month: 'short', year: 'numeric', timeZone: 'UTC' });
@@ -35,8 +35,9 @@ export function CohortsSection() {
         </span>
       ),
       sortValue: (row) => row.month,
+      csv: (row) => `${row.month}${row.maturing ? ' (maturing)' : ''}`,
     },
-    { key: 'people', header: 'People', numeric: true, render: (row) => <CountCell value={row.people} label="people" />, sortValue: (row) => countValue(row.people) },
+    { key: 'people', header: 'People', numeric: true, render: (row) => <CountCell value={row.people} label="people" />, sortValue: (row) => countValue(row.people), csv: (row) => countCsv(row.people) },
     ...(['lead', 'enrolled', 'hired'] as const).map(
       (stage): Column<CohortRow> => ({
         key: stage,
@@ -44,12 +45,13 @@ export function CohortsSection() {
         numeric: true,
         definition: `People of the cohort who became ${stage === 'lead' ? 'leads' : stage} at any time since.`,
         render: (row) => <CountCell value={row[stage]} label={stage} />,
+        csv: (row) => countCsv(row[stage]),
         sortValue: (row) => countValue(row[stage]),
       }),
     ),
     { key: 'cost', header: 'Cost',
       definition: 'Channel cost in the cohort month, in AMD.', numeric: true, render: (row) => formatAmd(row.costAmd), sortValue: (row) => row.costAmd },
-    { key: 'perEnrolled', header: 'Cost per enrolled', numeric: true, render: (row) => money(row.costPerEnrolled), sortValue: (row) => row.costPerEnrolled ?? -1 },
+    { key: 'perEnrolled', header: 'Cost per enrolled', numeric: true, render: (row) => money(row.costPerEnrolled), sortValue: (row) => row.costPerEnrolled ?? -1, csv: (row) => row.costPerEnrolled },
     {
       key: 'perHired',
       header: 'Cost per hired',
@@ -57,6 +59,7 @@ export function CohortsSection() {
       definition: 'Cost of the cohort month divided by its hired graduates. Shown only for cohorts at least 12 months old; younger cohorts are still maturing.',
       render: (row) => (row.maturing ? <span className="muted">Maturing</span> : money(row.costPerHired)),
       sortValue: (row) => row.costPerHired ?? -1,
+      csv: (row) => (row.maturing ? 'maturing' : row.costPerHired),
     },
   ];
   return (
@@ -83,7 +86,7 @@ export function CohortsSection() {
           />
         </div>
         {cohorts.isError && <Alert tone="danger" title="Cohorts not loaded">{cohorts.error.message}</Alert>}
-        <DataTable caption="Cohorts by month of first touch" captionHidden columns={columns} rows={cohorts.data?.cohorts ?? []} rowKey={(row) => row.month} loading={cohorts.isPending} />
+        <DataTable caption="Cohorts by month of first touch" captionHidden columns={columns} rows={cohorts.data?.cohorts ?? []} rowKey={(row) => row.month} loading={cohorts.isPending} exportFile={`cohorts-${model}${channel ? `-${channel}` : ''}`} />
       </section>
     </div>
   );

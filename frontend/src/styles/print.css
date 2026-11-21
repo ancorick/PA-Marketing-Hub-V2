@@ -1,0 +1,88 @@
+/*
+ * Print and "Export PDF" (ANL-12, Flow D step 5): the Overview fits one A4 landscape page. The light theme is
+ * applied while printing (lib/print.ts), so colours come from the same tokens; controls and navigation are hidden.
+ */
+@page {
+  size: A4 landscape;
+  margin: 10mm;
+}
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  html {
+    font-size: 11px;
+  }
+
+  body {
+    background: var(--color-surface);
+    print-color-adjust: exact;
+  }
+
+  .header,
+  .skip-link,
+  .no-print,
+  .tooltip__trigger,
+  .tile__footer,
+  .sort-btn svg,
+  .chart + details {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block;
+  }
+
+  .main {
+    padding: 0;
+    max-width: none;
+  }
+
+  .page-header {
+    margin-bottom: var(--space-3);
+  }
+
+  .page-header h1 {
+    font-size: 2rem;
+  }
+
+  .stack--lg {
+    gap: var(--space-3);
+  }
+
+  .tiles {
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-2);
+  }
+
+  .tile,
+  .card {
+    padding: var(--space-3);
+    box-shadow: none;
+    border-radius: var(--radius-md);
+    break-inside: avoid;
+    translate: none !important;
+    transform: none !important;
+  }
+
+  .tile__value {
+    font-size: 1.8rem;
+  }
+
+  .table th,
+  .table td {
+    height: auto;
+    padding-block: 0.3rem;
+  }
+
+  .table-wrap {
+    overflow: visible;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+}

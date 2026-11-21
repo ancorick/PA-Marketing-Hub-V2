@@ -42,6 +42,7 @@ export function CampaignsSection() {
           rowKey={(row) => row.campaign}
           loading={list.isPending}
           initialSort={{ key: 'cost', direction: 'descending' }}
+          exportFile={`campaigns-${period.from}-${period.to}-${model}`}
           empty="No campaign results or spend in this period. Tag links with the Link builder so visits carry a campaign."
         />
       </section>

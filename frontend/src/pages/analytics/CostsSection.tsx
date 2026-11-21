@@ -86,8 +86,9 @@ export function CostsSection() {
         </div>
       ),
       sortValue: (row) => row.description,
+      csv: (row) => `${row.description} (${channelName(row.channel)}${row.campaign ? `, ${row.campaign}` : ''})`,
     },
-    { key: 'dates', header: 'Spend dates', render: (row) => <span className="num">{range(row)}</span>, sortValue: (row) => row.dateFrom },
+    { key: 'dates', header: 'Spend dates', render: (row) => <span className="num">{range(row)}</span>, sortValue: (row) => row.dateFrom, csv: (row) => `${row.dateFrom} – ${row.dateTo}` },
     {
       key: 'amount',
       header: 'Amount',
@@ -104,7 +105,7 @@ export function CostsSection() {
       ),
       sortValue: (row) => row.amountAmd,
     },
-    { key: 'by', header: 'Entered by', render: (row) => row.updatedBy },
+    { key: 'by', header: 'Entered by', render: (row) => row.updatedBy, csv: (row) => row.updatedBy },
     ...(canEdit
       ? [
           {
@@ -140,6 +141,7 @@ export function CostsSection() {
           rowKey={(row) => row.channel}
           loading={costs.isPending}
           initialSort={{ key: 'total', direction: 'descending' }}
+          exportFile={`channel-costs-${period.from}-${period.to}`}
           footer={
             <tr>
               <th scope="row">Total</th>
@@ -228,6 +230,7 @@ export function CostsSection() {
           columns={entryColumns}
           rows={costs.data?.costs ?? []}
           rowKey={(row) => row.id}
+          exportFile={`manual-costs-${period.from}-${period.to}`}
           loading={costs.isPending}
           empty={canEdit ? 'No manual costs in this period. Add agency fees, printed materials, sponsorships or venue costs above.' : 'No manual costs in this period.'}
         />

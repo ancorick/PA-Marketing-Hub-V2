@@ -53,10 +53,11 @@ export function LinksSection() {
         </div>
       ),
       sortValue: (row) => row.label ?? row.destinationUrl,
+      csv: (row) => `${row.label ?? row.destinationUrl} ${row.shortUrl} ${row.fullUrl}`,
     },
     { key: 'channel', header: 'Channel', render: (row) => channelName(row.channel), sortValue: (row) => channelName(row.channel) },
     { key: 'campaign', header: 'Campaign', render: (row) => <code>{row.utmCampaign}</code>, sortValue: (row) => row.utmCampaign },
-    { key: 'source', header: 'Source / medium', render: (row) => <code>{`${row.utmSource} / ${row.utmMedium}`}</code> },
+    { key: 'source', header: 'Source / medium', render: (row) => <code>{`${row.utmSource} / ${row.utmMedium}`}</code>, csv: (row) => `${row.utmSource} / ${row.utmMedium}` },
     { key: 'clicks', header: 'Short link clicks', numeric: true, render: (row) => formatNumber(row.clicks), sortValue: (row) => row.clicks },
     { key: 'created', header: 'Created', render: (row) => <span className="num">{formatDate(row.createdAt)}</span>, sortValue: (row) => row.createdAt },
   ];
@@ -136,6 +137,7 @@ export function LinksSection() {
           rows={links.data.links}
           rowKey={(row) => row.id}
           initialSort={{ key: 'created', direction: 'descending' }}
+          exportFile="tracked-links"
           empty="No tracked links yet. Create one above before posting a campaign link."
         />
       </section>

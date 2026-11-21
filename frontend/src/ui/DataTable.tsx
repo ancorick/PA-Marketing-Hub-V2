@@ -1,5 +1,7 @@
-import { CaretDown, CaretUp, CaretUpDown } from '@phosphor-icons/react';
+import { CaretDown, CaretUp, CaretUpDown, DownloadSimple } from '@phosphor-icons/react';
 import { useMemo, useState, type ReactNode } from 'react';
+import { csvFile } from '../lib/csv';
+import { Button } from './Button';
 import { Tooltip } from './Tooltip';
 
 export type Column<Row> = {
@@ -13,7 +15,27 @@ export type Column<Row> = {
   sortValue?: (row: Row) => number | string;
   /** Metric definition, shown in a tooltip next to the header (ANL-15). */
   definition?: string;
+  /** Value written to the CSV export; defaults to sortValue; columns with neither are left out. */
+  csv?: (row: Row) => string | number | null;
 };
+
+/** CSV of the rows as sorted (ANL-12): columns with a csv value (or a sort value); others are left out. */
+export function tableCsv<Row>(columns: Column<Row>[], rows: Row[]): string {
+  const exported = columns.filter((c) => c.csv || c.sortValue);
+  return csvFile(
+    exported.map((c) => c.header),
+    rows.map((row) => exported.map((c) => (c.csv ?? c.sortValue)!(row))),
+  );
+}
+
+function download(name: string, text: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+  const link = Object.assign(document.createElement('a'), { href: url, download: name.endsWith('.csv') ? name : `${name}.csv` });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
 
 type DataTableProps<Row> = {
   caption: string;
@@ -28,6 +50,8 @@ type DataTableProps<Row> = {
   empty?: ReactNode;
   footer?: ReactNode;
   initialSort?: { key: string; direction: 'ascending' | 'descending' };
+  /** File name for "Download CSV" (ANL-12); no button without it. */
+  exportFile?: string;
 };
 
 /** Accessible data table: real <table>, sortable headers with aria-sort, scroll wrapper on narrow screens. */
@@ -42,6 +66,7 @@ export function DataTable<Row>({
   empty = 'No rows yet.',
   footer,
   initialSort,
+  exportFile,
 }: DataTableProps<Row>) {
   const [sort, setSort] = useState(initialSort ?? null);
 
@@ -111,7 +136,7 @@ export function DataTable<Row>({
     ));
   }
 
-  return (
+  const table = (
     <div className="table-wrap" role="region" aria-label={caption} tabIndex={0}>
       <table className="table" aria-busy={loading || undefined}>
         <caption className={captionHidden ? 'visually-hidden' : undefined}>{caption}</caption>
@@ -144,6 +169,17 @@ export function DataTable<Row>({
         <tbody>{body}</tbody>
         {footer && !loading && !error && sorted.length > 0 && <tfoot>{footer}</tfoot>}
       </table>
+    </div>
+  );
+  if (!exportFile) return table;
+  return (
+    <div className="stack stack--sm">
+      <div className="table-tools no-print">
+        <Button size="sm" variant="ghost" icon={<DownloadSimple size={16} aria-hidden />} disabled={loading || sorted.length === 0} onClick={() => download(exportFile, tableCsv(columns, sorted))}>
+          Download CSV<span className="visually-hidden">: {caption}</span>
+        </Button>
+      </div>
+      {table}
     </div>
   );
 }

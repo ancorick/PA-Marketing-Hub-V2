@@ -1,7 +1,7 @@
 import type { CampaignRow } from '../../lib/api';
 import { formatAmd } from '../../lib/format';
 import type { Column } from '../../ui';
-import { CountCell, countValue, peoplePath } from './numbers';
+import { CountCell, countCsv, countValue, peoplePath } from './numbers';
 
 const money = (value: number | null) => (value === null ? <span className="muted">—</span> : formatAmd(value));
 
@@ -22,11 +22,12 @@ export function campaignColumns(definitions: { modelNote: string; marketing: boo
         numeric: true,
         definition: `Credited to the campaign.${definitions.modelNote}`,
         render: (row) => <CountCell value={row[stage]} href={people(stage, row)} label={stage} />,
+        csv: (row) => countCsv(row[stage]),
         sortValue: (row) => countValue(row[stage]),
       }),
     ),
     { key: 'cost', header: 'Cost', numeric: true, definition: 'Ad spend for the campaign plus manual costs that name it, in the period.', render: (row) => formatAmd(row.costAmd), sortValue: (row) => row.costAmd },
-    { key: 'perEnrolled', header: 'Cost per enrolled', numeric: true, render: (row) => money(row.costPerEnrolled), sortValue: (row) => row.costPerEnrolled ?? -1 },
+    { key: 'perEnrolled', header: 'Cost per enrolled', numeric: true, render: (row) => money(row.costPerEnrolled), sortValue: (row) => row.costPerEnrolled ?? -1, csv: (row) => row.costPerEnrolled },
   ];
 }
 

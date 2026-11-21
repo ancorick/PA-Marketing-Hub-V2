@@ -11,6 +11,9 @@ export const STAGE_LABEL: Record<Stage, string> = { lead: 'Leads', applied: 'App
 /** Position-based credit can be fractional; show up to one decimal. */
 export const countText = (value: Count) => (value === 'fewer_than_3' ? SMALL_NUMBER_TEXT : formatNumber(value, undefined, { maximumFractionDigits: 1 }));
 
+/** CSV value of a count: the number, or the words shown on screen when suppressed. */
+export const countCsv = (value: Count) => (value === 'fewer_than_3' ? SMALL_NUMBER_TEXT : value);
+
 export const countValue = (value: Count) => (value === 'fewer_than_3' ? 1.5 : value);
 
 /** Hash link to the people behind a count (ANL-15). */
