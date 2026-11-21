@@ -23,6 +23,8 @@ export type CadenceInput = {
   collectWorkingDays: number;
   languages: Language[];
   segments: Partial<Record<Language, string>>;
+  /** NWS-15: template for every issue of this cadence; none = the default brand look. */
+  templateId?: string | null;
   active: boolean;
 };
 

@@ -5,6 +5,7 @@ import { LANGUAGES } from '../contacts/fields.js';
 import type { CoreEngineClient } from '../integrations/core-engine/contract.js';
 import { AssistUnavailableError } from '../ai/writing-assistant.js';
 import type { IssueEditor } from '../newsletter/editor.js';
+import type { NewsletterPublishing } from '../newsletter/publishing.js';
 import { NewsletterError, type NewsletterService } from '../newsletter/service.js';
 import { UploadError, type UploadService } from '../uploads/service.js';
 
@@ -36,6 +37,7 @@ const cadenceBody = z
     collectWorkingDays: z.number().int().min(1).max(15),
     languages: z.array(z.enum(LANGUAGES)).min(1).max(3),
     segments: z.partialRecord(z.enum(LANGUAGES), z.uuid()),
+    templateId: z.uuid().nullable().optional(),
     active: z.boolean(),
   })
   .strict();
@@ -49,9 +51,35 @@ export function newsletterError(reply: FastifyReply, error: unknown) {
 }
 
 /** Newsletter schedule and issues (NWS-01 to NWS-03, NWS-06). Editors work on drafts; managers own the schedule. */
-type NewsletterRoutesOptions = { newsletter: NewsletterService; editor: IssueEditor; uploads: UploadService; coreEngine: Pick<CoreEngineClient, 'verifyStaffToken'> };
+type NewsletterRoutesOptions = {
+  newsletter: NewsletterService;
+  editor: IssueEditor;
+  publishing: NewsletterPublishing;
+  uploads: UploadService;
+  seedList: string[];
+  coreEngine: Pick<CoreEngineClient, 'verifyStaffToken'>;
+};
 
-export async function newsletterRoutes(app: FastifyInstance, { newsletter, editor, uploads, coreEngine }: NewsletterRoutesOptions) {
+const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #FFDC00');
+const templateBody = z
+  .object({
+    name: z.string().trim().min(1).max(100),
+    accentColor: hex,
+    buttonTextColor: hex,
+    backgroundColor: hex,
+    textColor: hex,
+    fontFamily: z.string().trim().min(1).max(200),
+    logoUrl: z.string().max(2000).nullable(),
+    headerText: z.string().trim().min(1).max(100),
+    footerNote: z.string().max(500).nullable(),
+  })
+  .strict();
+const commentBody = z.object({ comment: z.string().trim().min(1).max(2000) }).strict();
+const optionalCommentBody = z.object({ comment: z.string().trim().max(2000).nullable().optional() }).strict();
+const approveBody = z.object({ comment: z.string().trim().max(2000).nullable().optional(), scheduledAt: z.iso.datetime({ offset: true }).nullable().optional() }).strict();
+const testBody = z.object({ emails: z.array(z.email()).max(20).optional() }).strict();
+
+export async function newsletterRoutes(app: FastifyInstance, { newsletter, editor, publishing, uploads, seedList, coreEngine }: NewsletterRoutesOptions) {
   const canEdit = requireRole(coreEngine, ['editor', 'marketing_manager', 'admin']);
   const managers = requireRole(coreEngine, ['marketing_manager', 'admin']);
   const withId = (handler: (id: string, request: FastifyRequest, reply: FastifyReply) => Promise<unknown>) => async (request: FastifyRequest, reply: FastifyReply) => {
@@ -136,6 +164,55 @@ export async function newsletterRoutes(app: FastifyInstance, { newsletter, edito
     const body = swapBody.safeParse(request.body);
     return body.success ? editor.swapItem(id, blockId, body.data.removeItemId, body.data.addItemId, request.staff!.userId) : invalid(reply, body.error);
   }));
+  // Templates (NWS-15): managers own the brand look.
+  app.get('/api/newsletter/templates', { preHandler: canEdit }, async () => ({ templates: await publishing.templates() }));
+  app.post('/api/newsletter/templates', { preHandler: managers }, async (request, reply) => {
+    const body = templateBody.safeParse(request.body);
+    if (!body.success) return invalid(reply, body.error);
+    try {
+      return reply.code(201).send(await publishing.saveTemplate(body.data, request.staff!.userId));
+    } catch (error) {
+      return newsletterError(reply, error);
+    }
+  });
+  app.put('/api/newsletter/templates/:id', { preHandler: managers }, withId(async (id, request, reply) => {
+    const body = templateBody.safeParse(request.body);
+    return body.success ? publishing.saveTemplate(body.data, request.staff!.userId, id) : invalid(reply, body.error);
+  }));
+
+  // Preview, test send and pre-send checks (NWS-08, NWS-09).
+  app.get('/api/newsletter/issues/:id/preview', { preHandler: canEdit }, withId(async (id) => publishing.preview(id)));
+  app.get('/api/newsletter/issues/:id/checks', { preHandler: canEdit }, withId(async (id) => ({ checks: await publishing.checks(id) })));
+  app.post('/api/newsletter/issues/:id/test', { preHandler: canEdit }, withId(async (id, request, reply) => {
+    const body = testBody.safeParse(request.body ?? {});
+    const recipients = (body.success && body.data.emails?.length ? body.data.emails : null) ?? seedList;
+    if (recipients.length === 0) return reply.code(400).send({ error: 'invalid_request', message: 'No seed list: set SEED_LIST or enter test addresses' });
+    return publishing.testSend(id, recipients);
+  }));
+
+  // Review and approval with comments (NWS-10); approval schedules the send (NWS-11).
+  app.get('/api/newsletter/issues/:id/comments', { preHandler: canEdit }, withId(async (id) => ({ comments: await publishing.comments(id) })));
+  app.post('/api/newsletter/issues/:id/comments', { preHandler: canEdit }, withId(async (id, request, reply) => {
+    const body = commentBody.safeParse(request.body);
+    if (!body.success) return invalid(reply, body.error);
+    await publishing.comment(id, request.staff!.userId, body.data.comment);
+    return reply.code(201).send({ ok: true });
+  }));
+  app.post('/api/newsletter/issues/:id/submit', { preHandler: canEdit }, withId(async (id, request, reply) => {
+    const body = optionalCommentBody.safeParse(request.body ?? {});
+    return body.success ? publishing.submit(id, request.staff!.userId, body.data.comment ?? null) : invalid(reply, body.error);
+  }));
+  app.post('/api/newsletter/issues/:id/request-changes', { preHandler: managers }, withId(async (id, request, reply) => {
+    const body = commentBody.safeParse(request.body);
+    return body.success ? publishing.requestChanges(id, request.staff!.userId, body.data.comment) : invalid(reply, body.error);
+  }));
+  app.post('/api/newsletter/issues/:id/approve', { preHandler: managers }, withId(async (id, request, reply) => {
+    const body = approveBody.safeParse(request.body ?? {});
+    if (!body.success) return invalid(reply, body.error);
+    return publishing.approve(id, request.staff!.userId, body.data.comment ?? null, body.data.scheduledAt ? new Date(body.data.scheduledAt) : null);
+  }));
+  app.post('/api/newsletter/issues/:id/unschedule', { preHandler: managers }, withId(async (id, request) => publishing.unschedule(id, request.staff!.userId)));
+
   // NWS-07: AI writing assist; answers 503 when no API key is configured or the AI service fails.
   app.get('/api/newsletter/ai', { preHandler: canEdit }, async () => ({ enabled: editor.aiEnabled }));
   app.post('/api/newsletter/issues/:id/ai-draft', { preHandler: canEdit }, withId(async (id, request, reply) => {

@@ -47,6 +47,7 @@ import {
   type Column,
   type Tone,
 } from '../ui';
+import { EmailPreview } from './EmailPreview';
 import { KillSwitchBanner } from './KillSwitch';
 
 export const SEND_STATUS: Record<SendStatus, { tone: Tone; label: string }> = {
@@ -151,48 +152,8 @@ const toInput = (send: Send): SendInput => ({
 
 const CHECK_TONE: Record<'pass' | 'warn' | 'fail', Tone> = { pass: 'success', warn: 'warning', fail: 'danger' };
 
-/** EML-13: the rendered email as desktop, phone or (simulated) dark-mode clients show it. */
 function Preview({ sendId, version }: { sendId: string; version: string }) {
-  const [device, setDevice] = useState<'desktop' | 'mobile' | 'dark'>('desktop');
-  const preview = useQuery({ queryKey: ['send-preview', sendId, version], queryFn: () => previewSend(sendId) });
-  return (
-    <section className="card stack" aria-labelledby="preview-heading">
-      <div className="card__header">
-        <h2 id="preview-heading">Preview</h2>
-        <div className="segmented" role="group" aria-label="Preview as">
-          {(['desktop', 'mobile', 'dark'] as const).map((value) => (
-            <button key={value} type="button" className="segmented__btn" aria-pressed={device === value} onClick={() => setDevice(value)}>
-              {value === 'desktop' ? 'Desktop' : value === 'mobile' ? 'Phone' : 'Dark mode'}
-            </button>
-          ))}
-        </div>
-      </div>
-      {preview.data ? (
-        <>
-          <dl className="facts facts--compact">
-            <div>
-              <dt>From</dt>
-              <dd>{preview.data.from}</dd>
-            </div>
-            <div>
-              <dt>Subject</dt>
-              <dd>{preview.data.subject}</dd>
-            </div>
-          </dl>
-          <div className={`email-preview email-preview--${device}`}>
-            <iframe title={`Email preview, ${device}`} sandbox="" srcDoc={preview.data.html} />
-          </div>
-          {device === 'dark' && <p className="muted">Dark mode is simulated; clients differ. Send a test to the seed list to see real ones.</p>}
-        </>
-      ) : preview.isError ? (
-        <Alert tone="danger" title="Preview failed">
-          {preview.error.message}
-        </Alert>
-      ) : (
-        <SkeletonCard />
-      )}
-    </section>
-  );
+  return <EmailPreview queryKey={['send-preview', sendId, version]} load={() => previewSend(sendId)} />;
 }
 
 function Checks({ sendId, version }: { sendId: string; version: string }) {

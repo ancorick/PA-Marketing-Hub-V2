@@ -383,6 +383,10 @@ export const sends = pgTable(
     buttonUrl: text('button_url'),
     /** utm_campaign added to every link (Flow B step 2, ANL-04). */
     utmCampaign: text('utm_campaign').notNull(),
+    /** Newsletter sends: the issue, and the approved blocks and template frozen at approval (what was approved is sent). */
+    issueId: uuid('issue_id'),
+    blocks: jsonb('blocks').$type<unknown[]>(),
+    theme: jsonb('theme').$type<Record<string, unknown>>(),
     /** draft | approved | scheduled | sending | paused | sent | cancelled */
     status: text('status').notNull().default('draft'),
     pausedReason: text('paused_reason'),
@@ -703,3 +707,39 @@ export const uploads = pgTable('uploads', {
   uploadedBy: text('uploaded_by').notNull(),
   ...timestamps,
 });
+
+/** Newsletter template (NWS-15): brand colours, font, logo and footer, reused across issues. */
+export const newsletterTemplates = pgTable('newsletter_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  accentColor: text('accent_color').notNull(),
+  buttonTextColor: text('button_text_color').notNull(),
+  backgroundColor: text('background_color').notNull(),
+  textColor: text('text_color').notNull(),
+  fontFamily: text('font_family').notNull(),
+  logoUrl: text('logo_url'),
+  headerText: text('header_text').notNull(),
+  footerNote: text('footer_note'),
+  version: integer('version').notNull().default(1),
+  createdBy: text('created_by').notNull(),
+  ...timestamps,
+});
+
+export type NewsletterTemplateRow = typeof newsletterTemplates.$inferSelect;
+
+/** Review thread of an issue (NWS-10): comments, change requests and the approval itself. */
+export const issueComments = pgTable(
+  'issue_comments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    issueId: uuid('issue_id')
+      .notNull()
+      .references(() => issues.id, { onDelete: 'cascade' }),
+    actorId: text('actor_id').notNull(),
+    /** comment | submitted | approved | changes_requested | unscheduled */
+    kind: text('kind').notNull(),
+    body: text('body'),
+    ...timestamps,
+  },
+  (table) => [index('issue_comments_issue_idx').on(table.issueId, table.createdAt)],
+);

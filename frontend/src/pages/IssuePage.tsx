@@ -7,6 +7,7 @@ import { useStaffRole } from '../lib/session';
 import { Disclosure } from '../motion';
 import { AccessNotice, accessProblem, Alert, Button, PageHeader, retryServerErrors, SkeletonCard, StatusBadge } from '../ui';
 import { IssueEditor } from './IssueEditor';
+import { IssueReview } from './IssueReview';
 import { ISSUE_STATUS } from './NewsletterPage';
 
 const SOURCE_LABEL: Record<CollectedItem['type'], string> = {
@@ -99,6 +100,7 @@ export function IssuePage({ id }: { id: string }) {
           </section>
         )}
         {issue.status !== 'collecting' && <IssueEditor data={detail.data} />}
+        {issue.status !== 'collecting' && <IssueReview issue={issue} />}
         <section className="card stack" aria-labelledby="items-heading">
           <h2 id="items-heading">Collected items</h2>
           <p className="muted">{items.filter((item) => item.used).length} in the draft, {items.filter((item) => item.publishable && !item.used).length} more available.</p>

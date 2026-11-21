@@ -5,7 +5,7 @@ import type { AppPgDatabase } from '../db/client.js';
 import { contacts, deliveries, sends, type DeliveryRow, type SendRow } from '../db/schema.js';
 import type { DomainService } from '../domains/service.js';
 import type { EmailAdapter } from '../email/adapter.js';
-import { renderEmail } from '../email/render.js';
+import { escapeHtml, renderEmail, type EmailTheme } from '../email/render.js';
 import type { Language } from '../integrations/core-engine/contract.js';
 import type { ContactLinks, LinkSigner } from '../links/tokens.js';
 import type { SegmentService } from '../segments/service.js';
@@ -43,12 +43,25 @@ export class SendError extends Error {
   }
 }
 
+/** A newsletter block as frozen into the send at approval. */
+export type SnapshotBlock = {
+  id: string;
+  title: string;
+  body: string;
+  imageUrl: string | null;
+  imageAlt: string | null;
+  buttonLabel: string | null;
+  buttonUrl: string | null;
+};
+
 export type CheckResult = { id: string; label: string; status: 'pass' | 'warn' | 'fail'; message: string };
 
 /** Link reachability for pre-send checks; injectable so tests never hit the network. */
 export interface LinkChecker {
   /** HTTP status, or null when the request failed (timeout, DNS). */
   status(url: string): Promise<number | null>;
+  /** Content-Length in bytes for image weight checks (NWS-09); null when unknown. */
+  contentLength?(url: string): Promise<number | null>;
 }
 
 export const httpLinkChecker: LinkChecker = {
@@ -57,6 +70,15 @@ export const httpLinkChecker: LinkChecker = {
       const response = await fetch(url, { method: 'HEAD', redirect: 'follow', signal: AbortSignal.timeout(5000) });
       if (response.status === 405) return (await fetch(url, { method: 'GET', redirect: 'follow', signal: AbortSignal.timeout(5000) })).status;
       return response.status;
+    } catch {
+      return null;
+    }
+  },
+  async contentLength(url) {
+    try {
+      const response = await fetch(url, { method: 'HEAD', redirect: 'follow', signal: AbortSignal.timeout(5000) });
+      const length = Number(response.headers.get('content-length'));
+      return response.ok && Number.isFinite(length) && length > 0 ? length : null;
     } catch {
       return null;
     }
@@ -177,12 +199,31 @@ export class SendService {
     const tag = (url: string) => tagUrl(url, { source, campaign: send.utmCampaign, token });
     const name = contact?.firstName ?? FALLBACK_NAME[language];
     const personalize = (value: string) => value.replace(/\{\{\s*first_name\s*\}\}/g, name);
-    const body = renderMarkup(personalize(send.body), tag);
+    // Newsletters render their approved blocks, each link tagged with its block (NWS-14).
+    const blocks = send.blocks
+      ? (send.blocks as SnapshotBlock[]).map((block) => {
+          const blockTag = (url: string) => tagUrl(url, { source, campaign: send.utmCampaign, token, content: block.id });
+          const inner = renderMarkup(personalize(block.body), blockTag);
+          const image = block.imageUrl
+            ? `<img src="${escapeHtml(block.imageUrl)}" alt="${escapeHtml(block.imageAlt ?? '')}" width="536" style="display:block;max-width:100%;height:auto;border-radius:12px;margin:0 0 16px;">`
+            : '';
+          const button =
+            block.buttonLabel && block.buttonUrl
+              ? `<p style="margin:0 0 16px;"><a href="${escapeHtml(blockTag(block.buttonUrl))}" style="display:inline-block;padding:12px 20px;border-radius:999px;background:${(send.theme as EmailTheme | null)?.accentColor ?? '#FFDC00'};color:${(send.theme as EmailTheme | null)?.buttonTextColor ?? '#131317'};font-weight:700;text-decoration:none;">${escapeHtml(block.buttonLabel)}</a></p>`
+              : '';
+          return {
+            html: `<h2 style="margin:24px 0 12px;font-size:20px;line-height:1.3;">${escapeHtml(block.title)}</h2>\n${image}\n${inner.html}\n${button}`,
+            text: [block.title.toUpperCase(), inner.text, ...(block.buttonLabel && block.buttonUrl ? [`${block.buttonLabel}: ${blockTag(block.buttonUrl)}`] : [])].join('\n\n'),
+          };
+        })
+      : [renderMarkup(personalize(send.body), tag)];
+    const body = blocks;
     const rendered = renderEmail({
+      ...(send.theme && { theme: send.theme as EmailTheme }),
       language,
       preheader: send.preheader ?? undefined,
       title: personalize(send.subject),
-      blocks: [body],
+      blocks: body,
       ...(send.kind === 'reengagement' && send.buttonLabel
         ? // EML-15: "Keep me subscribed" opens the person's own preferences link, which records the answer.
           { button: { label: send.buttonLabel, url: `${this.deps.links.preferencesPage(contactId)}&stay=1` } }

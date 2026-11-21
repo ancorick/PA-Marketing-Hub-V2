@@ -570,6 +570,7 @@ export const publicStay = (token: string) => publicFetch<PublicPreferences>(with
 
 export type IssueStatus = 'collecting' | 'draft' | 'in_review' | 'approved' | 'scheduled' | 'sent';
 export type Cadence = {
+  templateId?: string | null;
   id: string;
   name: string;
   sendDay: number;
@@ -653,3 +654,35 @@ export const uploadImage = (file: File) =>
 /** NWS-07: AI writing assist (off without ANTHROPIC_API_KEY on the backend). */
 export const aiStatus = () => apiFetch<{ enabled: boolean }>('/api/newsletter/ai');
 export const aiDraftIssue = (id: string) => apiFetch<{ subjectLines: string[]; blocks: number }>(`${issuePath(id)}/ai-draft`, { method: 'POST' });
+
+/* ---------- Newsletter publishing (NWS-08 to NWS-11, NWS-15) ---------- */
+
+export type NewsletterTemplate = {
+  id: string;
+  name: string;
+  accentColor: string;
+  buttonTextColor: string;
+  backgroundColor: string;
+  textColor: string;
+  fontFamily: string;
+  logoUrl: string | null;
+  headerText: string;
+  footerNote: string | null;
+  version: number;
+};
+export type TemplateInput = Omit<NewsletterTemplate, 'id' | 'version'>;
+export type IssueComment = { id: string; actorId: string; kind: 'comment' | 'submitted' | 'approved' | 'changes_requested' | 'unscheduled'; body: string | null; createdAt: string };
+
+export const listTemplates = () => apiFetch<{ templates: NewsletterTemplate[] }>('/api/newsletter/templates');
+export const saveTemplate = (input: TemplateInput, id?: string) =>
+  apiFetch<NewsletterTemplate>(id ? `/api/newsletter/templates/${encodeURIComponent(id)}` : '/api/newsletter/templates', { method: id ? 'PUT' : 'POST', body: JSON.stringify(input) });
+export const issuePreview = (id: string) => apiFetch<RenderedEmail>(`${issuePath(id)}/preview`);
+export const issueChecks = (id: string) => apiFetch<{ checks: SendCheck[] }>(`${issuePath(id)}/checks`);
+export const issueTestSend = (id: string, emails: string[]) => apiFetch<{ sent: number }>(`${issuePath(id)}/test`, { method: 'POST', body: JSON.stringify(emails.length > 0 ? { emails } : {}) });
+export const issueComments = (id: string) => apiFetch<{ comments: IssueComment[] }>(`${issuePath(id)}/comments`);
+export const addIssueComment = (id: string, comment: string) => apiFetch<{ ok: true }>(`${issuePath(id)}/comments`, { method: 'POST', body: JSON.stringify({ comment }) });
+export const submitIssue = (id: string, comment: string | null) => apiFetch<Issue>(`${issuePath(id)}/submit`, { method: 'POST', body: JSON.stringify({ comment }) });
+export const requestIssueChanges = (id: string, comment: string) => apiFetch<Issue>(`${issuePath(id)}/request-changes`, { method: 'POST', body: JSON.stringify({ comment }) });
+export const approveIssue = (id: string, comment: string | null, scheduledAt: string | null) =>
+  apiFetch<{ issue: Issue; sendId: string; scheduledAt: string }>(`${issuePath(id)}/approve`, { method: 'POST', body: JSON.stringify({ comment, scheduledAt }) });
+export const unscheduleIssue = (id: string) => apiFetch<Issue>(`${issuePath(id)}/unschedule`, { method: 'POST' });

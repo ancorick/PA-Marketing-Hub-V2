@@ -28,6 +28,7 @@ import { newsletterRoutes } from './routes/newsletter.js';
 import { Collectors } from './newsletter/collectors.js';
 import { NewsletterService } from './newsletter/service.js';
 import { IssueEditor } from './newsletter/editor.js';
+import { NewsletterPublishing } from './newsletter/publishing.js';
 import { Notifier } from './notify/notifier.js';
 import { UploadService } from './uploads/service.js';
 import { createWritingAssistant, type WritingAssistant } from './ai/writing-assistant.js';
@@ -81,6 +82,7 @@ declare module 'fastify' {
     sunset: SunsetPolicy;
     newsletter: NewsletterService;
     issueEditor: IssueEditor;
+    publishing: NewsletterPublishing;
     uploads: UploadService;
   }
 }
@@ -315,8 +317,29 @@ export async function buildApp({
   app.decorate('issueEditor', issueEditor);
   app.decorate('uploads', uploadService);
   app.decorate('newsletter', newsletter);
-  jobs.register({ name: 'newsletter_schedule', description: 'Newsletter: plan issues, collect items and draft', intervalMs: 60 * 60_000, run: () => newsletter.tick() });
-  await app.register(newsletterRoutes, { newsletter, editor: issueEditor, uploads: uploadService, coreEngine: resolvedIntegrations.coreEngine });
+  const publishing = new NewsletterPublishing({
+    db: database.db,
+    newsletter,
+    sends: sendService,
+    segments,
+    domains,
+    email: app.email,
+    uploads: uploadService,
+    linkChecker: linkChecker ?? httpLinkChecker,
+    mailFrom: config.mailFrom,
+  });
+  app.decorate('publishing', publishing);
+  jobs.register({
+    name: 'newsletter_schedule',
+    description: 'Newsletter: plan issues, collect items, draft, mark sent issues',
+    intervalMs: 60 * 60_000,
+    run: async () => {
+      const result = await newsletter.tick();
+      const sent = await publishing.syncSent();
+      return { rowsIn: result.rowsIn, rowsUpserted: result.rowsUpserted + sent.length };
+    },
+  });
+  await app.register(newsletterRoutes, { newsletter, editor: issueEditor, publishing, uploads: uploadService, seedList: config.seedList, coreEngine: resolvedIntegrations.coreEngine });
   const merge = new MergeService({ db: database.db, coreEngine: resolvedIntegrations.coreEngine, logger: app.log });
   await app.register(importRoutes, { imports, duplicates, merge, contacts, contactRepository, coreEngine: resolvedIntegrations.coreEngine });
 
