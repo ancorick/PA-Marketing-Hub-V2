@@ -853,3 +853,47 @@ export const peopleBehind = (period: Period, model: AttributionModel, stage: Sta
   apiFetch<{ total: number; people: PersonBehind[]; modelLabel: string }>(
     `/api/analytics/people?${periodQuery(period)}&model=${model}&stage=${stage}&channel=${encodeURIComponent(channel)}${campaign ? `&campaign=${encodeURIComponent(campaign)}` : ''}`,
   );
+
+/* ---------- Analytics: channel, campaign and cohort views (ANL-09, ANL-10) ---------- */
+
+export type Counts = Record<Stage, Count>;
+export type CampaignRow = Counts & { campaign: string; costAmd: number; costPerLead: number | null; costPerEnrolled: number | null };
+export type ChannelDetail = {
+  channel: string;
+  period: Period;
+  model: AttributionModel;
+  modelLabel: string;
+  shared: boolean;
+  funnel: Counts;
+  costAmd: number;
+  costPerLead: number | null;
+  costPerEnrolled: number | null;
+  campaigns: CampaignRow[];
+  trend: (Counts & { month: string; costAmd: number })[];
+};
+export type CampaignDetail = Counts & {
+  campaign: string;
+  period: Period;
+  modelLabel: string;
+  shared: boolean;
+  costAmd: number;
+  adSpendAmd: number;
+  impressions: number;
+  clicks: number;
+  platformLeads: number;
+  costPerLead: number | null;
+  costPerApplicant: number | null;
+  costPerEnrolled: number | null;
+  channels: string[];
+};
+export type CohortRow = Counts & { month: string; maturing: boolean; people: Count; costAmd: number; costPerEnrolled: number | null; costPerHired: number | null };
+
+const modelQuery = (period: Period, model: AttributionModel) => `${periodQuery(period)}&model=${model}`;
+export const getChannelDetail = (channel: string, period: Period, model: AttributionModel) =>
+  apiFetch<ChannelDetail>(`/api/analytics/channels/${encodeURIComponent(channel)}?${modelQuery(period, model)}`);
+export const listCampaignResults = (period: Period, model: AttributionModel) =>
+  apiFetch<{ modelLabel: string; shared: boolean; campaigns: CampaignRow[] }>(`/api/analytics/campaigns?${modelQuery(period, model)}`);
+export const getCampaignDetail = (campaign: string, period: Period, model: AttributionModel) =>
+  apiFetch<CampaignDetail>(`/api/analytics/campaigns/${encodeURIComponent(campaign)}?${modelQuery(period, model)}`);
+export const getCohorts = (model: AttributionModel, channel?: string) =>
+  apiFetch<{ modelLabel: string; shared: boolean; channel: string | null; cohorts: CohortRow[] }>(`/api/analytics/cohorts?model=${model}${channel ? `&channel=${encodeURIComponent(channel)}` : ''}`);

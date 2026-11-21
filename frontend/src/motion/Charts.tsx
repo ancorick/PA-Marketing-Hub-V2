@@ -16,7 +16,7 @@ function scaleY(value: number, max: number) {
 }
 
 /** Visible data table under every chart (PRD 14.5: charts have a table alternative). */
-function DataTableAlt({ caption, data, unit }: { caption: string; data: Point[]; unit: string }) {
+function DataTableAlt({ caption, data, unit, labelHeader = 'Month' }: { caption: string; data: Point[]; unit: string; labelHeader?: string }) {
   return (
     <Disclosure title="Show data as a table">
       <div className="table-wrap">
@@ -24,7 +24,7 @@ function DataTableAlt({ caption, data, unit }: { caption: string; data: Point[];
           <caption className="visually-hidden">{caption}</caption>
           <thead>
             <tr>
-              <th scope="col">Month</th>
+              <th scope="col">{labelHeader}</th>
               <th scope="col" className="is-num">
                 {unit}
               </th>
@@ -48,9 +48,10 @@ function DataTableAlt({ caption, data, unit }: { caption: string; data: Point[];
  * Column chart: bars grow from the baseline once, staggered by --stagger-step, when the chart
  * enters the viewport. The last bar is highlighted and labelled directly. Reduced motion: static.
  */
-export function BarChart({ data, summary, unit, colorVar = '--chart-1' }: { data: Point[]; summary: string; unit: string; colorVar?: string }) {
+export function BarChart({ data, summary, unit, colorVar = '--chart-1', labelHeader }: { data: Point[]; summary: string; unit: string; colorVar?: string; labelHeader?: string }) {
   const { reduced } = useMotionPreference();
-  const max = Math.max(...data.map((d) => d.value)) * 1.1;
+  // All zeros: keep a flat baseline instead of dividing by zero.
+  const max = Math.max(...data.map((d) => d.value), 1) * 1.1;
   const slot = (W - PAD.left - PAD.right) / data.length;
   const barW = slot * 0.56;
   const last = data.length - 1;
@@ -94,7 +95,7 @@ export function BarChart({ data, summary, unit, colorVar = '--chart-1' }: { data
         </text>
       </svg>
       <figcaption>{summary}</figcaption>
-      <DataTableAlt caption={summary} data={data} unit={unit} />
+      <DataTableAlt caption={summary} data={data} unit={unit} labelHeader={labelHeader} />
     </figure>
   );
 }

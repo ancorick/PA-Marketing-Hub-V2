@@ -2372,3 +2372,12 @@ th[aria-sort='descending'] .sort-btn {
 .period-picker .field {
   width: 11rem;
 }
+
+/* Charts are drawn on a 600-unit canvas: keep them near that size so axis text stays small. */
+.chart-narrow {
+  max-width: 48rem;
+}
+
+.field-narrow {
+  max-width: 20rem;
+}

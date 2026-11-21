@@ -4,6 +4,7 @@ import { CsvRowError, type AnalyticsPipeline } from '../analytics/pipeline.js';
 import { RULE_KINDS, TaxonomyError, type ChannelTaxonomy } from '../analytics/taxonomy.js';
 import { ATTRIBUTION_MODELS, MODEL_LABEL, STAGES, type AttributionService } from '../analytics/attribution.js';
 import { suppress, type OverviewService } from '../analytics/overview.js';
+import type { DetailService } from '../analytics/detail.js';
 import type { StaffSession } from '../integrations/core-engine/contract.js';
 import { COST_CURRENCIES, CostError, type CostService } from '../analytics/costs.js';
 import { CHANNEL_MEDIUM, CHANNEL_SOURCES, LinkBuilderError, type LinkBuilder } from '../analytics/links.js';
@@ -57,13 +58,14 @@ const isShared = (staff: StaffSession | null) => !staff?.roles.some((role) => ro
 const csvBody = z.object({ platform: z.enum(['meta_ads', 'google_ads']), csv: z.string().min(1).max(5_000_000) });
 
 /** Analytics pipeline (PRD 9.1, 9.2): re-runs of a date range (admin) and the ad spend CSV fallback. */
-export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy, links, costs, attribution, overview, coreEngine }: {
+export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy, links, costs, attribution, overview, detail, coreEngine }: {
     pipeline: AnalyticsPipeline;
     taxonomy: ChannelTaxonomy;
     links: LinkBuilder;
     costs: CostService;
     attribution: AttributionService;
     overview: OverviewService;
+    detail: DetailService;
     coreEngine: Pick<CoreEngineClient, 'verifyStaffToken'> }) {
   const admin = requireRole(coreEngine, ['admin']);
   const managers = requireRole(coreEngine, ['admin', 'marketing_manager']);
@@ -109,6 +111,45 @@ export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy
     const options = attributionQuery.safeParse(request.query);
     if (!options.success) return invalid(reply, options.error);
     return overview.overview(period.data, options.data.model, isShared(request.staff));
+  });
+
+  // Channel, campaign and cohort views (9.6, ANL-09, ANL-10): aggregates for every role.
+  const channelOrUnmapped = z.enum([...CHANNEL_IDS, 'unmapped', 'unattributed']);
+  app.get('/api/analytics/channels/:channel', { preHandler: anyStaff }, async (request, reply) => {
+    const channel = channelOrUnmapped.safeParse((request.params as { channel: string }).channel);
+    if (!channel.success) return reply.code(404).send({ error: 'not_found', message: 'Unknown channel' });
+    const period = periodQuery.safeParse(request.query);
+    if (!period.success) return invalid(reply, period.error);
+    const options = attributionQuery.safeParse(request.query);
+    if (!options.success) return invalid(reply, options.error);
+    return detail.channel(channel.data, period.data, options.data.model, isShared(request.staff));
+  });
+
+  app.get('/api/analytics/campaigns', { preHandler: anyStaff }, async (request, reply) => {
+    const period = periodQuery.safeParse(request.query);
+    if (!period.success) return invalid(reply, period.error);
+    const options = attributionQuery.safeParse(request.query);
+    if (!options.success) return invalid(reply, options.error);
+    const shared = isShared(request.staff);
+    return { model: options.data.model, modelLabel: MODEL_LABEL[options.data.model], shared, campaigns: await detail.campaigns(period.data, options.data.model, shared) };
+  });
+
+  app.get('/api/analytics/campaigns/:key', { preHandler: anyStaff }, async (request, reply) => {
+    const key = z.string().min(1).max(100).safeParse((request.params as { key: string }).key);
+    if (!key.success) return reply.code(404).send({ error: 'not_found', message: 'Unknown campaign' });
+    const period = periodQuery.safeParse(request.query);
+    if (!period.success) return invalid(reply, period.error);
+    const options = attributionQuery.safeParse(request.query);
+    if (!options.success) return invalid(reply, options.error);
+    return detail.campaign(key.data, period.data, options.data.model, isShared(request.staff));
+  });
+
+  app.get('/api/analytics/cohorts', { preHandler: anyStaff }, async (request, reply) => {
+    const options = attributionQuery.safeParse(request.query);
+    if (!options.success) return invalid(reply, options.error);
+    const channel = options.data.channel ? channelOrUnmapped.safeParse(options.data.channel) : null;
+    if (channel && !channel.success) return reply.code(400).send({ error: 'invalid_request', message: 'Unknown channel', field: 'channel' });
+    return detail.cohorts(options.data.model, isShared(request.staff), channel?.data);
   });
 
   // The contacts behind a number (ANL-15): marketing roles only, as they are individual records (4.3).

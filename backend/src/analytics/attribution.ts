@@ -54,7 +54,16 @@ export function window(touches: Touch[], anchor: Date): Touch[] {
   return touches.filter((touch) => touch.at <= anchor && touch.at.getTime() >= anchor.getTime() - LOOKBACK_MS).sort((a, b) => a.at.getTime() - b.at.getTime());
 }
 
-type Person = { touches: Touch[]; appliedAt: Date | null; firstTouchAt: Date | null };
+export type Person = { touches: Touch[]; appliedAt: Date | null; enrolledAt: Date | null; firstTouchAt: Date | null };
+
+/**
+ * The date touches are counted up to: the application (9.4, last touch before application); a person enrolled
+ * without a recorded application uses the enrollment; otherwise the outcome itself.
+ */
+export function anchorFor(person: Pick<Person, 'appliedAt' | 'enrolledAt'>, outcomeAt: Date): Date {
+  const conversion = person.appliedAt ?? person.enrolledAt;
+  return conversion && conversion <= outcomeAt ? conversion : outcomeAt;
+}
 
 /**
  * Attribution (PRD 9.4, ANL-06, ANL-07) of the leads, applicants, enrolled students, graduates and hired
@@ -75,11 +84,11 @@ export class AttributionService {
   /** Credits for one person under every model (contact page, ANL-06). */
   async forContact(contactId: string): Promise<{ anchor: string | null; models: Record<AttributionModel, Credit[]> }> {
     const people = await this.people([contactId]);
-    const person = people.get(contactId) ?? { touches: [], appliedAt: null, firstTouchAt: null };
-    const anchor = person.appliedAt ?? new Date();
+    const person = people.get(contactId) ?? { touches: [], appliedAt: null, enrolledAt: null, firstTouchAt: null };
+    const anchor = anchorFor(person, new Date());
     const touches = window(person.touches, anchor);
     return {
-      anchor: person.appliedAt?.toISOString() ?? null,
+      anchor: (person.appliedAt ?? person.enrolledAt)?.toISOString() ?? null,
       models: Object.fromEntries(ATTRIBUTION_MODELS.map((model) => [model, credit(touches, model)])) as Record<AttributionModel, Credit[]>,
     };
   }
@@ -98,12 +107,12 @@ export class AttributionService {
   }
 
   /** Visits every credit of every outcome in the period. */
-  private async walk(range: DateRange, model: AttributionModel, visit: (outcome: { contactId: string | null; type: Stage; at: Date }, credit: Credit) => void) {
+  async walk(range: DateRange, model: AttributionModel, visit: (outcome: { contactId: string | null; type: Stage; at: Date }, credit: Credit) => void) {
     const rows = await this.outcomesIn(range);
     const people = await this.people([...new Set(rows.map((row) => row.contactId).filter((id): id is string => id !== null))]);
     for (const row of rows) {
       const person = row.contactId ? people.get(row.contactId) : undefined;
-      const credits = person ? credit(window(person.touches, person.appliedAt && person.appliedAt <= row.at ? person.appliedAt : row.at), model) : [{ channel: UNATTRIBUTED, campaign: null, share: 1 }];
+      const credits = person ? credit(window(person.touches, anchorFor(person, row.at)), model) : [{ channel: UNATTRIBUTED, campaign: null, share: 1 }];
       for (const item of credits) visit(row, item);
     }
   }
@@ -133,7 +142,7 @@ export class AttributionService {
   }
 
   /** Touches (without estimated opens), the first application date and the source of each contact. */
-  private async people(contactIds: string[]): Promise<Map<string, Person>> {
+  async people(contactIds: string[]): Promise<Map<string, Person>> {
     const people = new Map<string, Person>();
     for (let i = 0; i < contactIds.length; i += 1000) {
       const ids = contactIds.slice(i, i + 1000);
@@ -143,20 +152,21 @@ export class AttributionService {
           .from(touchpoints)
           .where(and(inArray(touchpoints.contactId, ids), ne(touchpoints.type, 'open'))),
         this.db
-          .select({ contactId: outcomes.contactId, at: sql<Date>`min(${outcomes.occurredAt})` })
+          .select({ contactId: outcomes.contactId, type: outcomes.type, at: sql<Date>`min(${outcomes.occurredAt})` })
           .from(outcomes)
-          .where(and(inArray(outcomes.contactId, ids), inArray(outcomes.type, ['applied'])))
-          .groupBy(outcomes.contactId),
+          .where(and(inArray(outcomes.contactId, ids), inArray(outcomes.type, ['applied', 'enrolled'])))
+          .groupBy(outcomes.contactId, outcomes.type),
         this.db
           .select({ id: contacts.id, channel: contacts.sourceChannel, campaign: contacts.sourceCampaign, at: contacts.firstTouchAt })
           .from(contacts)
           .where(inArray(contacts.id, ids)),
       ]);
-      for (const id of ids) people.set(id, { touches: [], appliedAt: null, firstTouchAt: null });
+      for (const id of ids) people.set(id, { touches: [], appliedAt: null, enrolledAt: null, firstTouchAt: null });
       for (const row of touchRows) people.get(row.contactId as string)?.touches.push({ channel: row.channel, campaign: row.campaign, at: row.at });
       for (const row of applied) {
         const person = people.get(row.contactId as string);
-        if (person) person.appliedAt = new Date(row.at);
+        if (person && row.type === 'applied') person.appliedAt = new Date(row.at);
+        if (person && row.type === 'enrolled') person.enrolledAt = new Date(row.at);
       }
       for (const row of sources) {
         const person = people.get(row.id);
