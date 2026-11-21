@@ -82,7 +82,7 @@ export function App() {
         </>
       }>
       {/* Page change: short crossfade; the old page leaves faster than the new one arrives. */}
-      <AnimatePresence mode="wait" initial={false}>
+      <AnimatePresence mode="wait" initial={false} onExitComplete={() => window.scrollTo({ top: 0 })}>
         <m.div key={known} {...pageTransition}>
           <Suspense fallback={<SkeletonCard />}>{page}</Suspense>
         </m.div>

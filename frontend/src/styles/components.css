@@ -246,6 +246,30 @@
   }
 }
 
+/*
+ * The header keeps one row on every page: the scrollbar space is always reserved (base.css), so a 1280px window
+ * leaves about 1265px. Logo, navigation and switches never wrap or squeeze; narrower pills fit the nav up to 1440px.
+ */
+.brand,
+.header__end {
+  flex-shrink: 0;
+}
+
+.brand__name,
+.pillnav__link {
+  white-space: nowrap;
+}
+
+.header__end .segmented {
+  flex-wrap: nowrap;
+}
+
+@media (min-width: 1280px) and (max-width: 1439px) {
+  .pillnav__link {
+    padding: 0 var(--space-3);
+  }
+}
+
 /* ---------- Cards ---------- */
 .card {
   display: flex;

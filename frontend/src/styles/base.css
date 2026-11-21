@@ -12,6 +12,8 @@
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  /* Space for the scrollbar is always kept, so short and long pages share one width and nothing shifts sideways. */
+  scrollbar-gutter: stable;
 }
 
 body {

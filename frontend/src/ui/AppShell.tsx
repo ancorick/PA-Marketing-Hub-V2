@@ -66,7 +66,7 @@ export function AppShell({
       firstRender.current = false;
       return;
     }
-    window.scrollTo({ top: 0 });
+    // Scrolling to the top happens in App once the old page has faded out, so it never jumps mid-transition.
     mainRef.current?.focus({ preventScroll: true });
   }, [currentPath]);
 
