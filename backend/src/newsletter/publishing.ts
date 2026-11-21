@@ -1,6 +1,6 @@
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { AppPgDatabase } from '../db/client.js';
-import { issueComments, issues, linkClicks, newsletterCadences, newsletterTemplates, outcomes, sends, touchpoints, type NewsletterTemplateRow, type SendRow } from '../db/schema.js';
+import { deliveries, issueComments, issues, linkClicks, newsletterCadences, newsletterTemplates, outcomes, sends, touchpoints, type NewsletterTemplateRow, type SendRow } from '../db/schema.js';
 import type { DomainService } from '../domains/service.js';
 import type { EmailAdapter } from '../email/adapter.js';
 import { DEFAULT_THEME, type EmailTheme } from '../email/render.js';
@@ -135,6 +135,11 @@ export class NewsletterPublishing {
       buttonUrl: null,
       utmCampaign: `newsletter_${issue.edition.replace('-', '_')}_${issue.language}`,
       issueId: issue.id,
+      subjectB: issue.subjectB,
+      abSamplePercent: issue.subjectB ? issue.abSamplePercent : null,
+      abWaitHours: issue.subjectB ? issue.abWaitHours : null,
+      abDecideAt: null,
+      abWinner: null,
       blocks: await this.snapshot(issue),
       theme: (await this.themeFor(issue)) as unknown as Record<string, unknown>,
       status: 'draft',
@@ -186,6 +191,10 @@ export class NewsletterPublishing {
 
     const subject = issue.subject?.trim() ?? '';
     add('subject', 'Subject line', subject && subject.length <= MAX_SUBJECT ? 'pass' : 'fail', !subject ? 'Write a subject line' : `${subject.length} characters (limit ${MAX_SUBJECT})`);
+    if (issue.subjectB) {
+      const b = issue.subjectB.trim();
+      add('subject_b', 'Subject B (A/B test)', b.length <= MAX_SUBJECT && b !== subject ? 'pass' : 'fail', b === subject ? 'Subject B must differ from subject A' : `${b.length} characters; ${issue.abSamplePercent}% sample, winner after ${issue.abWaitHours} h`);
+    }
     add('blocks', 'Content', blocks.length > 0 ? 'pass' : 'fail', blocks.length > 0 ? `${blocks.length} blocks` : 'The issue has no blocks');
 
     const domain = (await this.deps.domains.list()).find((item) => item.domain === send.fromAddress.split('@')[1]);
@@ -279,6 +288,9 @@ export class NewsletterPublishing {
           body: '',
           utmCampaign: draft.utmCampaign,
           issueId: issue.id,
+          subjectB: draft.subjectB,
+          abSamplePercent: draft.abSamplePercent,
+          abWaitHours: draft.abWaitHours,
           blocks: draft.blocks,
           theme: draft.theme,
           status: 'scheduled',
@@ -372,7 +384,19 @@ export class NewsletterPublishing {
     });
     const by = stats.byStatus;
     const finalAt = send.finishedAt ? new Date(new Date(send.finishedAt).getTime() + 7 * 86_400_000) : null;
+    const variants = send.subjectB
+      ? await Promise.all(
+          (['A', 'B'] as const).map(async (variant) => {
+            const [row] = await this.deps.db
+              .select({ sent: sql<number>`count(*) filter (where ${deliveries.sentAt} is not null)`, clicks: sql<number>`count(${deliveries.firstClickAt})`, opens: sql<number>`count(${deliveries.openedAt})` })
+              .from(deliveries)
+              .where(and(eq(deliveries.sendId, send.id), eq(deliveries.variant, variant)));
+            return { variant, subject: variant === 'A' ? send.subject : send.subjectB, sent: Number(row?.sent ?? 0), clicks: Number(row?.clicks ?? 0), openedEstimated: Number(row?.opens ?? 0) };
+          }),
+        )
+      : null;
     return {
+      abTest: variants ? { winner: send.abWinner, decideAt: send.abDecideAt, variants } : null,
       sentAt: send.finishedAt,
       final: finalAt !== null && finalAt <= this.now(),
       finalAt: finalAt?.toISOString() ?? null,

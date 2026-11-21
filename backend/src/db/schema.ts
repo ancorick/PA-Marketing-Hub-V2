@@ -385,6 +385,12 @@ export const sends = pgTable(
     utmCampaign: text('utm_campaign').notNull(),
     /** Newsletter sends: the issue, and the approved blocks and template frozen at approval (what was approved is sent). */
     issueId: uuid('issue_id'),
+    /** NWS-16 subject A/B test: variant B, sample size, when to pick the winner, and the winner. */
+    subjectB: text('subject_b'),
+    abSamplePercent: integer('ab_sample_percent'),
+    abWaitHours: integer('ab_wait_hours'),
+    abDecideAt: timestamp('ab_decide_at', { withTimezone: true }),
+    abWinner: text('ab_winner'),
     blocks: jsonb('blocks').$type<unknown[]>(),
     theme: jsonb('theme').$type<Record<string, unknown>>(),
     /** draft | approved | scheduled | sending | paused | sent | cancelled */
@@ -418,7 +424,10 @@ export const deliveries = pgTable(
       .references(() => sends.id, { onDelete: 'cascade' }),
     contactId: uuid('contact_id').references(() => contacts.id, { onDelete: 'set null' }),
     email: text('email'),
+    /** queued … plus held: waiting for the A/B winner (NWS-16). */
     status: text('status').notNull().default('queued'),
+    /** NWS-16: subject variant this message gets (A or B); null when the send has no test. */
+    variant: text('variant'),
     skipReason: text('skip_reason'),
     attempts: integer('attempts').notNull().default(0),
     nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
@@ -609,6 +618,10 @@ export const issues = pgTable(
     subject: text('subject'),
     preheader: text('preheader'),
     subjectAiDrafted: boolean('subject_ai_drafted').notNull().default(false),
+    /** NWS-16: optional second subject tested on a sample before the full send. */
+    subjectB: text('subject_b'),
+    abSamplePercent: integer('ab_sample_percent').notNull().default(20),
+    abWaitHours: integer('ab_wait_hours').notNull().default(4),
     sendId: uuid('send_id'),
     archiveSlug: text('archive_slug').unique(),
     ...timestamps,

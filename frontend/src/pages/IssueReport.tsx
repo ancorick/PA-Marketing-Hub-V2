@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { issueReport, type IssueReport as Report } from '../lib/api';
-import { formatDate, formatNumber } from '../lib/format';
+import { formatDate, formatNumber, formatPercent } from '../lib/format';
 import { Alert, DataTable, StatTile, type Column } from '../ui';
 
 const columns: Column<Report['blocks'][number]>[] = [
@@ -35,6 +35,18 @@ export function IssueReport({ issueId, archiveSlug }: { issueId: string; archive
         Opened (estimated) {formatNumber(data.openedEstimated)} · unsubscribed {formatNumber(data.unsubscribes)} · complaints {formatNumber(data.complaints)} · bounced{' '}
         {formatNumber(data.bounced)}
       </p>
+ {data.abTest && (
+        <div className="inset">
+          <strong>Subject A/B test {data.abTest.winner ? `· winner: ${data.abTest.winner}` : data.abTest.decideAt ? `· winner picked at ${formatDate(data.abTest.decideAt, undefined, { timeStyle: 'short' })}` : ''}</strong>
+          <ul className="list-reset stack stack--xs">
+            {data.abTest.variants.map((variant) => (
+              <li key={variant.variant} className="num">
+                {variant.variant}: “{variant.subject}” · {formatNumber(variant.sent)} sent · {formatNumber(variant.clicks)} clicked ({variant.sent > 0 ? formatPercent(variant.clicks / variant.sent) : '—'}) · {formatNumber(variant.openedEstimated)} opened (est.)
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <DataTable caption="Clicks per block" columns={columns} rows={data.blocks} rowKey={(block) => block.id} initialSort={{ key: 'clicks', direction: 'descending' }} />
     </section>
   );

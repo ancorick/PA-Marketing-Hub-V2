@@ -201,7 +201,7 @@ export class SendService {
    * `archive`: the public web version (NWS-12): no personal token, no unsubscribe links (there is no
    * recipient), links tagged with medium "archive" so archive visits are not counted as email clicks.
    */
-  renderFor(send: SendView, contact: Pick<Contact, 'id' | 'firstName'> | null, options: { archive?: boolean } = {}) {
+  renderFor(send: SendView, contact: Pick<Contact, 'id' | 'firstName'> | null, options: { archive?: boolean; variant?: string | null } = {}) {
     const language = send.language as Language;
     const medium = options.archive ? 'archive' : 'email';
     const contactId = contact?.id ?? '00000000-0000-4000-8000-000000000000';
@@ -209,6 +209,8 @@ export class SendService {
     const source = send.kind === 'newsletter' ? 'newsletter' : 'campaign';
     const tag = (url: string) => tagUrl(url, { source, campaign: send.utmCampaign, token, medium });
     const name = contact?.firstName ?? FALLBACK_NAME[language];
+    // NWS-16: variant B of a subject test.
+    const subject = options.variant === 'B' && send.subjectB ? send.subjectB : send.subject;
     const personalize = (value: string) => value.replace(/\{\{\s*first_name\s*\}\}/g, name);
     // Newsletters render their approved blocks, each link tagged with its block (NWS-14).
     const blocks = send.blocks
@@ -233,7 +235,7 @@ export class SendService {
       ...(send.theme && { theme: send.theme as EmailTheme }),
       language,
       preheader: send.preheader ?? undefined,
-      title: personalize(send.subject),
+      title: personalize(subject),
       blocks: body,
       ...(send.kind === 'reengagement' && send.buttonLabel
         ? // EML-15: "Keep me subscribed" opens the person's own preferences link, which records the answer.
@@ -250,7 +252,7 @@ export class SendService {
     });
     return {
       from: `${send.fromName} <${send.fromAddress}>`,
-      subject: personalize(send.subject),
+      subject: personalize(subject),
       html: rendered.html,
       text: rendered.text,
       headers: this.deps.links.unsubscribeHeaders(contactId, send.id),

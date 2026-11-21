@@ -66,9 +66,17 @@ export class IssueEditor {
     return { subjectLines: result.subjectLines, blocks: updated };
   }
 
-  async updateIssue(issueId: string, changes: { subject?: string; preheader?: string | null }, actorId: string, options: { subjectFromAi?: boolean } = {}) {
+  async updateIssue(
+    issueId: string,
+    changes: { subject?: string; preheader?: string | null; subjectB?: string | null; abSamplePercent?: number; abWaitHours?: number },
+    actorId: string,
+    options: { subjectFromAi?: boolean } = {},
+  ) {
     const issue = await this.editable(issueId);
     const logs = [];
+    if (changes.subjectB !== undefined && changes.subjectB !== issue.subjectB) logs.push({ field: 'subjectB', before: issue.subjectB, after: changes.subjectB });
+    if (changes.abSamplePercent !== undefined && changes.abSamplePercent !== issue.abSamplePercent) logs.push({ field: 'abSamplePercent', before: String(issue.abSamplePercent), after: String(changes.abSamplePercent) });
+    if (changes.abWaitHours !== undefined && changes.abWaitHours !== issue.abWaitHours) logs.push({ field: 'abWaitHours', before: String(issue.abWaitHours), after: String(changes.abWaitHours) });
     if (changes.subject !== undefined && changes.subject !== issue.subject) logs.push({ field: 'subject', before: issue.subject, after: changes.subject });
     if (changes.preheader !== undefined && changes.preheader !== issue.preheader) logs.push({ field: 'preheader', before: issue.preheader, after: changes.preheader });
     if (logs.length === 0) return issue;

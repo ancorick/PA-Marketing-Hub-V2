@@ -66,6 +66,7 @@ export class SendDispatcher {
       .where(and(eq(deliveries.status, 'sending'), lt(deliveries.updatedAt, new Date(this.now().getTime() - STALE_CLAIM_MS))));
 
     if (await this.deps.killSwitch.isPaused()) return { rowsIn: 0, rowsUpserted: 0 };
+    await this.decideAbTests();
 
     const due = await this.deps.db
       .select()
@@ -105,7 +106,62 @@ export class SendDispatcher {
     await this.deps.db.execute(
       sql`insert into ${deliveries} (send_id, contact_id, email) select ${sendId}, ${contacts.id}, ${contacts.email} from ${contacts} where ${where} on conflict (send_id, contact_id) do nothing`,
     );
+    if (send.subjectB && !send.abWinner && !send.abDecideAt) await this.startAbTest(send);
     await this.deps.sends.setStatus(sendId, { status: 'sending', startedAt: send.startedAt ? new Date(send.startedAt) : this.now() });
+  }
+
+  /**
+   * NWS-16: a random sample (abSamplePercent) is split evenly between subjects A and B; everyone else is
+   * held until the winner is picked after abWaitHours.
+   */
+  private async startAbTest(send: SendView) {
+    const rows = await this.deps.db
+      .select({ id: deliveries.id })
+      .from(deliveries)
+      .where(and(eq(deliveries.sendId, send.id), eq(deliveries.status, 'queued')))
+      .orderBy(sql`random()`);
+    if (rows.length < 2) return;
+    const sample = Math.min(rows.length, Math.max(2, Math.ceil((rows.length * (send.abSamplePercent ?? 20)) / 100)));
+    const ids = rows.map((row) => row.id);
+    const half = Math.ceil(sample / 2);
+    const assign = async (slice: string[], values: Partial<typeof deliveries.$inferInsert>) => {
+      for (let i = 0; i < slice.length; i += 1000) await this.deps.db.update(deliveries).set(values).where(inArray(deliveries.id, slice.slice(i, i + 1000)));
+    };
+    await assign(ids.slice(0, half), { variant: 'A' });
+    await assign(ids.slice(half, sample), { variant: 'B' });
+    await assign(ids.slice(sample), { status: 'held' });
+    await this.deps.sends.setStatus(send.id, { abDecideAt: new Date(this.now().getTime() + (send.abWaitHours ?? 4) * 3_600_000) });
+  }
+
+  /** NWS-16: the subject with the higher unique click rate wins (opens break ties; they are estimates, 7.5). */
+  async decideAbTests(): Promise<void> {
+    const due = await this.deps.db
+      .select()
+      .from(sends)
+      .where(and(isNull(sends.abWinner), lte(sends.abDecideAt, this.now())));
+    for (const send of due) {
+      const stats = await this.deps.db
+        .select({
+          variant: deliveries.variant,
+          sent: sql<number>`count(*) filter (where ${deliveries.sentAt} is not null)`,
+          clicks: sql<number>`count(${deliveries.firstClickAt})`,
+          opens: sql<number>`count(${deliveries.openedAt})`,
+        })
+        .from(deliveries)
+        .where(and(eq(deliveries.sendId, send.id), inArray(deliveries.variant, ['A', 'B'])))
+        .groupBy(deliveries.variant);
+      const rate = (variant: string, key: 'clicks' | 'opens') => {
+        const row = stats.find((item) => item.variant === variant);
+        return row && Number(row.sent) > 0 ? Number(row[key]) / Number(row.sent) : 0;
+      };
+      const winner =
+        rate('B', 'clicks') > rate('A', 'clicks') || (rate('B', 'clicks') === rate('A', 'clicks') && rate('B', 'opens') > rate('A', 'opens')) ? 'B' : 'A';
+      await this.deps.db.update(sends).set({ abWinner: winner }).where(eq(sends.id, send.id));
+      await this.deps.db
+        .update(deliveries)
+        .set({ status: 'queued', variant: winner })
+        .where(and(eq(deliveries.sendId, send.id), eq(deliveries.status, 'held')));
+    }
   }
 
   private async process(sendId: string, tickStarted: number): Promise<{ sent: number; handled: number }> {
@@ -188,7 +244,7 @@ export class SendDispatcher {
       if (recent) return skip('frequency: monthly');
     }
 
-    const rendered = this.deps.sends.renderFor(send, contact);
+    const rendered = this.deps.sends.renderFor(send, contact, { variant: delivery.variant });
     try {
       const result = await this.deps.email.send({
         idempotencyKey: `${send.id}:${contact.id}`,
@@ -234,7 +290,7 @@ export class SendDispatcher {
     const [open] = await this.deps.db
       .select({ id: deliveries.id })
       .from(deliveries)
-      .where(and(eq(deliveries.sendId, sendId), inArray(deliveries.status, ['queued', 'sending'])))
+      .where(and(eq(deliveries.sendId, sendId), inArray(deliveries.status, ['queued', 'sending', 'held'])))
       .limit(1);
     if (!open) await this.deps.sends.setStatus(sendId, { status: 'sent', finishedAt: this.now() });
   }

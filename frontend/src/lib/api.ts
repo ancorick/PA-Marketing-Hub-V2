@@ -594,6 +594,9 @@ export type Issue = {
   subject: string | null;
   preheader: string | null;
   subjectAiDrafted: boolean;
+  subjectB: string | null;
+  abSamplePercent: number;
+  abWaitHours: number;
   sendId: string | null;
   archiveSlug: string | null;
   updatedAt: string;
@@ -637,7 +640,10 @@ export const collectIssue = (id: string) => apiFetch<Issue>(`/api/newsletter/iss
 export type BlockInput = { title?: string; body?: string; imageUrl?: string | null; imageAlt?: string | null; buttonLabel?: string | null; buttonUrl?: string | null };
 export type IssueEdit = { id: string; blockId: string | null; actorId: string; action: string; field: string | null; before: string | null; after: string | null; createdAt: string };
 const issuePath = (id: string) => `/api/newsletter/issues/${encodeURIComponent(id)}`;
-export const updateIssue = (id: string, changes: { subject?: string; preheader?: string | null; subjectFromAi?: boolean }) =>
+export const updateIssue = (
+  id: string,
+  changes: { subject?: string; preheader?: string | null; subjectFromAi?: boolean; subjectB?: string | null; abSamplePercent?: number; abWaitHours?: number },
+) =>
   apiFetch<Issue>(issuePath(id), { method: 'PATCH', body: JSON.stringify(changes) });
 export const updateBlock = (id: string, blockId: string, changes: BlockInput & { acceptAi?: boolean }) =>
   apiFetch<IssueBlock>(`${issuePath(id)}/blocks/${encodeURIComponent(blockId)}`, { method: 'PATCH', body: JSON.stringify(changes) });
@@ -690,6 +696,7 @@ export const unscheduleIssue = (id: string) => apiFetch<Issue>(`${issuePath(id)}
 /* ---------- Issue report and public archive (NWS-12, NWS-13) ---------- */
 
 export type IssueReport = {
+  abTest: { winner: 'A' | 'B' | null; decideAt: string | null; variants: { variant: 'A' | 'B'; subject: string; sent: number; clicks: number; openedEstimated: number }[] } | null;
   sentAt: string | null;
   final: boolean;
   finalAt: string | null;

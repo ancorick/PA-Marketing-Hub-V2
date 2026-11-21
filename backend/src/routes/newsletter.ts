@@ -26,7 +26,17 @@ const blockBody = z
 const addBody = z
   .object({ title: z.string().trim().min(1).max(200), body: z.string().max(20_000), imageUrl: optionalText(2000), imageAlt: optionalText(300), buttonLabel: optionalText(60), buttonUrl: optionalText(2000), position: z.number().int().min(0).optional() })
   .strict();
-const issueBody = z.object({ subject: z.string().trim().min(1).max(200).optional(), preheader: optionalText(200), subjectFromAi: z.boolean().optional() }).strict();
+const issueBody = z
+  .object({
+    subject: z.string().trim().min(1).max(200).optional(),
+    preheader: optionalText(200),
+    subjectFromAi: z.boolean().optional(),
+    // NWS-16: subject B, sample share (10-50%) and hours before picking the winner (1-48).
+    subjectB: z.string().trim().max(200).nullable().optional().transform((value) => (value === '' ? null : value)),
+    abSamplePercent: z.number().int().min(10).max(50).optional(),
+    abWaitHours: z.number().int().min(1).max(48).optional(),
+  })
+  .strict();
 const orderBody = z.object({ blockIds: z.array(z.uuid()).min(1).max(50) }).strict();
 const swapBody = z.object({ removeItemId: z.uuid(), addItemId: z.uuid() }).strict();
 const cadenceBody = z

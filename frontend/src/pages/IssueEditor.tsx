@@ -216,8 +216,16 @@ export function IssueEditor({ data }: { data: IssueDetail }) {
   const readOnly = !['draft', 'in_review', 'approved'].includes(issue.status);
   const [subject, setSubject] = useState(issue.subject ?? '');
   const [preheader, setPreheader] = useState(issue.preheader ?? '');
+  const [subjectB, setSubjectB] = useState(issue.subjectB ?? '');
+  const [samplePercent, setSamplePercent] = useState(issue.abSamplePercent);
+  const [waitHours, setWaitHours] = useState(issue.abWaitHours);
   const [adding, setAdding] = useState(false);
-  const saveIssue = useMutation({ mutationFn: () => updateIssue(issue.id, { subject, preheader: preheader || null }), onSuccess: refresh });
+  const saveIssue = useMutation({
+    mutationFn: () => updateIssue(issue.id, { subject, preheader: preheader || null, subjectB: subjectB.trim() || null, abSamplePercent: samplePercent, abWaitHours: waitHours }),
+    onSuccess: refresh,
+  });
+  const subjectChanged =
+    subject !== (issue.subject ?? '') || preheader !== (issue.preheader ?? '') || subjectB !== (issue.subjectB ?? '') || samplePercent !== issue.abSamplePercent || waitHours !== issue.abWaitHours;
   const add = useMutation({ mutationFn: (input: BlockInput) => addBlock(issue.id, { title: input.title ?? '', body: input.body ?? '', ...input, position: Math.max(blocks.length - 1, 0) }), onSuccess: () => { setAdding(false); refresh(); } });
   const reorder = useMutation({ mutationFn: (ids: string[]) => reorderBlocks(issue.id, ids), onSuccess: refresh });
   const edits = useQuery({ queryKey: ['issue-edits', issue.id], queryFn: () => issueEdits(issue.id) });
@@ -236,11 +244,18 @@ export function IssueEditor({ data }: { data: IssueDetail }) {
         <div className="form-row">
           <TextField label="Subject line" required disabled={readOnly} hint={`${subject.length} characters (keep under 70, NWS-09).`} value={subject} onChange={(e) => setSubject(e.target.value)} />
           <TextField label="Preview text" disabled={readOnly} value={preheader} onChange={(e) => setPreheader(e.target.value)} />
+          <TextField label="Subject B (optional A/B test)" disabled={readOnly} hint="NWS-16: tested against the subject above on a sample; the one with more clicks goes to everyone else." value={subjectB} onChange={(e) => setSubjectB(e.target.value)} />
+          {subjectB.trim() && (
+            <>
+              <TextField label="Sample (% of the audience)" type="number" min={10} max={50} disabled={readOnly} hint="Split evenly between A and B." value={samplePercent} onChange={(e) => setSamplePercent(Math.min(50, Math.max(10, Number(e.target.value) || 20)))} />
+              <TextField label="Pick the winner after (hours)" type="number" min={1} max={48} disabled={readOnly} value={waitHours} onChange={(e) => setWaitHours(Math.min(48, Math.max(1, Number(e.target.value) || 4)))} />
+            </>
+          )}
         </div>
         {issue.subjectAiDrafted && <StatusBadge tone="warning">AI-drafted subject</StatusBadge>}
         {!readOnly && (
           <div>
-            <Button variant="secondary" loading={saveIssue.isPending} disabled={subject === (issue.subject ?? '') && preheader === (issue.preheader ?? '')} onClick={() => saveIssue.mutate()}>
+            <Button variant="secondary" loading={saveIssue.isPending} disabled={!subjectChanged} onClick={() => saveIssue.mutate()}>
               Save subject
             </Button>
           </div>
