@@ -5,7 +5,8 @@ import { LANGUAGE_LABEL } from '../lib/contacts';
 import { formatDate } from '../lib/format';
 import { useStaffRole } from '../lib/session';
 import { Disclosure } from '../motion';
-import { AccessNotice, accessProblem, Alert, Button, PageHeader, retryServerErrors, SkeletonCard, StatusBadge, Tag } from '../ui';
+import { AccessNotice, accessProblem, Alert, Button, PageHeader, retryServerErrors, SkeletonCard, StatusBadge } from '../ui';
+import { IssueEditor } from './IssueEditor';
 import { ISSUE_STATUS } from './NewsletterPage';
 
 const SOURCE_LABEL: Record<CollectedItem['type'], string> = {
@@ -74,7 +75,7 @@ export function IssuePage({ id }: { id: string }) {
   if (access) return <>{back}<AccessNotice problem={access} title="The newsletter is for editors, marketing managers and admins">Ask an admin if you need access.</AccessNotice></>;
   if (detail.isPending) return <SkeletonCard />;
   if (detail.isError) return <>{back}<Alert tone="danger" title="Issue not found">{detail.error.message}</Alert></>;
-  const { issue, blocks, items } = detail.data;
+  const { issue, items } = detail.data;
   const canCollect = issue.status === 'collecting' || issue.status === 'draft';
 
   return (
@@ -97,19 +98,7 @@ export function IssuePage({ id }: { id: string }) {
             {collect.isError && <Alert tone="danger" title="Collect failed">{collect.error.message}</Alert>}
           </section>
         )}
-        {blocks.map((block) => (
-          <section key={block.id} className="card stack" aria-label={block.title}>
-            <div className="card__header">
-              <h2>{block.title}</h2>
-              <div className="cluster">
-                <Tag>{block.type}</Tag>
-                {block.aiDrafted && <StatusBadge tone="warning">AI-drafted</StatusBadge>}
-              </div>
-            </div>
-            <p className="block-body">{block.body}</p>
-            {block.buttonLabel && <p className="muted">Button: {block.buttonLabel} → {block.buttonUrl}</p>}
-          </section>
-        ))}
+        {issue.status !== 'collecting' && <IssueEditor data={detail.data} />}
         <section className="card stack" aria-labelledby="items-heading">
           <h2 id="items-heading">Collected items</h2>
           <p className="muted">{items.filter((item) => item.used).length} in the draft, {items.filter((item) => item.publishable && !item.used).length} more available.</p>

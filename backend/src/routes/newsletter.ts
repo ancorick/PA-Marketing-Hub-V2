@@ -3,9 +3,30 @@ import { z } from 'zod';
 import { requireRole } from '../auth/staff.js';
 import { LANGUAGES } from '../contacts/fields.js';
 import type { CoreEngineClient } from '../integrations/core-engine/contract.js';
+import type { IssueEditor } from '../newsletter/editor.js';
 import { NewsletterError, type NewsletterService } from '../newsletter/service.js';
+import { UploadError, type UploadService } from '../uploads/service.js';
 
 const idParams = z.object({ id: z.uuid() });
+const blockParams = z.object({ id: z.uuid(), blockId: z.uuid() });
+const optionalText = (max: number) => z.string().max(max).nullable().optional();
+const blockBody = z
+  .object({
+    title: z.string().trim().min(1).max(200).optional(),
+    body: z.string().max(20_000).optional(),
+    imageUrl: optionalText(2000),
+    imageAlt: optionalText(300),
+    buttonLabel: optionalText(60),
+    buttonUrl: optionalText(2000),
+    acceptAi: z.boolean().optional(),
+  })
+  .strict();
+const addBody = z
+  .object({ title: z.string().trim().min(1).max(200), body: z.string().max(20_000), imageUrl: optionalText(2000), imageAlt: optionalText(300), buttonLabel: optionalText(60), buttonUrl: optionalText(2000), position: z.number().int().min(0).optional() })
+  .strict();
+const issueBody = z.object({ subject: z.string().trim().min(1).max(200).optional(), preheader: optionalText(200) }).strict();
+const orderBody = z.object({ blockIds: z.array(z.uuid()).min(1).max(50) }).strict();
+const swapBody = z.object({ removeItemId: z.uuid(), addItemId: z.uuid() }).strict();
 const cadenceBody = z
   .object({
     name: z.string().trim().min(1).max(120),
@@ -27,7 +48,9 @@ export function newsletterError(reply: FastifyReply, error: unknown) {
 }
 
 /** Newsletter schedule and issues (NWS-01 to NWS-03, NWS-06). Editors work on drafts; managers own the schedule. */
-export async function newsletterRoutes(app: FastifyInstance, { newsletter, coreEngine }: { newsletter: NewsletterService; coreEngine: Pick<CoreEngineClient, 'verifyStaffToken'> }) {
+type NewsletterRoutesOptions = { newsletter: NewsletterService; editor: IssueEditor; uploads: UploadService; coreEngine: Pick<CoreEngineClient, 'verifyStaffToken'> };
+
+export async function newsletterRoutes(app: FastifyInstance, { newsletter, editor, uploads, coreEngine }: NewsletterRoutesOptions) {
   const canEdit = requireRole(coreEngine, ['editor', 'marketing_manager', 'admin']);
   const managers = requireRole(coreEngine, ['marketing_manager', 'admin']);
   const withId = (handler: (id: string, request: FastifyRequest, reply: FastifyReply) => Promise<unknown>) => async (request: FastifyRequest, reply: FastifyReply) => {
@@ -69,4 +92,71 @@ export async function newsletterRoutes(app: FastifyInstance, { newsletter, coreE
   }));
   // Collect now instead of waiting for the scheduled moment, or redraft after sources changed.
   app.post('/api/newsletter/issues/:id/collect', { preHandler: canEdit }, withId(async (id) => newsletter.collectAndDraft(id)));
+
+  const withBlock = (handler: (id: string, blockId: string, request: FastifyRequest, reply: FastifyReply) => Promise<unknown>) => async (request: FastifyRequest, reply: FastifyReply) => {
+    const params = blockParams.safeParse(request.params);
+    if (!params.success) return reply.code(404).send({ error: 'not_found', message: 'Not found' });
+    try {
+      return await handler(params.data.id, params.data.blockId, request, reply);
+    } catch (error) {
+      return newsletterError(reply, error);
+    }
+  };
+  const invalid = (reply: FastifyReply, error: z.ZodError) => reply.code(400).send({ error: 'invalid_request', message: error.issues[0]?.message ?? 'Invalid request' });
+
+  // Block editor (NWS-05) with the edit log (NWS-17).
+  app.patch('/api/newsletter/issues/:id', { preHandler: canEdit }, withId(async (id, request, reply) => {
+    const body = issueBody.safeParse(request.body);
+    return body.success ? editor.updateIssue(id, body.data, request.staff!.userId) : invalid(reply, body.error);
+  }));
+  app.patch('/api/newsletter/issues/:id/blocks/:blockId', { preHandler: canEdit }, withBlock(async (id, blockId, request, reply) => {
+    const body = blockBody.safeParse(request.body);
+    if (!body.success) return invalid(reply, body.error);
+    const { acceptAi, ...changes } = body.data;
+    return editor.updateBlock(id, blockId, changes, request.staff!.userId, { acceptAi });
+  }));
+  app.post('/api/newsletter/issues/:id/blocks', { preHandler: canEdit }, withId(async (id, request, reply) => {
+    const body = addBody.safeParse(request.body);
+    return body.success ? reply.code(201).send(await editor.addBlock(id, body.data, request.staff!.userId)) : invalid(reply, body.error);
+  }));
+  app.delete('/api/newsletter/issues/:id/blocks/:blockId', { preHandler: canEdit }, withBlock(async (id, blockId, request, reply) => {
+    await editor.removeBlock(id, blockId, request.staff!.userId);
+    return reply.code(204).send();
+  }));
+  app.put('/api/newsletter/issues/:id/order', { preHandler: canEdit }, withId(async (id, request, reply) => {
+    const body = orderBody.safeParse(request.body);
+    if (!body.success) return invalid(reply, body.error);
+    await editor.reorder(id, body.data.blockIds, request.staff!.userId);
+    return { ok: true };
+  }));
+  app.post('/api/newsletter/issues/:id/blocks/:blockId/swap', { preHandler: canEdit }, withBlock(async (id, blockId, request, reply) => {
+    const body = swapBody.safeParse(request.body);
+    return body.success ? editor.swapItem(id, blockId, body.data.removeItemId, body.data.addItemId, request.staff!.userId) : invalid(reply, body.error);
+  }));
+  app.get('/api/newsletter/issues/:id/edits', { preHandler: canEdit }, withId(async (id) => ({ edits: await editor.edits(id) })));
+
+  // Images for blocks (NWS-05): uploaded by staff, served publicly for email clients.
+  app.register(async (scoped) => {
+    scoped.addContentTypeParser('*', { parseAs: 'buffer', bodyLimit: 1024 * 1024 + 1 }, (_request, body, done) => done(null, body));
+    scoped.post('/api/uploads/images', { preHandler: canEdit }, async (request, reply) => {
+      if (!Buffer.isBuffer(request.body)) return reply.code(400).send({ error: 'invalid_request', message: 'Upload the image as the request body' });
+      try {
+        return reply.code(201).send(await uploads.saveImage(request.body, request.staff!.userId));
+      } catch (error) {
+        if (error instanceof UploadError) return reply.code(400).send({ error: 'invalid_image', message: error.message });
+        throw error;
+      }
+    });
+  });
+  app.get('/api/public/images/:id', async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    const image = params.success ? await uploads.get(params.data.id) : null;
+    if (!image) return reply.code(404).send({ error: 'not_found', message: 'Image not found' });
+    return reply
+      .header('content-type', image.contentType)
+      .header('cache-control', 'public, max-age=31536000, immutable')
+      .header('etag', `"${image.sha256}"`)
+      .header('cross-origin-resource-policy', 'cross-origin')
+      .send(image.bytes);
+  });
 }

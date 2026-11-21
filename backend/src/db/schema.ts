@@ -669,3 +669,37 @@ export const issueBlocks = pgTable(
 );
 
 export type IssueBlockRow = typeof issueBlocks.$inferSelect;
+
+/** NWS-17: every edit to an issue with editor, time and the text before and after. */
+export const issueEdits = pgTable(
+  'issue_edits',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    issueId: uuid('issue_id')
+      .notNull()
+      .references(() => issues.id, { onDelete: 'cascade' }),
+    blockId: uuid('block_id'),
+    actorId: text('actor_id').notNull(),
+    /** edit | add | remove | reorder | swap | subject | accept_ai | ai_draft */
+    action: text('action').notNull(),
+    field: text('field'),
+    before: text('before'),
+    after: text('after'),
+    ...timestamps,
+  },
+  (table) => [index('issue_edits_issue_idx').on(table.issueId, table.createdAt)],
+);
+
+/**
+ * Uploaded images for newsletters (NWS-05). Served publicly at /api/public/images/:id because email clients
+ * load them without a session; size is capped so issues stay under the 1 MB image budget (NWS-09).
+ */
+export const uploads = pgTable('uploads', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  contentType: text('content_type').notNull(),
+  bytes: text('bytes').notNull(),
+  size: integer('size').notNull(),
+  sha256: text('sha256').notNull(),
+  uploadedBy: text('uploaded_by').notNull(),
+  ...timestamps,
+});

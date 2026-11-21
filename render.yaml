@@ -45,6 +45,9 @@ services:
       # Verifies ESP webhooks (NFR-S4); give the same value to the ESP webhook settings.
       - key: ESP_WEBHOOK_SECRET
         generateValue: true
+      # Slack incoming webhook for "newsletter draft ready" (NWS-04); create it in Slack (manual).
+      - key: SLACK_WEBHOOK_URL
+        sync: false
       # Netlify site URL (public unsubscribe/preferences pages) and this service's own HTTPS URL.
       - key: PUBLIC_APP_URL
         sync: false

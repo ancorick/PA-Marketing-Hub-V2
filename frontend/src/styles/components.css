@@ -2291,3 +2291,28 @@ th[aria-sort='descending'] .sort-btn {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+.block-image {
+  display: block;
+  max-width: min(100%, 36rem);
+  height: auto;
+  border-radius: var(--radius-md);
+}
+
+/* NWS-17 edit log: what was there and what replaced it; the label of each comes from the action line. */
+.edit-before,
+.edit-after {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.edit-before {
+  background: var(--color-danger-soft);
+  text-decoration: line-through;
+}
+
+.edit-after {
+  background: var(--color-success-soft);
+}

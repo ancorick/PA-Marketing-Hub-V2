@@ -48,6 +48,9 @@ const envSchema = z.object({
   DMARC_KNOWN_SOURCES: z.string().default(''),
   // Where the newsletter call to action sends readers (admissions page). Empty: the block has no button.
   ADMISSIONS_URL: z.string().optional().transform((value) => (value && value.trim().length > 0 ? value.trim() : undefined)).pipe(z.url().optional()),
+  // NWS-04: Slack incoming webhook for "draft ready" (a secret) and editor emails, comma-separated.
+  SLACK_WEBHOOK_URL: z.string().optional().transform((value) => (value && value.trim().length > 0 ? value.trim() : undefined)).pipe(z.url().optional()),
+  NEWSLETTER_EDITOR_EMAILS: z.string().default(''),
   // Shared secret for ESP webhook signatures (EML-04, NFR-S4); the real ESP adapter may use its own scheme.
   ESP_WEBHOOK_SECRET: z
     .string()
@@ -89,6 +92,8 @@ export type AppConfig = {
   espWebhookSecret: string | null;
   dmarcKnownSources: string[];
   admissionsUrl: string | null;
+  slackWebhookUrl: string | null;
+  newsletterEditorEmails: string[];
 };
 
 /** Development only: links signed with it stop working on any real deploy, where the secret is required. */
@@ -129,6 +134,8 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     sendBatchSize: env.SEND_BATCH_SIZE,
     espWebhookSecret: env.ESP_WEBHOOK_SECRET ?? (env.NODE_ENV === 'production' ? null : 'development-only-esp-webhook-secret-0123456789'),
     admissionsUrl: env.ADMISSIONS_URL ?? null,
+    slackWebhookUrl: env.SLACK_WEBHOOK_URL ?? null,
+    newsletterEditorEmails: env.NEWSLETTER_EDITOR_EMAILS.split(',').map((item) => item.trim()).filter((item) => item.includes('@')),
     dmarcKnownSources: env.DMARC_KNOWN_SOURCES.split(',').map((item) => item.trim()).filter(Boolean),
     seedList: env.SEED_LIST.split(',').map((item) => item.trim()).filter((item) => item.includes('@')),
     jobsEnabled: env.JOBS_ENABLED === undefined ? env.NODE_ENV !== 'test' : env.JOBS_ENABLED === 'true',

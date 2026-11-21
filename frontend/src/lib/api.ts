@@ -632,3 +632,20 @@ export const saveCadence = (input: CadenceInput, id?: string) =>
 export const listIssues = () => apiFetch<{ issues: Issue[] }>('/api/newsletter/issues');
 export const getIssue = (id: string) => apiFetch<IssueDetail>(`/api/newsletter/issues/${encodeURIComponent(id)}`);
 export const collectIssue = (id: string) => apiFetch<Issue>(`/api/newsletter/issues/${encodeURIComponent(id)}/collect`, { method: 'POST' });
+
+export type BlockInput = { title?: string; body?: string; imageUrl?: string | null; imageAlt?: string | null; buttonLabel?: string | null; buttonUrl?: string | null };
+export type IssueEdit = { id: string; blockId: string | null; actorId: string; action: string; field: string | null; before: string | null; after: string | null; createdAt: string };
+const issuePath = (id: string) => `/api/newsletter/issues/${encodeURIComponent(id)}`;
+export const updateIssue = (id: string, changes: { subject?: string; preheader?: string | null }) =>
+  apiFetch<Issue>(issuePath(id), { method: 'PATCH', body: JSON.stringify(changes) });
+export const updateBlock = (id: string, blockId: string, changes: BlockInput & { acceptAi?: boolean }) =>
+  apiFetch<IssueBlock>(`${issuePath(id)}/blocks/${encodeURIComponent(blockId)}`, { method: 'PATCH', body: JSON.stringify(changes) });
+export const addBlock = (id: string, input: BlockInput & { title: string; body: string; position?: number }) =>
+  apiFetch<IssueBlock>(`${issuePath(id)}/blocks`, { method: 'POST', body: JSON.stringify(input) });
+export const removeBlock = (id: string, blockId: string) => apiFetch<void>(`${issuePath(id)}/blocks/${encodeURIComponent(blockId)}`, { method: 'DELETE' });
+export const reorderBlocks = (id: string, blockIds: string[]) => apiFetch<{ ok: true }>(`${issuePath(id)}/order`, { method: 'PUT', body: JSON.stringify({ blockIds }) });
+export const swapBlockItem = (id: string, blockId: string, removeItemId: string, addItemId: string) =>
+  apiFetch<IssueBlock>(`${issuePath(id)}/blocks/${encodeURIComponent(blockId)}/swap`, { method: 'POST', body: JSON.stringify({ removeItemId, addItemId }) });
+export const issueEdits = (id: string) => apiFetch<{ edits: IssueEdit[] }>(`${issuePath(id)}/edits`);
+export const uploadImage = (file: File) =>
+  apiFetch<{ id: string; url: string; size: number; contentType: string }>('/api/uploads/images', { method: 'POST', body: file, headers: { 'Content-Type': 'application/octet-stream' } });

@@ -27,6 +27,9 @@ import { dmarcRoutes } from './routes/dmarc.js';
 import { newsletterRoutes } from './routes/newsletter.js';
 import { Collectors } from './newsletter/collectors.js';
 import { NewsletterService } from './newsletter/service.js';
+import { IssueEditor } from './newsletter/editor.js';
+import { Notifier } from './notify/notifier.js';
+import { UploadService } from './uploads/service.js';
 import { DmarcService } from './dmarc/service.js';
 import { PrivacyService } from './privacy/service.js';
 import { AlertService } from './alerts/service.js';
@@ -76,6 +79,8 @@ declare module 'fastify' {
     dmarc: DmarcService;
     sunset: SunsetPolicy;
     newsletter: NewsletterService;
+    issueEditor: IssueEditor;
+    uploads: UploadService;
   }
 }
 
@@ -282,10 +287,33 @@ export async function buildApp({
     library: resolvedIntegrations.library,
     groupLaunchpad: resolvedIntegrations.groupLaunchpad,
   });
-  const newsletter = new NewsletterService({ db: database.db, collectors, ranking: async () => undefined, ctaUrl: config.admissionsUrl });
+  const notifier = new Notifier({
+    slackWebhookUrl: config.slackWebhookUrl,
+    editorEmails: config.newsletterEditorEmails,
+    email: app.email,
+    mail: { from: config.mailFrom, postalAddress: config.postalAddress },
+    logger: app.log,
+  });
+  const newsletter = new NewsletterService({
+    db: database.db,
+    collectors,
+    ranking: async () => undefined,
+    ctaUrl: config.admissionsUrl,
+    // NWS-04: "draft ready" to Slack and the editors.
+    onDraftReady: (issue) =>
+      notifier.notify({
+        title: `Newsletter draft ready: ${issue.subject ?? issue.edition} (${issue.language})`,
+        text: `Planned for ${issue.plannedSendAt.slice(0, 10)}. Review the blocks and skipped items, then ask a marketing manager to approve.`,
+        link: `${config.publicAppUrl}/#/newsletter/${issue.id}`,
+      }),
+  });
+  const uploadService = new UploadService(database.db, config.publicApiUrl);
+  const issueEditor = new IssueEditor(database.db, newsletter);
+  app.decorate('issueEditor', issueEditor);
+  app.decorate('uploads', uploadService);
   app.decorate('newsletter', newsletter);
   jobs.register({ name: 'newsletter_schedule', description: 'Newsletter: plan issues, collect items and draft', intervalMs: 60 * 60_000, run: () => newsletter.tick() });
-  await app.register(newsletterRoutes, { newsletter, coreEngine: resolvedIntegrations.coreEngine });
+  await app.register(newsletterRoutes, { newsletter, editor: issueEditor, uploads: uploadService, coreEngine: resolvedIntegrations.coreEngine });
   const merge = new MergeService({ db: database.db, coreEngine: resolvedIntegrations.coreEngine, logger: app.log });
   await app.register(importRoutes, { imports, duplicates, merge, contacts, contactRepository, coreEngine: resolvedIntegrations.coreEngine });
 
