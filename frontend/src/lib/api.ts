@@ -548,3 +548,15 @@ export const exportSegmentCsv = (id: string, name: string) => apiDownload(`/api/
 
 export type ExportLogRow = { id: string; actorId: string; kind: 'segment_csv' | 'contact_data'; segmentName: string | null; contactId: string | null; rowCount: number; createdAt: string };
 export const listExports = () => apiFetch<{ exports: ExportLogRow[] }>('/api/admin/exports');
+
+/* ---------- DMARC aggregate reports (EML-07) ---------- */
+
+export type DmarcSource = { sourceIp: string; domain: string; category: 'pass' | 'fail' | 'unknown'; messages: number; lastSeen: string; reporters: string[] };
+export type DmarcSummary = { days: number; reports: number; messages: number; totals: Record<'pass' | 'fail' | 'unknown', number>; passRate: number | null; sources: DmarcSource[] };
+export const dmarcSummary = (days = 30) => apiFetch<DmarcSummary>(`/api/email/dmarc-reports/summary?days=${days}`);
+export const uploadDmarcReport = (file: File) =>
+  apiFetch<{ duplicate: boolean; records: number; unknownSources: string[] }>('/api/email/dmarc-reports', {
+    method: 'POST',
+    body: file,
+    headers: { 'Content-Type': 'application/octet-stream' },
+  });

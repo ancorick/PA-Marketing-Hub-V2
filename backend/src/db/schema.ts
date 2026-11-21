@@ -490,3 +490,43 @@ export const exportLog = pgTable('export_log', {
   rowCount: integer('row_count').notNull(),
   ...timestamps,
 });
+
+/** DMARC aggregate report (EML-07): one per reporting organisation and report ID, so re-uploads are ignored. */
+export const dmarcReports = pgTable(
+  'dmarc_reports',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orgName: text('org_name').notNull(),
+    reportId: text('report_id').notNull(),
+    domain: text('domain').notNull(),
+    policy: text('policy'),
+    dateBegin: timestamp('date_begin', { withTimezone: true }).notNull(),
+    dateEnd: timestamp('date_end', { withTimezone: true }).notNull(),
+    uploadedBy: text('uploaded_by').notNull(),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex('dmarc_reports_org_report_idx').on(table.orgName, table.reportId)],
+);
+
+/**
+ * One row of a DMARC report: a sending IP and how its messages fared. category: pass (DMARC aligned),
+ * fail (a known sender failing, e.g. forwarding), unknown (failing and not a known sender: alert, 7.4).
+ */
+export const dmarcRecords = pgTable(
+  'dmarc_records',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    reportId: uuid('report_id')
+      .notNull()
+      .references(() => dmarcReports.id, { onDelete: 'cascade' }),
+    sourceIp: text('source_ip').notNull(),
+    count: integer('count').notNull(),
+    disposition: text('disposition'),
+    dkim: text('dkim'),
+    spf: text('spf'),
+    headerFrom: text('header_from'),
+    category: text('category').notNull(),
+    ...timestamps,
+  },
+  (table) => [index('dmarc_records_report_idx').on(table.reportId), index('dmarc_records_ip_idx').on(table.sourceIp)],
+);

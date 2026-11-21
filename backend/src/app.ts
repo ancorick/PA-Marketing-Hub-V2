@@ -23,6 +23,8 @@ import { sendRoutes } from './routes/sends.js';
 import { webhookRoutes } from './routes/webhooks.js';
 import { alertRoutes } from './routes/alerts.js';
 import { privacyRoutes } from './routes/privacy.js';
+import { dmarcRoutes } from './routes/dmarc.js';
+import { DmarcService } from './dmarc/service.js';
 import { PrivacyService } from './privacy/service.js';
 import { AlertService } from './alerts/service.js';
 import { EspEventService } from './events/service.js';
@@ -67,6 +69,7 @@ declare module 'fastify' {
     alerts: AlertService;
     espEvents: EspEventService;
     privacy: PrivacyService;
+    dmarc: DmarcService;
   }
 }
 
@@ -251,6 +254,9 @@ export async function buildApp({
   const privacy = new PrivacyService({ db: database.db, segments, coreEngine: resolvedIntegrations.coreEngine, logger: app.log });
   app.decorate('privacy', privacy);
   await app.register(privacyRoutes, { privacy, coreEngine: resolvedIntegrations.coreEngine });
+  const dmarc = new DmarcService({ db: database.db, alerts, knownSources: config.dmarcKnownSources });
+  app.decorate('dmarc', dmarc);
+  await app.register(dmarcRoutes, { dmarc, coreEngine: resolvedIntegrations.coreEngine });
   const merge = new MergeService({ db: database.db, coreEngine: resolvedIntegrations.coreEngine, logger: app.log });
   await app.register(importRoutes, { imports, duplicates, merge, contacts, contactRepository, coreEngine: resolvedIntegrations.coreEngine });
 

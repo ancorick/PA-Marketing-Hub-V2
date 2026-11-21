@@ -14,6 +14,7 @@ import {
 } from '../lib/api';
 import { formatDate } from '../lib/format';
 import { useStaffRole } from '../lib/session';
+import { DmarcSection } from './DmarcSection';
 import { KillSwitchPanel } from './KillSwitch';
 import { WarmupSection } from './WarmupSection';
 import {
@@ -393,6 +394,7 @@ export function EmailSettingsPage() {
             </section>
           )}
           {data?.domains.map((domain) => <DomainCard key={domain.id} domain={domain} canManage={canManage} />)}
+          <DmarcSection />
         </div>
       )}
     </>
