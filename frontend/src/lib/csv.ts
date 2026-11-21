@@ -2,7 +2,9 @@ export type CsvValue = string | number | null | undefined;
 
 /** One CSV field (RFC 4180): quoted when it holds a delimiter, a quote or a line break. */
 export function csvCell(value: CsvValue): string {
-  const text = value === null || value === undefined ? '' : String(value);
+  const raw = value === null || value === undefined ? '' : String(value);
+  // Text starting with = + - @ would run as a formula in a spreadsheet (CSV injection); numbers stay numbers.
+  const text = typeof value === 'string' && /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
   return /[",\n\r;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 

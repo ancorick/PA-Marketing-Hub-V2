@@ -105,6 +105,7 @@ declare module 'fastify' {
     uploads: UploadService;
     pipeline: AnalyticsPipeline;
     eventHub: EventHubService;
+    routeList: { method: string; url: string }[];
     taxonomy: ChannelTaxonomy;
     linkBuilder: LinkBuilder;
     costs: CostService;
@@ -147,7 +148,7 @@ export async function buildApp({
     logger: {
       level: config.nodeEnv === 'test' ? 'silent' : config.logLevel,
       // Never log credentials or tokens (NFR-S3).
-      redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers["x-api-key"]'],
+      redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers["x-api-key"]', 'req.headers["x-mh-signature"]', 'req.headers["x-eventhub-signature"]'],
     },
     // Render terminates TLS in front of the service.
     trustProxy: true,
@@ -169,6 +170,13 @@ export async function buildApp({
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     exposedHeaders: ['x-request-id'],
     maxAge: 600,
+  });
+
+  // NFR-S1: every route is recorded, so a test can prove that each staff endpoint checks the role.
+  const routeList: { method: string; url: string }[] = [];
+  app.decorate('routeList', routeList);
+  app.addHook('onRoute', (route) => {
+    for (const method of [route.method].flat()) if (method !== 'HEAD') routeList.push({ method, url: route.url });
   });
 
   app.addHook('onSend', async (request, reply) => {
@@ -405,7 +413,7 @@ export async function buildApp({
     coreEngine: resolvedIntegrations.coreEngine,
   });
   await app.register(eventHubIntegrationRoutes, {
-    integration: new EventHubIntegration({ db: database.db, segments, consentRepository }),
+    integration: new EventHubIntegration({ db: database.db, segments, consentRepository, coreEngine: resolvedIntegrations.coreEngine }),
     segments,
     apiKey: config.eventHubApiKey,
     coreEngine: resolvedIntegrations.coreEngine,
