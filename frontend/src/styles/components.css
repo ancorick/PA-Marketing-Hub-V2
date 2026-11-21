@@ -2285,3 +2285,9 @@ th[aria-sort='descending'] .sort-btn {
 .page-section {
   margin-top: var(--space-8);
 }
+
+/* Newsletter block text as typed (markup shown until the email preview). */
+.block-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

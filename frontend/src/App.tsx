@@ -17,6 +17,8 @@ const SegmentsPage = lazy(() => import('./pages/SegmentsPage').then((mod) => ({ 
 const SegmentPage = lazy(() => import('./pages/SegmentsPage').then((mod) => ({ default: mod.SegmentPage })));
 const CampaignsPage = lazy(() => import('./pages/CampaignsPage').then((mod) => ({ default: mod.CampaignsPage })));
 const CampaignPage = lazy(() => import('./pages/CampaignsPage').then((mod) => ({ default: mod.CampaignPage })));
+const NewsletterPage = lazy(() => import('./pages/NewsletterPage').then((mod) => ({ default: mod.NewsletterPage })));
+const IssuePage = lazy(() => import('./pages/IssuePage').then((mod) => ({ default: mod.IssuePage })));
 const ImportPage = lazy(() => import('./pages/ImportPage').then((mod) => ({ default: mod.ImportPage })));
 const DuplicatesPage = lazy(() => import('./pages/DuplicatesPage').then((mod) => ({ default: mod.DuplicatesPage })));
 /** Pages for contacts (unsubscribe, preferences, privacy): no staff shell, no staff session. */
@@ -25,7 +27,6 @@ const NewContactPage = lazy(() => import('./pages/ContactPage').then((mod) => ({
 
 /** Screens not built yet, with the PLAYBOOK phase that delivers them (PRD 5.4). */
 const PLACEHOLDERS: Record<string, { title: string; phase: string }> = {
-  '/newsletter': { title: 'Newsletter', phase: 'phase 2' },
   '/events': { title: 'Events', phase: 'phase 4' },
   '/analytics': { title: 'Analytics', phase: 'phase 3' },
 };
@@ -47,13 +48,17 @@ export function App() {
     ['/audience', '/audience/import', '/audience/duplicates', '/audience/segments'].includes(path) || contactId !== undefined || segmentId !== undefined;
   const campaignId = path.match(/^\/campaigns\/([^/]+)$/)?.[1];
   const campaigns = path === '/campaigns' || campaignId !== undefined;
-  const known = placeholder || audience || campaigns || path === '/design-system' || path === '/email-settings' || path === '/admin' ? path : '/';
+  const issueId = path.match(/^\/newsletter\/([^/]+)$/)?.[1];
+  const newsletter = path === '/newsletter' || issueId !== undefined;
+  const known = placeholder || audience || campaigns || newsletter || path === '/design-system' || path === '/email-settings' || path === '/admin' ? path : '/';
 
   let page;
   if (path === '/design-system') page = <DesignSystemPage />;
   else if (path === '/email-settings') page = <EmailSettingsPage />;
   else if (path === '/admin') page = <AdminPage />;
   else if (path === '/campaigns') page = <CampaignsPage />;
+  else if (path === '/newsletter') page = <NewsletterPage />;
+  else if (issueId !== undefined) page = <IssuePage key={issueId} id={decodeURIComponent(issueId)} />;
   else if (campaignId !== undefined) page = <CampaignPage key={campaignId} id={campaignId === 'new' ? null : decodeURIComponent(campaignId)} />;
   else if (path === '/audience') page = <ContactsPage />;
   else if (path === '/audience/import') page = <ImportPage />;

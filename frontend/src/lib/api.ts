@@ -565,3 +565,70 @@ export const uploadDmarcReport = (file: File) =>
 
 /** EML-15: "keep me subscribed" from the re-engagement email. */
 export const publicStay = (token: string) => publicFetch<PublicPreferences>(withToken('/api/public/preferences/stay', token), { method: 'POST' });
+
+/* ---------- Newsletter (NWS-01 to NWS-17) ---------- */
+
+export type IssueStatus = 'collecting' | 'draft' | 'in_review' | 'approved' | 'scheduled' | 'sent';
+export type Cadence = {
+  id: string;
+  name: string;
+  sendDay: number;
+  sendHour: number;
+  collectWorkingDays: number;
+  languages: Language[];
+  segments: Partial<Record<Language, string>>;
+  active: boolean;
+};
+export type CadenceInput = Omit<Cadence, 'id'>;
+export type Issue = {
+  id: string;
+  cadenceId: string;
+  edition: string;
+  language: Language;
+  periodStart: string;
+  cutOffAt: string | null;
+  collectAt: string;
+  plannedSendAt: string;
+  status: IssueStatus;
+  subject: string | null;
+  preheader: string | null;
+  subjectAiDrafted: boolean;
+  sendId: string | null;
+  archiveSlug: string | null;
+  updatedAt: string;
+};
+export type IssueBlock = {
+  id: string;
+  issueId: string;
+  type: string;
+  position: number;
+  title: string;
+  body: string;
+  itemIds: string[];
+  imageUrl: string | null;
+  imageAlt: string | null;
+  buttonLabel: string | null;
+  buttonUrl: string | null;
+  aiDrafted: boolean;
+  editedBy: string | null;
+};
+export type CollectedItem = {
+  id: string;
+  sourceSystem: string;
+  sourceRef: string;
+  type: 'upcoming_event' | 'recent_event' | 'library' | 'graduation' | 'hire' | 'new_group';
+  title: string;
+  url: string | null;
+  occurredAt: string;
+  publishable: boolean;
+  skipReason: string | null;
+  used: boolean;
+};
+export type IssueDetail = { issue: Issue; blocks: IssueBlock[]; items: CollectedItem[] };
+
+export const listCadences = () => apiFetch<{ cadences: Cadence[] }>('/api/newsletter/cadences');
+export const saveCadence = (input: CadenceInput, id?: string) =>
+  apiFetch<Cadence>(id ? `/api/newsletter/cadences/${encodeURIComponent(id)}` : '/api/newsletter/cadences', { method: id ? 'PUT' : 'POST', body: JSON.stringify(input) });
+export const listIssues = () => apiFetch<{ issues: Issue[] }>('/api/newsletter/issues');
+export const getIssue = (id: string) => apiFetch<IssueDetail>(`/api/newsletter/issues/${encodeURIComponent(id)}`);
+export const collectIssue = (id: string) => apiFetch<Issue>(`/api/newsletter/issues/${encodeURIComponent(id)}/collect`, { method: 'POST' });

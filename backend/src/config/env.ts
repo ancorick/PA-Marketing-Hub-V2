@@ -46,6 +46,8 @@ const envSchema = z.object({
   // Sending IPs (or IPv4 CIDR ranges) of the ESP and other services allowed to send for the domain (EML-07).
   // DMARC failures from anything else count as unknown sources and alert the admin.
   DMARC_KNOWN_SOURCES: z.string().default(''),
+  // Where the newsletter call to action sends readers (admissions page). Empty: the block has no button.
+  ADMISSIONS_URL: z.string().optional().transform((value) => (value && value.trim().length > 0 ? value.trim() : undefined)).pipe(z.url().optional()),
   // Shared secret for ESP webhook signatures (EML-04, NFR-S4); the real ESP adapter may use its own scheme.
   ESP_WEBHOOK_SECRET: z
     .string()
@@ -86,6 +88,7 @@ export type AppConfig = {
   /** null in production without a secret: the webhook endpoint answers 503 instead of trusting anyone. */
   espWebhookSecret: string | null;
   dmarcKnownSources: string[];
+  admissionsUrl: string | null;
 };
 
 /** Development only: links signed with it stop working on any real deploy, where the secret is required. */
@@ -125,6 +128,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     sendRatePerSecond: env.SEND_RATE_PER_SECOND,
     sendBatchSize: env.SEND_BATCH_SIZE,
     espWebhookSecret: env.ESP_WEBHOOK_SECRET ?? (env.NODE_ENV === 'production' ? null : 'development-only-esp-webhook-secret-0123456789'),
+    admissionsUrl: env.ADMISSIONS_URL ?? null,
     dmarcKnownSources: env.DMARC_KNOWN_SOURCES.split(',').map((item) => item.trim()).filter(Boolean),
     seedList: env.SEED_LIST.split(',').map((item) => item.trim()).filter((item) => item.includes('@')),
     jobsEnabled: env.JOBS_ENABLED === undefined ? env.NODE_ENV !== 'test' : env.JOBS_ENABLED === 'true',

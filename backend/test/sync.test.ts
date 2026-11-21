@@ -44,6 +44,7 @@ describe('Core Engine and CRM sync (AUD-06)', () => {
     const all = await db.select().from(outcomes);
     expect(all.map((row) => `${row.sourceSystem}:${row.type}`).sort()).toEqual([
       'alumni_tracker:hired',
+      'alumni_tracker:hired',
       'core_engine:completed',
       'core_engine:enrolled',
       'navigator_crm:applied',

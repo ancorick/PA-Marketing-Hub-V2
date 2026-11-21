@@ -24,6 +24,9 @@ import { webhookRoutes } from './routes/webhooks.js';
 import { alertRoutes } from './routes/alerts.js';
 import { privacyRoutes } from './routes/privacy.js';
 import { dmarcRoutes } from './routes/dmarc.js';
+import { newsletterRoutes } from './routes/newsletter.js';
+import { Collectors } from './newsletter/collectors.js';
+import { NewsletterService } from './newsletter/service.js';
 import { DmarcService } from './dmarc/service.js';
 import { PrivacyService } from './privacy/service.js';
 import { AlertService } from './alerts/service.js';
@@ -72,6 +75,7 @@ declare module 'fastify' {
     privacy: PrivacyService;
     dmarc: DmarcService;
     sunset: SunsetPolicy;
+    newsletter: NewsletterService;
   }
 }
 
@@ -271,6 +275,17 @@ export async function buildApp({
   const dmarc = new DmarcService({ db: database.db, alerts, knownSources: config.dmarcKnownSources });
   app.decorate('dmarc', dmarc);
   await app.register(dmarcRoutes, { dmarc, coreEngine: resolvedIntegrations.coreEngine });
+  const collectors = new Collectors({
+    db: database.db,
+    coreEngine: resolvedIntegrations.coreEngine,
+    alumni: resolvedIntegrations.alumniTracker,
+    library: resolvedIntegrations.library,
+    groupLaunchpad: resolvedIntegrations.groupLaunchpad,
+  });
+  const newsletter = new NewsletterService({ db: database.db, collectors, ranking: async () => undefined, ctaUrl: config.admissionsUrl });
+  app.decorate('newsletter', newsletter);
+  jobs.register({ name: 'newsletter_schedule', description: 'Newsletter: plan issues, collect items and draft', intervalMs: 60 * 60_000, run: () => newsletter.tick() });
+  await app.register(newsletterRoutes, { newsletter, coreEngine: resolvedIntegrations.coreEngine });
   const merge = new MergeService({ db: database.db, coreEngine: resolvedIntegrations.coreEngine, logger: app.log });
   await app.register(importRoutes, { imports, duplicates, merge, contacts, contactRepository, coreEngine: resolvedIntegrations.coreEngine });
 

@@ -2,6 +2,7 @@ import {
   CORE_ENGINE_CONTRACT_VERSION,
   type ActivityLogEntry,
   type CoreEngineClient,
+  type CoreGraduation,
   type CoreMarketingTouch,
   type CoreOutcome,
   type CorePerson,
@@ -59,6 +60,13 @@ export class MockCoreEngineClient implements CoreEngineClient {
 
   async listOutcomesSince(since: Date): Promise<CoreOutcome[]> {
     return OUTCOMES.filter((outcome) => new Date(outcome.occurredAt) >= since);
+  }
+
+  async listGraduationsSince(since: Date): Promise<CoreGraduation[]> {
+    const graduations: CoreGraduation[] = [
+      { groupId: 'fe-2026-05', courseId: 'course-frontend', courseTitle: 'Frontend Development', graduatedAt: new Date(Date.now() - 8 * 86_400_000).toISOString(), graduates: 21 },
+    ];
+    return graduations.filter((graduation) => new Date(graduation.graduatedAt) >= since);
   }
 
   async writeActivityLog(entry: ActivityLogEntry): Promise<void> {

@@ -45,6 +45,15 @@ export type CoreMarketingTouch = {
   occurredAt: string;
 };
 
+/** A group that finished its course (newsletter "Graduations": aggregate only, PRD 8.2). */
+export type CoreGraduation = {
+  groupId: string;
+  courseId: string;
+  courseTitle: string;
+  graduatedAt: string; // ISO 8601
+  graduates: number;
+};
+
 export type StaffSession = {
   userId: string;
   email: string;
@@ -71,6 +80,8 @@ export interface CoreEngineClient {
   findPersonByEmail(email: string): Promise<CorePerson | null>;
   listPeopleChangedSince(since: Date): Promise<CorePerson[]>;
   listOutcomesSince(since: Date): Promise<CoreOutcome[]>;
+  /** Added in v1.1 for the newsletter collectors. */
+  listGraduationsSince(since: Date): Promise<CoreGraduation[]>;
   writeActivityLog(entry: ActivityLogEntry): Promise<void>;
   /** Idempotent by touch ID: sending the same touch twice stores it once. */
   addMarketingTouches(touches: CoreMarketingTouch[]): Promise<void>;

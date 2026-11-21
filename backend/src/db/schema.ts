@@ -533,3 +533,139 @@ export const dmarcRecords = pgTable(
   },
   (table) => [index('dmarc_records_report_idx').on(table.reportId), index('dmarc_records_ip_idx').on(table.sourceIp)],
 );
+
+/**
+ * Events known to Marketing Hub: pushed by Event Hub (PRD 10.2, phase 4) or entered by staff while Event
+ * Hub is not ready (10.5). Read by the newsletter collectors for upcoming and recent events (NWS-02).
+ */
+export const events = pgTable(
+  'events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** Event Hub ID; null for events entered by hand. */
+    externalId: text('external_id').unique(),
+    title: text('title').notNull(),
+    /** open_day, workshop, info_session, meetup, graduation, other */
+    type: text('type').notNull(),
+    language: text('language'),
+    startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+    public: boolean('public').notNull().default(false),
+    registrationUrl: text('registration_url'),
+    registrationOpen: boolean('registration_open').notNull().default(false),
+    recordingUrl: text('recording_url'),
+    photosUrl: text('photos_url'),
+    mediaPublic: boolean('media_public').notNull().default(false),
+    ...timestamps,
+  },
+  (table) => [index('events_starts_idx').on(table.startsAt)],
+);
+
+export type EventRow = typeof events.$inferSelect;
+
+/** Recurring newsletter schedule (NWS-01): one issue per language per period, sent to that language's segment. */
+export const newsletterCadences = pgTable('newsletter_cadences', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  /** monthly (default) | biweekly */
+  interval: text('interval').notNull().default('monthly'),
+  /** Monthly: day of the month the issue goes out (1-28). */
+  sendDay: integer('send_day').notNull().default(10),
+  /** Hour in Yerevan time. */
+  sendHour: integer('send_hour').notNull().default(11),
+  /** Collect and draft this many working days before the send date (8.1: default five). */
+  collectWorkingDays: integer('collect_working_days').notNull().default(5),
+  languages: text('languages').array().notNull(),
+  /** Segment per language, e.g. {"hy": "<segment id>"} (NWS-06). */
+  segments: jsonb('segments').$type<Record<string, string>>().notNull(),
+  templateId: uuid('template_id'),
+  active: boolean('active').notNull().default(true),
+  ...timestamps,
+});
+
+export type NewsletterCadenceRow = typeof newsletterCadences.$inferSelect;
+
+/** Issue (PRD 12.2): one language version of one edition. */
+export const issues = pgTable(
+  'issues',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    cadenceId: uuid('cadence_id')
+      .notNull()
+      .references(() => newsletterCadences.id, { onDelete: 'cascade' }),
+    /** e.g. 2026-12 */
+    edition: text('edition').notNull(),
+    language: text('language').notNull(),
+    /** Items since this moment (the previous issue's cut-off) are collected. */
+    periodStart: timestamp('period_start', { withTimezone: true }).notNull(),
+    cutOffAt: timestamp('cut_off_at', { withTimezone: true }),
+    collectAt: timestamp('collect_at', { withTimezone: true }).notNull(),
+    plannedSendAt: timestamp('planned_send_at', { withTimezone: true }).notNull(),
+    /** collecting | draft | in_review | approved | scheduled | sent */
+    status: text('status').notNull().default('collecting'),
+    subject: text('subject'),
+    preheader: text('preheader'),
+    subjectAiDrafted: boolean('subject_ai_drafted').notNull().default(false),
+    sendId: uuid('send_id'),
+    archiveSlug: text('archive_slug').unique(),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex('issues_edition_idx').on(table.cadenceId, table.edition, table.language)],
+);
+
+export type IssueRow = typeof issues.$inferSelect;
+
+/**
+ * CollectedItem (PRD 12.2, NWS-02): what a collector found, with a link to its source record. Shared by all
+ * language versions; `payload` keeps the source fields (titles per language, dates, links).
+ */
+export const collectedItems = pgTable(
+  'collected_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    sourceSystem: text('source_system').notNull(),
+    sourceRef: text('source_ref').notNull(),
+    /** upcoming_event | recent_event | library | graduation | hire | new_group */
+    type: text('type').notNull(),
+    title: text('title').notNull(),
+    url: text('url'),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+    publishable: boolean('publishable').notNull(),
+    /** Why the publish rule left it out (8.5 "skipped items" panel). */
+    skipReason: text('skip_reason'),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex('collected_items_source_idx').on(table.sourceSystem, table.sourceRef, table.type)],
+);
+
+export type CollectedItemRow = typeof collectedItems.$inferSelect;
+
+/** IssueBlock (PRD 12.2): one block of an issue, in order. */
+export const issueBlocks = pgTable(
+  'issue_blocks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    issueId: uuid('issue_id')
+      .notNull()
+      .references(() => issues.id, { onDelete: 'cascade' }),
+    /** lead | upcoming_events | recent_events | library | graduations | hires | new_groups | cta | custom */
+    type: text('type').notNull(),
+    position: integer('position').notNull(),
+    title: text('title').notNull(),
+    /** Same safe markup as campaign bodies. */
+    body: text('body').notNull(),
+    /** Collected item IDs shown in the block (8.1 "each block shows its source item"). */
+    itemIds: uuid('item_ids').array().notNull(),
+    imageUrl: text('image_url'),
+    imageAlt: text('image_alt'),
+    buttonLabel: text('button_label'),
+    buttonUrl: text('button_url'),
+    /** NWS-07: true until a person edits or accepts the text. */
+    aiDrafted: boolean('ai_drafted').notNull().default(false),
+    editedBy: text('edited_by'),
+    ...timestamps,
+  },
+  (table) => [index('issue_blocks_issue_idx').on(table.issueId, table.position)],
+);
+
+export type IssueBlockRow = typeof issueBlocks.$inferSelect;

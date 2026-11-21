@@ -5,8 +5,13 @@ import {
   type Referral,
 } from './contract.js';
 
+const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000);
+
+/** Dated relative to today so the newsletter "Alumni hires" collector always has a period to look at. */
 const EMPLOYMENT: EmploymentRecord[] = [
-  { corePersonId: 'core-p-002', status: 'employed', company: 'Example Tech LLC', role: 'Junior Backend Developer', inTech: true, startDate: '2026-08-15', featureConsent: true, updatedAt: '2026-08-20T09:00:00.000Z' },
+  { corePersonId: 'core-p-002', status: 'employed', company: 'Example Tech LLC', role: 'Junior Backend Developer', inTech: true, startDate: daysAgo(15).toISOString().slice(0, 10), featureConsent: true, updatedAt: daysAgo(10).toISOString() },
+  // Did not agree to be featured: collected, but skipped by the publish rule (PRD 8.2).
+  { corePersonId: 'core-p-003', status: 'employed', company: 'Sample Studio', role: 'QA Intern', inTech: true, startDate: daysAgo(6).toISOString().slice(0, 10), featureConsent: false, updatedAt: daysAgo(5).toISOString() },
 ];
 
 const REFERRALS: Referral[] = [
