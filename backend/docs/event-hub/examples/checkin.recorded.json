@@ -1,0 +1,11 @@
+{
+  "id": "evh-msg-0005",
+  "type": "checkin.recorded",
+  "version": "1",
+  "occurredAt": "2026-12-05T12:07:00+04:00",
+  "data": {
+    "registrationId": "evh-reg-9001",
+    "eventId": "evh-ev-42",
+    "checkedInAt": "2026-12-05T12:07:00+04:00"
+  }
+}

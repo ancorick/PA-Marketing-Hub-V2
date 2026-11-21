@@ -1,0 +1,719 @@
+{
+  "$id": "urn:picsart-academy:marketing-hub:event-hub:v1",
+  "title": "Event Hub to Marketing Hub message, v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Idempotency key: unique per message; a retry repeats it and Marketing Hub processes it once"
+        },
+        "type": {
+          "type": "string",
+          "const": "event.created"
+        },
+        "version": {
+          "type": "string",
+          "const": "1"
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "eventId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Event Hub event ID; stable for the life of the event"
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "open_day",
+                "workshop",
+                "info_session",
+                "meetup",
+                "graduation",
+                "guest_visit",
+                "other"
+              ]
+            },
+            "startsAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "endsAt": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "language": {
+              "description": "Main language of the event; null for mixed",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "hy",
+                    "en",
+                    "ru"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "public": {
+              "type": "boolean",
+              "description": "Listed publicly; only public events reach the newsletter"
+            },
+            "registrationUrl": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2000,
+                  "format": "uri"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "registrationOpen": {
+              "type": "boolean"
+            },
+            "recordingUrl": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2000,
+                  "format": "uri"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "photosUrl": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2000,
+                  "format": "uri"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "mediaPublic": {
+              "default": false,
+              "description": "Recording and photos may be shared publicly (newsletter \"recent events\")",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "eventId",
+            "title",
+            "type",
+            "startsAt",
+            "public",
+            "registrationOpen"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "version",
+        "occurredAt",
+        "data"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Idempotency key: unique per message; a retry repeats it and Marketing Hub processes it once"
+        },
+        "type": {
+          "type": "string",
+          "const": "event.updated"
+        },
+        "version": {
+          "type": "string",
+          "const": "1"
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "eventId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Event Hub event ID; stable for the life of the event"
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "open_day",
+                "workshop",
+                "info_session",
+                "meetup",
+                "graduation",
+                "guest_visit",
+                "other"
+              ]
+            },
+            "startsAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "endsAt": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "language": {
+              "description": "Main language of the event; null for mixed",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "hy",
+                    "en",
+                    "ru"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "public": {
+              "type": "boolean",
+              "description": "Listed publicly; only public events reach the newsletter"
+            },
+            "registrationUrl": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2000,
+                  "format": "uri"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "registrationOpen": {
+              "type": "boolean"
+            },
+            "recordingUrl": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2000,
+                  "format": "uri"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "photosUrl": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2000,
+                  "format": "uri"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "mediaPublic": {
+              "default": false,
+              "description": "Recording and photos may be shared publicly (newsletter \"recent events\")",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "eventId",
+            "title",
+            "type",
+            "startsAt",
+            "public",
+            "registrationOpen"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "version",
+        "occurredAt",
+        "data"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Idempotency key: unique per message; a retry repeats it and Marketing Hub processes it once"
+        },
+        "type": {
+          "type": "string",
+          "const": "registration.created"
+        },
+        "version": {
+          "type": "string",
+          "const": "1"
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "registrationId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "eventId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "registeredAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "contact": {
+              "type": "object",
+              "properties": {
+                "corePersonId": {
+                  "description": "Core Engine person ID when Event Hub knows it; matched first (AUD-04)",
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "email": {
+                  "type": "string",
+                  "maxLength": 320,
+                  "format": "email",
+                  "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                },
+                "firstName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 100
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "lastName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 100
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "phone": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 40
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "language": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "hy",
+                        "en",
+                        "ru"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "email"
+              ]
+            },
+            "consent": {
+              "default": [],
+              "description": "Boxes the person ticked; empty = no marketing consent given (the registration itself is not consent)",
+              "maxItems": 4,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "topic": {
+                    "type": "string",
+                    "enum": [
+                      "newsletter",
+                      "courses",
+                      "events",
+                      "alumni"
+                    ]
+                  },
+                  "wordingVersion": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60,
+                    "description": "Version of the Audience wording shown on the form (AUD-07)"
+                  }
+                },
+                "required": [
+                  "topic",
+                  "wordingVersion"
+                ]
+              }
+            },
+            "campaign": {
+              "default": {},
+              "description": "Campaign parameters of the registration link",
+              "type": "object",
+              "properties": {
+                "utmSource": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "utmMedium": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "utmCampaign": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "pageUrl": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2000,
+                  "format": "uri"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "registrationId",
+            "eventId",
+            "registeredAt",
+            "contact"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "version",
+        "occurredAt",
+        "data"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Idempotency key: unique per message; a retry repeats it and Marketing Hub processes it once"
+        },
+        "type": {
+          "type": "string",
+          "const": "registration.cancelled"
+        },
+        "version": {
+          "type": "string",
+          "const": "1"
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "registrationId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "eventId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "cancelledAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            }
+          },
+          "required": [
+            "registrationId",
+            "eventId",
+            "cancelledAt"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "version",
+        "occurredAt",
+        "data"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Idempotency key: unique per message; a retry repeats it and Marketing Hub processes it once"
+        },
+        "type": {
+          "type": "string",
+          "const": "checkin.recorded"
+        },
+        "version": {
+          "type": "string",
+          "const": "1"
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "registrationId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "eventId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "checkedInAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            }
+          },
+          "required": [
+            "registrationId",
+            "eventId",
+            "checkedInAt"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "version",
+        "occurredAt",
+        "data"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Idempotency key: unique per message; a retry repeats it and Marketing Hub processes it once"
+        },
+        "type": {
+          "type": "string",
+          "const": "event.cost_recorded"
+        },
+        "version": {
+          "type": "string",
+          "const": "1"
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "costId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Stable ID of the cost line; a corrected amount is sent again with the same costId"
+            },
+            "eventId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "category": {
+              "type": "string",
+              "enum": [
+                "venue",
+                "catering",
+                "materials",
+                "promotion",
+                "other"
+              ]
+            },
+            "amount": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 10000000000
+            },
+            "currency": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            "spentOn": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 300
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "costId",
+            "eventId",
+            "category",
+            "amount",
+            "currency",
+            "spentOn"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "version",
+        "occurredAt",
+        "data"
+      ]
+    }
+  ]
+}

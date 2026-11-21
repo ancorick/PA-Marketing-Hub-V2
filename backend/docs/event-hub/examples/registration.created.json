@@ -1,0 +1,35 @@
+{
+  "id": "evh-msg-0003",
+  "type": "registration.created",
+  "version": "1",
+  "occurredAt": "2026-11-10T18:30:00+04:00",
+  "data": {
+    "registrationId": "evh-reg-9001",
+    "eventId": "evh-ev-42",
+    "registeredAt": "2026-11-10T18:30:00+04:00",
+    "contact": {
+      "corePersonId": null,
+      "email": "ani.sample@example.test",
+      "firstName": "Ani",
+      "lastName": "Sample",
+      "phone": "+37491000000",
+      "language": "hy"
+    },
+    "consent": [
+      {
+        "topic": "events",
+        "wordingVersion": "events-hy-v1"
+      },
+      {
+        "topic": "newsletter",
+        "wordingVersion": "newsletter-hy-v1"
+      }
+    ],
+    "campaign": {
+      "utmSource": "instagram",
+      "utmMedium": "paid_social",
+      "utmCampaign": "open-day-december"
+    },
+    "pageUrl": "https://events.picsart.academy/open-day-december"
+  }
+}

@@ -42,8 +42,11 @@ export function signWebhook(secret: string, body: string, timestamp = Math.floor
   return `t=${timestamp},v1=${mac(secret, timestamp, body)}`;
 }
 
-/** Verifies the signature and timestamp of a raw webhook body, then parses it. */
-export function verifyWebhook(secret: string, header: string | undefined, rawBody: string, now = new Date()): EspEvent[] {
+/**
+ * Verifies a "t=…,v1=…" signature and its timestamp, then parses the JSON body. Shared by the ESP and Event Hub
+ * webhooks (NFR-S4).
+ */
+export function verifySignedJson(secret: string, header: string | undefined, rawBody: string, now = new Date()): unknown {
   if (!header) throw new WebhookError('missing_signature', 'Missing signature header');
   const parts = Object.fromEntries(header.split(',').map((part) => part.trim().split('=', 2) as [string, string]));
   const timestamp = Number(parts.t);
@@ -52,13 +55,16 @@ export function verifyWebhook(secret: string, header: string | undefined, rawBod
   const expected = Buffer.from(mac(secret, timestamp, rawBody));
   const given = Buffer.from(parts.v1);
   if (expected.length !== given.length || !timingSafeEqual(expected, given)) throw new WebhookError('bad_signature', 'Signature does not match');
-  let json: unknown;
   try {
-    json = JSON.parse(rawBody);
+    return JSON.parse(rawBody) as unknown;
   } catch {
     throw new WebhookError('bad_payload', 'Body is not JSON');
   }
-  const parsed = webhookBodySchema.safeParse(json);
+}
+
+/** Verifies the signature and timestamp of a raw ESP webhook body, then parses it. */
+export function verifyWebhook(secret: string, header: string | undefined, rawBody: string, now = new Date()): EspEvent[] {
+  const parsed = webhookBodySchema.safeParse(verifySignedJson(secret, header, rawBody, now));
   if (!parsed.success) throw new WebhookError('bad_payload', parsed.error.issues[0]?.message ?? 'Invalid events');
   return parsed.data.events;
 }

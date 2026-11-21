@@ -1,0 +1,20 @@
+{
+  "id": "evh-msg-0002",
+  "type": "event.updated",
+  "version": "1",
+  "occurredAt": "2026-12-06T10:00:00+04:00",
+  "data": {
+    "eventId": "evh-ev-42",
+    "title": "Open day: Frontend and Data courses",
+    "type": "open_day",
+    "startsAt": "2026-12-05T12:00:00+04:00",
+    "endsAt": "2026-12-05T15:00:00+04:00",
+    "language": "hy",
+    "public": true,
+    "registrationUrl": "https://events.picsart.academy/open-day-december",
+    "registrationOpen": false,
+    "recordingUrl": "https://www.youtube.com/watch?v=example",
+    "photosUrl": "https://photos.picsart.academy/open-day-december",
+    "mediaPublic": true
+  }
+}

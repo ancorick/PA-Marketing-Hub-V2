@@ -1,0 +1,11 @@
+{
+  "id": "evh-msg-0004",
+  "type": "registration.cancelled",
+  "version": "1",
+  "occurredAt": "2026-12-01T08:00:00+04:00",
+  "data": {
+    "registrationId": "evh-reg-9002",
+    "eventId": "evh-ev-42",
+    "cancelledAt": "2026-12-01T08:00:00+04:00"
+  }
+}

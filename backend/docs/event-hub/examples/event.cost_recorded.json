@@ -1,0 +1,15 @@
+{
+  "id": "evh-msg-0006",
+  "type": "event.cost_recorded",
+  "version": "1",
+  "occurredAt": "2026-12-06T11:00:00+04:00",
+  "data": {
+    "costId": "evh-cost-77",
+    "eventId": "evh-ev-42",
+    "category": "catering",
+    "amount": 180000,
+    "currency": "AMD",
+    "spentOn": "2026-12-05",
+    "description": "Coffee and snacks for 60 people"
+  }
+}
