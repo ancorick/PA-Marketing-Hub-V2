@@ -31,6 +31,12 @@ npm run dev
 Sign-in uses mock staff tokens until the Core Engine (Project 1) is connected: the role switcher in the header
 chooses viewer, editor, marketing manager, admin or leadership.
 
+Demo data: start the backend with `DEMO_SEED=true npm run dev` (or set it in `backend/.env`) to load a synthetic
+data set into an empty database: about 1,800 made-up contacts in hy/en/ru over 18 months, costs and exchange
+rates, events, three newsletter issues, campaign sends, sync runs, alerts and unmapped utm values
+(`backend/src/demo/`). A database that already has contacts is never touched, and `NODE_ENV=production` refuses
+the flag at start-up. With the embedded database the set is rebuilt on every start; the same day gives the same data.
+
 ## Checks
 
 ```sh

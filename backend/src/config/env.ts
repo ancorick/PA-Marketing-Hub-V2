@@ -94,6 +94,8 @@ const envSchema = z.object({
   // Seed list for test sends (EML-13): staff inboxes on Gmail, Outlook, Apple Mail, comma-separated.
   SEED_LIST: z.string().default(''),
   ACADEMY_POSTAL_ADDRESS: z.string().min(3).default('Picsart Academy, address to be confirmed, Yerevan, Armenia'),
+  // Synthetic demo data on start-up (docs/RESTRUCTURE.md R2), only into an empty database. Never in production.
+  DEMO_SEED: z.enum(['true', 'false']).optional(),
 });
 
 export type AppConfig = {
@@ -133,6 +135,8 @@ export type AppConfig = {
   newsletterEditorEmails: string[];
   /** Data source failures (ANL-11) and other admin alerts by email. */
   adminAlertEmails: string[];
+  /** Load the synthetic demo data set into an empty database on start-up (src/demo); refused in production. */
+  demoSeed: boolean;
 };
 
 /** Development only: links signed with it stop working on any real deploy, where the secret is required. */
@@ -150,6 +154,10 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   const env = parsed.data;
   if (env.NODE_ENV === 'production' && !env.LINK_SIGNING_SECRET) {
     throw new Error('Invalid environment configuration: LINK_SIGNING_SECRET is required in production (NFR-S5)');
+  }
+  // Demo data must never reach a real deployment (PRD 14.4: synthetic data stays out of production).
+  if (env.NODE_ENV === 'production' && env.DEMO_SEED === 'true') {
+    throw new Error('Invalid environment configuration: DEMO_SEED cannot be enabled in production');
   }
   return {
     nodeEnv: env.NODE_ENV,
@@ -186,5 +194,6 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     dmarcKnownSources: env.DMARC_KNOWN_SOURCES.split(',').map((item) => item.trim()).filter(Boolean),
     seedList: env.SEED_LIST.split(',').map((item) => item.trim()).filter((item) => item.includes('@')),
     jobsEnabled: env.JOBS_ENABLED === undefined ? env.NODE_ENV !== 'test' : env.JOBS_ENABLED === 'true',
+    demoSeed: env.DEMO_SEED === 'true',
   };
 }

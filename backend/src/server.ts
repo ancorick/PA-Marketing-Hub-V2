@@ -1,6 +1,7 @@
 import { buildApp } from './app.js';
 import { loadConfig } from './config/env.js';
 import { createDatabase, createEmbeddedDatabase } from './db/client.js';
+import { seedDemoData } from './demo/seed.js';
 
 const config = loadConfig();
 const database = config.databaseUrl ? createDatabase(config.databaseUrl) : await createEmbeddedDatabase();
@@ -26,6 +27,18 @@ await migrate();
 if (database.kind === 'embedded') app.log.warn('DATABASE_URL is not set: using an in-process database, data is lost on restart');
 if (config.integrationsMode === 'mock') {
   app.log.warn('INTEGRATIONS_MODE=mock: Core Engine, Navigator CRM and Alumni Tracker are stubs');
+}
+
+// DEMO_SEED=true (never in production, loadConfig refuses it): synthetic data before the scheduler starts,
+// so the jobs see the seeded run history instead of backfilling on their own.
+if (config.demoSeed) {
+  try {
+    const result = await seedDemoData(database.db, { nodeEnv: config.nodeEnv });
+    if (result.status === 'seeded') app.log.warn({ rows: result.rows }, 'DEMO_SEED: synthetic demo data loaded');
+    else app.log.warn(`DEMO_SEED: skipped, ${result.reason}`);
+  } catch (error) {
+    app.log.error({ err: error }, 'DEMO_SEED: loading demo data failed');
+  }
 }
 
 if (config.jobsEnabled) app.jobs.start();
