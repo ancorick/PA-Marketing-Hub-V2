@@ -67,6 +67,9 @@ export type ContactView = {
   tags: string[];
   status: ContactStatus;
   frequency: Frequency;
+  /** EML-15: re-engagement email sent / moved out of regular sends. */
+  reengagementSentAt: string | null;
+  sunsetAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -103,6 +106,8 @@ const toView = (contact: Contact): ContactView => ({
   tags: contact.tags,
   status: contact.status,
   frequency: contact.frequency,
+  reengagementSentAt: contact.reengagementSentAt?.toISOString() ?? null,
+  sunsetAt: contact.sunsetAt?.toISOString() ?? null,
   createdAt: contact.createdAt.toISOString(),
   updatedAt: contact.updatedAt.toISOString(),
 });

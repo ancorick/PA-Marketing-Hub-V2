@@ -141,6 +141,8 @@ export type Contact = {
   firstTouchAt: string;
   tags: string[];
   status: ContactStatus;
+  reengagementSentAt: string | null;
+  sunsetAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -560,3 +562,6 @@ export const uploadDmarcReport = (file: File) =>
     body: file,
     headers: { 'Content-Type': 'application/octet-stream' },
   });
+
+/** EML-15: "keep me subscribed" from the re-engagement email. */
+export const publicStay = (token: string) => publicFetch<PublicPreferences>(withToken('/api/public/preferences/stay', token), { method: 'POST' });

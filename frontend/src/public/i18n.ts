@@ -42,6 +42,7 @@ type Strings = {
   prefsUnsubscribeAll: string;
   prefsUnsubscribedAll: string;
   prefsDataNote: string;
+  stayDone: string;
   confirmWorking: string;
   confirmDoneTitle: string;
   confirmDoneText: string;
@@ -88,6 +89,7 @@ const en: Strings = {
   prefsUnsubscribedAll: 'You are unsubscribed from everything.',
   prefsDataNote:
     'We record which emails you open and which links you click, to send fewer and better emails. Opens are estimated. We do not use third-party tracking cookies.',
+  stayDone: 'Thank you! You stay subscribed. You can change topics below.',
   confirmWorking: 'Confirming your subscription…',
   confirmDoneTitle: 'Subscription confirmed',
   confirmDoneText: 'Thank you. The first email will arrive with the next issue.',
@@ -144,6 +146,7 @@ const hy: Strings = {
   prefsUnsubscribedAll: 'Դուք ապաբաժանորդագրվել եք ամեն ինչից։',
   prefsDataNote:
     'Մենք գրանցում ենք, թե որ նամակներն եք բացում և որ հղումներով անցնում, որպեսզի ուղարկենք ավելի քիչ և ավելի օգտակար նամակներ։ Բացումները մոտավոր են։ Մենք չենք օգտագործում երրորդ կողմի հետևող cookie-ներ։',
+  stayDone: 'Շնորհակալություն։ Դուք մնում եք բաժանորդագրված։ Թեմաները կարող եք փոխել ներքևում։',
   confirmWorking: 'Հաստատում ենք բաժանորդագրությունը…',
   confirmDoneTitle: 'Բաժանորդագրությունը հաստատված է',
   confirmDoneText: 'Շնորհակալություն։ Առաջին նամակը կգա հաջորդ թողարկման հետ։',
@@ -200,6 +203,7 @@ const ru: Strings = {
   prefsUnsubscribedAll: 'Вы отписались от всего.',
   prefsDataNote:
     'Мы отмечаем, какие письма вы открываете и по каким ссылкам переходите, чтобы присылать меньше писем и полезнее. Открытия считаются приблизительно. Мы не используем сторонние отслеживающие cookie.',
+  stayDone: 'Спасибо! Подписка сохранена. Темы можно изменить ниже.',
   confirmWorking: 'Подтверждаем подписку…',
   confirmDoneTitle: 'Подписка подтверждена',
   confirmDoneText: 'Спасибо. Первое письмо придёт со следующим выпуском.',

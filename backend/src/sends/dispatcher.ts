@@ -88,6 +88,11 @@ export class SendDispatcher {
   /** Materializes the audience at send time. */
   async start(sendId: string): Promise<void> {
     const send = await this.deps.sends.require(sendId);
+    // Re-engagement sends (EML-15) are created with their recipients already queued.
+    if (send.kind === 'reengagement') {
+      await this.deps.sends.setStatus(sendId, { status: 'sending', startedAt: this.now() });
+      return;
+    }
     if (!send.segmentId) {
       await this.deps.sends.setStatus(sendId, { status: 'paused', pausedReason: 'The segment was deleted; choose another one' });
       return;
@@ -164,13 +169,16 @@ export class SendDispatcher {
     const [contact] = delivery.contactId ? ((await this.deps.db.select().from(contacts).where(eq(contacts.id, delivery.contactId))) as Contact[]) : [];
     if (!contact?.email) return skip('contact removed');
     if (contact.status !== 'active' || (await this.deps.consent.isSuppressed(contact.email))) return skip('suppressed');
-    const [latest] = await this.deps.db
-      .select({ state: consentRecords.state })
+    // The send's topic must be granted; a re-engagement email goes to anyone with at least one granted topic.
+    const records = await this.deps.db
+      .select({ topic: consentRecords.topic, state: consentRecords.state })
       .from(consentRecords)
-      .where(and(eq(consentRecords.contactId, contact.id), eq(consentRecords.topic, send.topic)))
-      .orderBy(desc(consentRecords.createdAt))
-      .limit(1);
-    if (latest?.state !== 'granted') return skip('no consent');
+      .where(eq(consentRecords.contactId, contact.id))
+      .orderBy(desc(consentRecords.createdAt));
+    const latest = new Map<string, string>();
+    for (const record of records) if (!latest.has(record.topic)) latest.set(record.topic, record.state);
+    const consented = send.kind === 'reengagement' ? [...latest.values()].includes('granted') : latest.get(send.topic) === 'granted';
+    if (!consented) return skip('no consent');
     if (contact.frequency === 'monthly') {
       const [recent] = await this.deps.db
         .select({ id: deliveries.id })

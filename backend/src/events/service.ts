@@ -27,6 +27,8 @@ type Deps = {
   alerts: AlertService;
   killSwitch: KillSwitch;
   logger: { warn: (obj: object, msg: string) => void };
+  /** EML-15: an open or click brings a sunset contact back into regular sends. */
+  onEngagement?: (contactId: string) => Promise<void>;
 };
 
 /**
@@ -86,6 +88,7 @@ export class EspEventService {
             sourceSystem: 'esp',
             sourceRef: event.id,
           });
+          await this.deps.onEngagement?.(delivery.contactId);
         }
         return;
       }

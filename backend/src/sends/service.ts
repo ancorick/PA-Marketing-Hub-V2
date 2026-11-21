@@ -183,7 +183,10 @@ export class SendService {
       preheader: send.preheader ?? undefined,
       title: personalize(send.subject),
       blocks: [body],
-      ...(send.buttonLabel && send.buttonUrl && { button: { label: send.buttonLabel, url: tag(send.buttonUrl) } }),
+      ...(send.kind === 'reengagement' && send.buttonLabel
+        ? // EML-15: "Keep me subscribed" opens the person's own preferences link, which records the answer.
+          { button: { label: send.buttonLabel, url: `${this.deps.links.preferencesPage(contactId)}&stay=1` } }
+        : send.buttonLabel && send.buttonUrl && { button: { label: send.buttonLabel, url: tag(send.buttonUrl) } }),
       footer: {
         reason: REASON[language](send.topic as Topic),
         postalAddress: this.deps.postalAddress,

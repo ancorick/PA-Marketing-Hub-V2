@@ -6,6 +6,7 @@ import {
   ApiError,
   getPublicPreferences,
   publicConfirm,
+  publicStay,
   publicUndoUnsubscribe,
   publicUnsubscribe,
   publicUnsubscribeAll,
@@ -161,8 +162,15 @@ function ConfirmPage({ token }: { token: string }) {
 }
 
 /** AUD-11: topics, language and frequency, or unsubscribe from all, through a signed link. */
-function PreferencesPage({ token }: { token: string }) {
+function PreferencesPage({ token, stay }: { token: string; stay: boolean }) {
   const [, t] = usePublicLanguage();
+  const stayStarted = useRef(false);
+  const stayed = useMutation({ mutationFn: () => publicStay(token) });
+  useEffect(() => {
+    if (!stay || stayStarted.current) return;
+    stayStarted.current = true;
+    stayed.mutate();
+  }, [stay, stayed]);
   const preferences = useQuery({ queryKey: ['public-preferences', token], queryFn: () => getPublicPreferences(token), retry: false });
   const [topics, setTopics] = useState<Topic[] | null>(null);
   const [language, setLanguage] = useState<Language | null>(null);
@@ -210,6 +218,7 @@ function PreferencesPage({ token }: { token: string }) {
         </h1>
         <p className="muted">{t.prefsFor(data.email)}</p>
       </div>
+      {stayed.isSuccess && <Alert tone="success" title={t.stayDone} />}
       {data.suppressed && <Alert tone="info" title={t.prefsSuppressed} />}
       <form className="stack stack--lg" onSubmit={submit} noValidate>
         <fieldset className="fieldset">
@@ -305,7 +314,7 @@ export function PublicApp({ path }: { path: string }) {
   let content: ReactNode;
   if (page === '/p/unsubscribe') content = token ? <UnsubscribePage token={token} /> : <LinkProblem error={new ApiError(400, '', null, 'invalid_link')} />;
   else if (page === '/p/confirm') content = token ? <ConfirmPage token={token} /> : <LinkProblem error={new ApiError(400, '', null, 'invalid_link')} />;
-  else if (page === '/p/preferences') content = token ? <PreferencesPage token={token} /> : <LinkProblem error={new ApiError(400, '', null, 'invalid_link')} />;
+  else if (page === '/p/preferences') content = token ? <PreferencesPage token={token} stay={new URLSearchParams(query).get('stay') === '1'} /> : <LinkProblem error={new ApiError(400, '', null, 'invalid_link')} />;
   else content = <PrivacyPage />;
   return <PublicLayout>{content}</PublicLayout>;
 }

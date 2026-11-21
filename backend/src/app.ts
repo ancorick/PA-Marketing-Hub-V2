@@ -30,6 +30,7 @@ import { AlertService } from './alerts/service.js';
 import { EspEventService } from './events/service.js';
 import { SendDispatcher } from './sends/dispatcher.js';
 import { KillSwitch } from './sends/kill-switch.js';
+import { SunsetPolicy } from './sends/sunset.js';
 import { httpLinkChecker, SendService, type LinkChecker } from './sends/service.js';
 import { SegmentService } from './segments/service.js';
 import { JobRunner } from './jobs/runner.js';
@@ -70,6 +71,7 @@ declare module 'fastify' {
     espEvents: EspEventService;
     privacy: PrivacyService;
     dmarc: DmarcService;
+    sunset: SunsetPolicy;
   }
 }
 
@@ -168,6 +170,8 @@ export async function buildApp({
   app.decorate('links', links);
   const touchpoints = new TouchpointRepository(database.db);
   app.decorate('touchpoints', touchpoints);
+  const sunset = new SunsetPolicy({ db: database.db, mailFrom: config.mailFrom });
+  app.decorate('sunset', sunset);
   const signup = new SignupService({
     contacts,
     contactRepository,
@@ -192,7 +196,16 @@ export async function buildApp({
   await app.register(domainRoutes, { domains, coreEngine: resolvedIntegrations.coreEngine });
   await app.register(contactRoutes, { contacts, coreEngine: resolvedIntegrations.coreEngine });
   await app.register(consentRoutes, { consent, coreEngine: resolvedIntegrations.coreEngine });
-  await app.register(publicPreferenceRoutes, { consent, contacts: contactRepository, signer, db: database.db });
+  await app.register(publicPreferenceRoutes, {
+    consent,
+    contacts: contactRepository,
+    signer,
+    db: database.db,
+    stay: async (contactId) => {
+      await touchpoints.record({ contactId, channel: 'email', campaign: 'reengagement', type: 'click', occurredAt: new Date(), sourceSystem: 'preferences', sourceRef: null });
+      await sunset.reactivate(contactId);
+    },
+  });
   await app.register(publicSignupRoutes, { signup });
   const duplicates = new DuplicateService(database.db);
   const imports = new ImportService({ db: database.db, contacts: contactRepository, consentRepository, consent });
@@ -247,7 +260,8 @@ export async function buildApp({
   app.decorate('dispatcher', dispatcher);
   jobs.register({ name: 'send_dispatcher', description: 'Sends approved campaigns in batches', intervalMs: 60_000, run: () => dispatcher.tick() });
   await app.register(sendRoutes, { sends: sendService, killSwitch, seedList: config.seedList, coreEngine: resolvedIntegrations.coreEngine });
-  const espEvents = new EspEventService({ db: database.db, consent, touchpoints, alerts, killSwitch, logger: app.log });
+  const espEvents = new EspEventService({ db: database.db, consent, touchpoints, alerts, killSwitch, logger: app.log, onEngagement: (contactId) => sunset.reactivate(contactId) });
+  jobs.register({ name: 'sunset_policy', description: 'Sunset policy: re-engagement emails and leaving regular sends', intervalMs: 24 * 60 * 60_000, run: () => sunset.run() });
   app.decorate('espEvents', espEvents);
   await app.register(webhookRoutes, { events: espEvents, secret: config.espWebhookSecret });
   await app.register(alertRoutes, { alerts, db: database.db, coreEngine: resolvedIntegrations.coreEngine });

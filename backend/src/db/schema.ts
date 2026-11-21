@@ -87,6 +87,9 @@ export const contacts = pgTable(
     selfReportedSource: text('self_reported_source'),
     /** Alumni Tracker: employed | seeking | not_seeking (purpose: segments in 6.4, e.g. "alumni, hired"). */
     employmentStatus: text('employment_status'),
+    /** Sunset policy (EML-15): when the re-engagement email went out, and when the contact left regular sends. */
+    reengagementSentAt: timestamp('reengagement_sent_at', { withTimezone: true }),
+    sunsetAt: timestamp('sunset_at', { withTimezone: true }),
     /** Digits with an optional leading "+", e.g. +37491234567. */
     phone: text('phone'),
     firstName: text('first_name'),

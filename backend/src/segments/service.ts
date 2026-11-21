@@ -184,6 +184,8 @@ export class SegmentService {
       reachable: and(
         eq(contacts.status, 'active'),
         isNotNull(contacts.email),
+        // EML-15: contacts moved out of regular sends by the sunset policy.
+        isNull(contacts.sunsetAt),
         // 7.4: contacts of an import blocked for its bounce rate wait until someone reviews it.
         sql`not exists (select 1 from ${contactImports} where ${contactImports.id} = ${contacts.importId} and ${contactImports.sendBlockedAt} is not null and ${contactImports.reviewedAt} is null)`,
       ) as SQL,

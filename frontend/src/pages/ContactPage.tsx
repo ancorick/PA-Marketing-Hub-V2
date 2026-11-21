@@ -223,6 +223,11 @@ export function ContactPage({ id }: { id: string }) {
         {data.status !== 'erased' && <ConsentSection contactId={data.id} displayName={name ?? data.email ?? 'this contact'} />}
 
         {exportData.isError && <Alert tone="danger" title="Export failed">{exportData.error.message}</Alert>}
+        {data.sunsetAt && (
+          <Alert tone="warning" title={`Out of regular sends since ${formatDate(data.sunsetAt)}`}>
+            No opens or clicks for a year and no answer to the re-engagement email (EML-15). Any open, click or “keep me subscribed” brings them back.
+          </Alert>
+        )}
         {data.status === 'erased' && (
           <Alert tone="info" title="Personal data erased">
             Only an anonymous row remains for totals, and the address stays on the suppression list so it is never emailed again (AUD-18).

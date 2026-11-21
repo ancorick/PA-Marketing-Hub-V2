@@ -15,6 +15,8 @@ type PublicPreferencesOptions = {
   contacts: Pick<ContactRepository, 'findById' | 'update'>;
   signer: LinkSigner;
   db: AppPgDatabase;
+  /** EML-15: "keep me subscribed" from the re-engagement email. */
+  stay: (contactId: string) => Promise<void>;
 };
 
 const tokenQuery = z.object({ t: z.string().min(10).max(1000) });
@@ -38,7 +40,7 @@ const PERSON = { kind: 'person' } as const;
  * Public pages without a password (AUD-09, AUD-11, Flow E). Every request carries a signed, expiring token
  * (NFR-S5) and is rate-limited (NFR-S6). Answers never include the full email address.
  */
-export async function publicPreferenceRoutes(app: FastifyInstance, { consent, contacts, signer, db }: PublicPreferencesOptions) {
+export async function publicPreferenceRoutes(app: FastifyInstance, { consent, contacts, signer, db, stay }: PublicPreferencesOptions) {
   const limited = rateLimit({ max: 30, windowMs: 60_000 });
 
   async function contactFor(request: FastifyRequest, reply: FastifyReply, purpose: LinkPurpose) {
@@ -100,6 +102,15 @@ export async function publicPreferenceRoutes(app: FastifyInstance, { consent, co
       // Lets the confirmation page offer "Change preferences" without another email.
       preferencesToken: contact ? signer.sign(contactId, 'preferences') : null,
     };
+  });
+
+  // EML-15: the re-engagement button lands on the preferences page, which confirms the person wants to stay.
+  app.post('/api/public/preferences/stay', { preHandler: limited }, async (request, reply) => {
+    const found = await contactFor(request, reply, 'preferences');
+    if (!found) return reply;
+    if (!found.contact || found.contact.status === 'erased') return reply.code(404).send({ error: 'not_found', message: 'These preferences no longer exist' });
+    await stay(found.contactId);
+    return preferencesView(found.contactId);
   });
 
   // "Unsubscribe from all" on the preferences page (AUD-11), with the preferences token.
