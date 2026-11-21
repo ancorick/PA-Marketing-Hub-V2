@@ -744,3 +744,28 @@ export const resolveUnmapped = (id: string, channel: string) =>
     method: 'POST',
     body: JSON.stringify({ channel }),
   });
+
+/* ---------- Analytics: campaign link builder (ANL-04) ---------- */
+
+export type TrackedLink = {
+  id: string;
+  code: string;
+  label: string | null;
+  shortUrl: string;
+  destinationUrl: string;
+  fullUrl: string;
+  channel: string;
+  utmSource: string;
+  utmMedium: string;
+  utmCampaign: string;
+  utmContent: string | null;
+  clicks: number;
+  lastClickAt: string | null;
+  createdBy: string;
+  createdAt: string;
+};
+export type LinkChannel = Channel & { medium: string; sources: string[] };
+export type NewTrackedLink = { destinationUrl: string; channel: string; source: string; campaign: string; content?: string | null; label?: string | null };
+
+export const listTrackedLinks = () => apiFetch<{ links: TrackedLink[]; campaigns: string[]; channels: LinkChannel[] }>('/api/analytics/links');
+export const createTrackedLink = (link: NewTrackedLink) => apiFetch<TrackedLink>('/api/analytics/links', { method: 'POST', body: JSON.stringify(link) });

@@ -58,6 +58,7 @@ import { healthRoutes } from './routes/health.js';
 import { analyticsRoutes } from './routes/analytics.js';
 import { AnalyticsPipeline } from './analytics/pipeline.js';
 import { ChannelTaxonomy } from './analytics/taxonomy.js';
+import { LinkBuilder } from './analytics/links.js';
 import type { AnalyticsSources } from './analytics/sources/contract.js';
 import { createMockAnalyticsSources } from './analytics/sources/mock.js';
 
@@ -91,6 +92,7 @@ declare module 'fastify' {
     uploads: UploadService;
     pipeline: AnalyticsPipeline;
     taxonomy: ChannelTaxonomy;
+    linkBuilder: LinkBuilder;
   }
 }
 
@@ -362,7 +364,9 @@ export async function buildApp({
   });
   app.decorate('pipeline', pipeline);
   for (const job of pipeline.jobs()) jobs.register(job);
-  await app.register(analyticsRoutes, { pipeline, taxonomy, coreEngine: resolvedIntegrations.coreEngine });
+  const linkBuilder = new LinkBuilder(database.db, taxonomy, config.publicApiUrl);
+  app.decorate('linkBuilder', linkBuilder);
+  await app.register(analyticsRoutes, { pipeline, taxonomy, links: linkBuilder, coreEngine: resolvedIntegrations.coreEngine });
   await app.register(importRoutes, { imports, duplicates, merge, contacts, contactRepository, coreEngine: resolvedIntegrations.coreEngine });
 
   return app;

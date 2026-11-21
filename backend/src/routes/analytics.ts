@@ -2,7 +2,10 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { CsvRowError, type AnalyticsPipeline } from '../analytics/pipeline.js';
 import { RULE_KINDS, TaxonomyError, type ChannelTaxonomy } from '../analytics/taxonomy.js';
+import { CHANNEL_MEDIUM, CHANNEL_SOURCES, LinkBuilderError, type LinkBuilder } from '../analytics/links.js';
 import { requireRole } from '../auth/staff.js';
+import { CHANNEL_IDS, CHANNELS } from '../contacts/fields.js';
+import { rateLimit } from '../public/rate-limit.js';
 import type { CoreEngineClient } from '../integrations/core-engine/contract.js';
 
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD');
@@ -13,10 +16,18 @@ const rerunBody = z
 const ruleBody = z.object({ kind: z.enum(RULE_KINDS), value: z.string().trim().min(1).max(200), channel: z.string() });
 const resolveBody = z.object({ channel: z.string() });
 const idParams = z.object({ id: z.string().uuid() });
+const linkBody = z.object({
+  destinationUrl: z.string().trim().min(1).max(2000),
+  channel: z.enum(CHANNEL_IDS),
+  source: z.string().max(100),
+  campaign: z.string().max(100),
+  content: z.string().max(100).nullish(),
+  label: z.string().max(200).nullish(),
+});
 const csvBody = z.object({ platform: z.enum(['meta_ads', 'google_ads']), csv: z.string().min(1).max(5_000_000) });
 
 /** Analytics pipeline (PRD 9.1, 9.2): re-runs of a date range (admin) and the ad spend CSV fallback. */
-export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy, coreEngine }: { pipeline: AnalyticsPipeline; taxonomy: ChannelTaxonomy; coreEngine: Pick<CoreEngineClient, 'verifyStaffToken'> }) {
+export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy, links, coreEngine }: { pipeline: AnalyticsPipeline; taxonomy: ChannelTaxonomy; links: LinkBuilder; coreEngine: Pick<CoreEngineClient, 'verifyStaffToken'> }) {
   const admin = requireRole(coreEngine, ['admin']);
   const costs = requireRole(coreEngine, ['admin', 'marketing_manager']);
   const marketing = requireRole(coreEngine, ['admin', 'marketing_manager', 'editor']);
@@ -26,6 +37,32 @@ export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy
     if (error instanceof TaxonomyError) return reply.code(error.field === 'id' ? 404 : 400).send({ error: error.field === 'id' ? 'not_found' : 'invalid_request', message: error.message, field: error.field });
     throw error;
   };
+
+  // Campaign link builder (9.3, ANL-04): editors and managers create links; everyone in marketing sees them.
+  app.get('/api/analytics/links', { preHandler: marketing }, async () => ({
+    links: await links.list(),
+    campaigns: await links.campaigns(),
+    channels: CHANNELS.map((channel) => ({ ...channel, medium: CHANNEL_MEDIUM[channel.id], sources: CHANNEL_SOURCES[channel.id] })),
+  }));
+
+  app.post('/api/analytics/links', { preHandler: marketing }, async (request, reply) => {
+    const body = linkBody.safeParse(request.body);
+    if (!body.success) return invalid(reply, body.error);
+    try {
+      return reply.code(201).send(await links.create(body.data, request.staff!.userId));
+    } catch (error) {
+      if (error instanceof LinkBuilderError) return reply.code(400).send({ error: 'invalid_request', message: error.message, field: error.field });
+      throw error;
+    }
+  });
+
+  // Short links are public: anyone who sees the post or ad opens them.
+  app.get('/l/:code', { preHandler: rateLimit({ max: 120, windowMs: 60_000 }) }, async (request, reply) => {
+    const { code } = request.params as { code: string };
+    const target = /^[A-Za-z0-9]{4,16}$/.test(code) ? await links.resolve(code) : null;
+    if (!target) return reply.code(404).type('text/plain; charset=utf-8').send('This link does not exist.');
+    return reply.code(302).header('cache-control', 'no-store').redirect(target);
+  });
 
   // Channel taxonomy (9.3, ANL-03): marketing staff see it; managers and admins change it.
   app.get('/api/analytics/taxonomy', { preHandler: marketing }, async () => ({

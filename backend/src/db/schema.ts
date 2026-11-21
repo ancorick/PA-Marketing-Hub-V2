@@ -908,3 +908,28 @@ export const unmappedValues = pgTable(
   },
   (table) => [uniqueIndex('unmapped_values_key').on(table.source, table.field, table.value)],
 );
+
+/**
+ * Tracked links from the campaign link builder (PRD 9.3, ANL-04): staff never type campaign parameters by
+ * hand. The short link redirects to the full URL and counts clicks (anonymous traffic, not attribution).
+ */
+export const trackedLinks = pgTable(
+  'tracked_links',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    label: text('label'),
+    destinationUrl: text('destination_url').notNull(),
+    fullUrl: text('full_url').notNull(),
+    channel: text('channel').notNull(),
+    utmSource: text('utm_source').notNull(),
+    utmMedium: text('utm_medium').notNull(),
+    utmCampaign: text('utm_campaign').notNull(),
+    utmContent: text('utm_content'),
+    clicks: integer('clicks').notNull().default(0),
+    lastClickAt: timestamp('last_click_at', { withTimezone: true }),
+    createdBy: text('created_by').notNull(),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex('tracked_links_code').on(table.code), index('tracked_links_campaign_idx').on(table.utmCampaign)],
+);

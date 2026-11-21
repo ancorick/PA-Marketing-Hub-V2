@@ -85,7 +85,7 @@ export class ChannelTaxonomy {
   }
 
   /** utm_source / utm_medium → channel. No parameters at all is a direct visit (Search and website). */
-  async mapUtm(source: string | null | undefined, medium: string | null | undefined, origin: string): Promise<ChannelId | null> {
+  async mapUtm(source: string | null | undefined, medium: string | null | undefined, origin: string, options: { queue?: boolean } = {}): Promise<ChannelId | null> {
     const s = clean(source);
     const m = clean(medium);
     if (!s && !m) return 'search_website';
@@ -97,7 +97,7 @@ export class ChannelTaxonomy {
       (m ? rules.get(`builtin:medium:${m}`) : undefined) ??
       (s ? rules.get(`builtin:source:${s}`) : undefined);
     if (channel) return channel;
-    await this.queue(origin, 'utm', `${s || NONE} / ${m || NONE}`);
+    if (options.queue !== false) await this.queue(origin, 'utm', `${s || NONE} / ${m || NONE}`);
     return null;
   }
 
