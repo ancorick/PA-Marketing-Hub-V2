@@ -68,6 +68,12 @@ const envSchema = z.object({
     .optional()
     .transform((value) => (value && value.trim().length > 0 ? value.trim() : undefined))
     .pipe(z.string().min(32, 'must be at least 32 characters').optional()),
+  // API key Event Hub uses for segments, suppression checks and consent wordings (EVT-07).
+  EVENT_HUB_API_KEY: z
+    .string()
+    .optional()
+    .transform((value) => (value && value.trim().length > 0 ? value.trim() : undefined))
+    .pipe(z.string().min(32, 'must be at least 32 characters').optional()),
   // API key of Command Center (Project 15) for aggregate metrics (ANL-13); unset = endpoint answers 503.
   COMMAND_CENTER_API_KEY: z
     .string()
@@ -111,6 +117,7 @@ export type AppConfig = {
   espWebhookSecret: string | null;
   commandCenterApiKey: string | null;
   eventHubWebhookSecret: string | null;
+  eventHubApiKey: string | null;
   dmarcKnownSources: string[];
   admissionsUrl: string | null;
   slackWebhookUrl: string | null;
@@ -159,6 +166,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     sendRatePerSecond: env.SEND_RATE_PER_SECOND,
     sendBatchSize: env.SEND_BATCH_SIZE,
     commandCenterApiKey: env.COMMAND_CENTER_API_KEY ?? null,
+    eventHubApiKey: env.EVENT_HUB_API_KEY ?? null,
     eventHubWebhookSecret: env.EVENT_HUB_WEBHOOK_SECRET ?? (env.NODE_ENV === 'production' ? null : 'development-only-event-hub-secret-0123456789'),
     espWebhookSecret: env.ESP_WEBHOOK_SECRET ?? (env.NODE_ENV === 'production' ? null : 'development-only-esp-webhook-secret-0123456789'),
     admissionsUrl: env.ADMISSIONS_URL ?? null,

@@ -401,6 +401,8 @@ export type Segment = {
   ownerId: string;
   lastCount: number | null;
   lastCountedAt: string | null;
+  /** Event Hub may pull it for invitations (EVT-07). */
+  sharedWithEventHub: boolean;
   updatedAt: string;
 };
 
@@ -978,3 +980,6 @@ export const importAttendees = (id: string, csv: string, attendedByDefault: bool
     method: 'POST',
     body: JSON.stringify({ csv, attendedByDefault }),
   });
+
+export const shareSegmentWithEventHub = (id: string, shared: boolean) =>
+  apiFetch<Segment>(`/api/audience/segments/${encodeURIComponent(id)}/event-hub`, { method: 'PUT', body: JSON.stringify({ shared }) });

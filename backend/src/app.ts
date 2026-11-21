@@ -24,6 +24,8 @@ import { webhookRoutes } from './routes/webhooks.js';
 import { EventHubService } from './eventhub/service.js';
 import { EventsView } from './eventhub/events-view.js';
 import { ManualEvents } from './eventhub/manual.js';
+import { EventHubIntegration } from './eventhub/integration.js';
+import { eventHubIntegrationRoutes } from './routes/event-hub-integration.js';
 import { eventRoutes } from './routes/events.js';
 import { alertRoutes } from './routes/alerts.js';
 import { privacyRoutes } from './routes/privacy.js';
@@ -400,6 +402,12 @@ export async function buildApp({
   await app.register(eventRoutes, {
     view: new EventsView(database.db),
     manual: new ManualEvents({ db: database.db, eventHub, consent, touchpoints }),
+    coreEngine: resolvedIntegrations.coreEngine,
+  });
+  await app.register(eventHubIntegrationRoutes, {
+    integration: new EventHubIntegration({ db: database.db, segments, consentRepository }),
+    segments,
+    apiKey: config.eventHubApiKey,
     coreEngine: resolvedIntegrations.coreEngine,
   });
   await app.register(webhookRoutes, { events: espEvents, secret: config.espWebhookSecret, eventHub, eventHubSecret: config.eventHubWebhookSecret });

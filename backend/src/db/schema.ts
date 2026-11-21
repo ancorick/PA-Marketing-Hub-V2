@@ -336,6 +336,8 @@ export const segments = pgTable('segments', {
   /** Members at the last count, for the list screen; the real audience is computed at send time. */
   lastCount: integer('last_count'),
   lastCountedAt: timestamp('last_counted_at', { withTimezone: true }),
+  /** Event Hub may pull it for invitations (EVT-07); set by a marketing manager, off by default. */
+  sharedWithEventHub: boolean('shared_with_event_hub').notNull().default(false),
   ...timestamps,
 });
 

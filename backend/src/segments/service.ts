@@ -27,6 +27,7 @@ export type SegmentView = {
   ownerId: string;
   lastCount: number | null;
   lastCountedAt: string | null;
+  sharedWithEventHub: boolean;
   updatedAt: string;
 };
 
@@ -55,6 +56,7 @@ const view = (row: SegmentRow): SegmentView => ({
   ownerId: row.ownerId,
   lastCount: row.lastCount,
   lastCountedAt: row.lastCountedAt?.toISOString() ?? null,
+  sharedWithEventHub: row.sharedWithEventHub,
   updatedAt: row.updatedAt.toISOString(),
 });
 
@@ -109,6 +111,12 @@ export class SegmentService {
       })
       .where(eq(segments.id, id));
     return this.refreshCount(id);
+  }
+
+  /** EVT-07: whether Event Hub may pull this segment for invitations. */
+  async shareWithEventHub(id: string, shared: boolean): Promise<SegmentView | null> {
+    const [row] = await this.db.update(segments).set({ sharedWithEventHub: shared }).where(eq(segments.id, id)).returning();
+    return row ? view(row) : null;
   }
 
   async remove(id: string): Promise<boolean> {

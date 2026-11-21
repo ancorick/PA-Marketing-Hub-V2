@@ -13,6 +13,7 @@ import {
   listSegments,
   removeSegmentMembers,
   updateSegment,
+  shareSegmentWithEventHub,
   type Segment,
   type SegmentContact,
   type SegmentRule,
@@ -204,6 +205,29 @@ function StaticMembers({ segment }: { segment: Segment }) {
   );
 }
 
+/** EVT-07: a marketing manager lets Event Hub use the segment for event invitations. */
+function EventHubSharing({ segment }: { segment: Segment }) {
+  const role = useStaffRole();
+  const queryClient = useQueryClient();
+  const share = useMutation({
+    mutationFn: (shared: boolean) => shareSegmentWithEventHub(segment.id, shared),
+    onSuccess: (saved) => queryClient.setQueryData(['segment', saved.id, role], saved),
+  });
+  return (
+    <section className="card stack" aria-labelledby="event-hub-sharing-heading">
+      <h2 id="event-hub-sharing-heading">Event invitations</h2>
+      <label className="check">
+        <input type="checkbox" checked={segment.sharedWithEventHub} disabled={share.isPending} onChange={(e) => share.mutate(e.target.checked)} />
+        <span>Event Hub may use this segment for event invitations</span>
+      </label>
+      <p className="muted">
+        Event Hub then gets only the people in it who can be emailed and agreed to event emails, minus the suppression list. Every pull is logged like an export.
+      </p>
+      {share.isError && <Alert tone="danger" title="Not changed">{share.error.message}</Alert>}
+    </section>
+  );
+}
+
 /** Segment builder (PRD 13.6): rule editor, live count, save; static lists show their members. */
 export function SegmentPage({ id }: { id: string | null }) {
   const role = useStaffRole();
@@ -307,6 +331,7 @@ export function SegmentPage({ id }: { id: string | null }) {
         </section>
         {currentType === 'dynamic' && <LiveCount rule={currentRule} />}
         {segment?.type === 'static' && <StaticMembers segment={segment} />}
+        {segment && canExport && <EventHubSharing segment={segment} />}
       </div>
       <ConfirmDialog
         open={confirmExport}

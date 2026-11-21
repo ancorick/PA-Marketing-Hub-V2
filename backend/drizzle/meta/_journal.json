@@ -176,6 +176,13 @@
       "when": 1795283634337,
       "tag": "0024_event_hub",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1795284236814,
+      "tag": "0025_segment_event_hub_share",
+      "breakpoints": true
     }
   ]
 }

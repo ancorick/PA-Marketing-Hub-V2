@@ -73,6 +73,21 @@ Both are generated from the code (`src/eventhub/contract.ts`, `src/eventhub/fixt
 - **Privacy:** send only the fields above; Marketing Hub stores what it needs for the contact and the event and
   nothing else (NFR-P2).
 
+## Marketing Hub → Event Hub (EVT-07)
+
+Service endpoints with header `x-api-key: <EVENT_HUB_API_KEY>` (at least 32 characters, generated on Render; staff
+tokens do not work; unset key → `503`), 120 requests per minute.
+
+| Endpoint | Returns |
+|---|---|
+| `GET /api/integrations/event-hub/segments` | segments a marketing manager shared for invitations: `{segments: [{id, name, description, updatedAt}]}` |
+| `GET /api/integrations/event-hub/segments/:id/invitees` | `{segmentId, segmentName, purpose: "event_invitation", consentTopic: "events", invitees: [{corePersonId, email, firstName, language}]}`: only people who can be emailed, whose latest `events` consent is granted and who are not suppressed; at most 10,000; every pull is written to the export log |
+| `POST /api/integrations/event-hub/suppression-check` | body `{emails: [...]}` (up to 1,000) → `{suppressed: [...]}`: never send promotional mail to these |
+| `GET /api/integrations/event-hub/consent-wordings` | the versioned consent wordings to show on registration forms (AUD-07) |
+
+Invitations are promotional: send them only to the invitees returned (or check your own list first) and keep the
+unsubscribe link. Confirmations and reminders after registering stay transactional.
+
 ## Versioning
 
 New optional fields and new enum values may be added within v1; receivers ignore unknown fields. Removing or

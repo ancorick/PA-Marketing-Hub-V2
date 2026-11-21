@@ -1,0 +1,1 @@
+ALTER TABLE "segments" ADD COLUMN "shared_with_event_hub" boolean DEFAULT false NOT NULL;
