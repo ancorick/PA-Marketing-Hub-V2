@@ -2387,3 +2387,7 @@ th[aria-sort='descending'] .sort-btn {
   display: flex;
   justify-content: flex-end;
 }
+
+.cell-wide {
+  min-width: 16rem;
+}

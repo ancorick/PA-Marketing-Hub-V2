@@ -20,6 +20,7 @@ const CampaignPage = lazy(() => import('./pages/CampaignsPage').then((mod) => ({
 const NewsletterPage = lazy(() => import('./pages/NewsletterPage').then((mod) => ({ default: mod.NewsletterPage })));
 const IssuePage = lazy(() => import('./pages/IssuePage').then((mod) => ({ default: mod.IssuePage })));
 const ImportPage = lazy(() => import('./pages/ImportPage').then((mod) => ({ default: mod.ImportPage })));
+const EventsPage = lazy(() => import('./pages/EventsPage').then((mod) => ({ default: mod.EventsPage })));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then((mod) => ({ default: mod.AnalyticsPage })));
 const DuplicatesPage = lazy(() => import('./pages/DuplicatesPage').then((mod) => ({ default: mod.DuplicatesPage })));
 /** Pages for contacts (unsubscribe, preferences, privacy): no staff shell, no staff session. */
@@ -28,7 +29,6 @@ const NewContactPage = lazy(() => import('./pages/ContactPage').then((mod) => ({
 
 /** Screens not built yet, with the PLAYBOOK phase that delivers them (PRD 5.4). */
 const PLACEHOLDERS: Record<string, { title: string; phase: string }> = {
-  '/events': { title: 'Events', phase: 'phase 4' },
 };
 
 /** Staff shell. Layout and styling follow design-system/marketing-hub/MASTER.md. */
@@ -51,7 +51,8 @@ export function App() {
   const issueId = path.match(/^\/newsletter\/([^/]+)$/)?.[1];
   const newsletter = path === '/newsletter' || issueId !== undefined;
   const analytics = path === '/analytics' || path.startsWith('/analytics/');
-  const known = analytics ? '/analytics' : placeholder || audience || campaigns || newsletter || path === '/design-system' || path === '/email-settings' || path === '/admin' ? path : '/';
+  const eventsPage = path === '/events';
+  const known = analytics ? '/analytics' : eventsPage ? '/events' : placeholder || audience || campaigns || newsletter || path === '/design-system' || path === '/email-settings' || path === '/admin' ? path : '/';
 
   let page;
   if (path === '/design-system') page = <DesignSystemPage />;
@@ -60,6 +61,7 @@ export function App() {
   else if (path === '/campaigns') page = <CampaignsPage />;
   else if (path === '/newsletter') page = <NewsletterPage />;
   else if (analytics) page = <AnalyticsPage path={path} />;
+  else if (eventsPage) page = <EventsPage />;
   else if (issueId !== undefined) page = <IssuePage key={issueId} id={decodeURIComponent(issueId)} />;
   else if (campaignId !== undefined) page = <CampaignPage key={campaignId} id={campaignId === 'new' ? null : decodeURIComponent(campaignId)} />;
   else if (path === '/audience') page = <ContactsPage />;

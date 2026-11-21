@@ -939,3 +939,26 @@ export type SelfReported = {
   groups: Record<string, string>;
 };
 export const getSelfReported = (period: Period) => apiFetch<SelfReported>(`/api/analytics/self-reported?${periodQuery(period)}`);
+
+/* ---------- Events module (EVT-05, PRD 10.5) ---------- */
+
+export type EventRow = {
+  id: string;
+  externalId: string | null;
+  title: string;
+  type: string;
+  startsAt: string;
+  language: string | null;
+  public: boolean;
+  source: 'event_hub' | 'manual';
+  campaign: string;
+  costAmd: number;
+  registrations: Count;
+  attendees: Count;
+  leads: Count;
+  enrolled: Count;
+  hired: Count;
+  costPerAttendee: number | null;
+};
+export type EventTotals = Omit<EventRow, 'id' | 'externalId' | 'title' | 'type' | 'startsAt' | 'language' | 'public' | 'source' | 'campaign'>;
+export const listEvents = (period: Period) => apiFetch<{ period: Period; shared: boolean; events: EventRow[]; totals: EventTotals }>(`/api/events?${periodQuery(period)}`);
