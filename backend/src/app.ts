@@ -21,6 +21,7 @@ import { jobRoutes } from './routes/jobs.js';
 import { segmentRoutes } from './routes/segments.js';
 import { sendRoutes } from './routes/sends.js';
 import { webhookRoutes } from './routes/webhooks.js';
+import { EventHubService } from './eventhub/service.js';
 import { alertRoutes } from './routes/alerts.js';
 import { privacyRoutes } from './routes/privacy.js';
 import { dmarcRoutes } from './routes/dmarc.js';
@@ -98,6 +99,7 @@ declare module 'fastify' {
     publishing: NewsletterPublishing;
     uploads: UploadService;
     pipeline: AnalyticsPipeline;
+    eventHub: EventHubService;
     taxonomy: ChannelTaxonomy;
     linkBuilder: LinkBuilder;
     costs: CostService;
@@ -323,7 +325,6 @@ export async function buildApp({
   const espEvents = new EspEventService({ db: database.db, consent, touchpoints, alerts, killSwitch, logger: app.log, onEngagement: (contactId) => sunset.reactivate(contactId) });
   jobs.register({ name: 'sunset_policy', description: 'Sunset policy: re-engagement emails and leaving regular sends', intervalMs: 24 * 60 * 60_000, run: () => sunset.run() });
   app.decorate('espEvents', espEvents);
-  await app.register(webhookRoutes, { events: espEvents, secret: config.espWebhookSecret });
   await app.register(alertRoutes, { alerts, db: database.db, coreEngine: resolvedIntegrations.coreEngine });
   const privacy = new PrivacyService({ db: database.db, segments, coreEngine: resolvedIntegrations.coreEngine, logger: app.log });
   app.decorate('privacy', privacy);
@@ -391,6 +392,9 @@ export async function buildApp({
   const linkBuilder = new LinkBuilder(database.db, taxonomy, config.publicApiUrl);
   app.decorate('linkBuilder', linkBuilder);
   const costs = new CostService(database.db, sources.rates);
+  const eventHub = new EventHubService({ db: database.db, contacts, contactRepository, consent, touchpoints, taxonomy, costs, logger: app.log });
+  app.decorate('eventHub', eventHub);
+  await app.register(webhookRoutes, { events: espEvents, secret: config.espWebhookSecret, eventHub, eventHubSecret: config.eventHubWebhookSecret });
   app.decorate('costs', costs);
   const attribution = new AttributionService(database.db);
   app.decorate('attribution', attribution);

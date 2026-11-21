@@ -67,7 +67,9 @@ Both are generated from the code (`src/eventhub/contract.ts`, `src/eventhub/fixt
 - **Messages:** confirmations and reminders are transactional and belong to Event Hub. Promotional follow-up ("apply
   for the next course") goes through Marketing Hub and respects marketing consent.
 - **Attribution:** registration and check-in become touchpoints with channel `events` and the event as campaign
-  (`event:<eventId>`); campaign parameters of the registration link are kept on the registration.
+  (`event-<eventId>`). When the registration link carries campaign parameters of another channel (for example an
+  Instagram ad), that channel is recorded as a touch one second before the registration, so first-touch
+  attribution credits the ad and last touch credits the event.
 - **Privacy:** send only the fields above; Marketing Hub stores what it needs for the contact and the event and
   nothing else (NFR-P2).
 

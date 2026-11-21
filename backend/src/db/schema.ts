@@ -956,7 +956,52 @@ export const manualCosts = pgTable(
     updatedBy: text('updated_by').notNull(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     deletedBy: text('deleted_by'),
+    /** Source of a cost sent by another system, e.g. "event_hub:<costId>"; a resend replaces the amount. */
+    externalRef: text('external_ref').unique(),
     ...timestamps,
   },
   (table) => [index('manual_costs_dates_idx').on(table.dateFrom, table.dateTo)],
+);
+
+/** Event Hub messages already processed (EVT-02): each idempotency key once; kept as the integration log. */
+export const eventHubMessages = pgTable('event_hub_messages', {
+  id: text('id').primaryKey(),
+  type: text('type').notNull(),
+  /** processed | ignored */
+  status: text('status').notNull(),
+  detail: text('detail'),
+  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+  ...timestamps,
+});
+
+/**
+ * Event registrations (EVT-03, EVT-05, PRD 10.5): from Event Hub, a CSV attendee list or the manual form.
+ * A registration for an event not received yet keeps the Event Hub event ID and is linked when it arrives.
+ */
+export const eventRegistrations = pgTable(
+  'event_registrations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** Event Hub registration ID; null for CSV and manual entries. */
+    externalId: text('external_id').unique(),
+    eventExternalId: text('event_external_id'),
+    eventId: uuid('event_id').references(() => events.id, { onDelete: 'cascade' }),
+    contactId: uuid('contact_id').references(() => contacts.id, { onDelete: 'set null' }),
+    /** registered | cancelled */
+    status: text('status').notNull().default('registered'),
+    registeredAt: timestamp('registered_at', { withTimezone: true }).notNull(),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    checkedInAt: timestamp('checked_in_at', { withTimezone: true }),
+    utmSource: text('utm_source'),
+    utmMedium: text('utm_medium'),
+    utmCampaign: text('utm_campaign'),
+    /** event_hub | csv | manual */
+    source: text('source').notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index('event_registrations_event_idx').on(table.eventId),
+    index('event_registrations_external_event_idx').on(table.eventExternalId),
+    uniqueIndex('event_registrations_contact_event').on(table.eventId, table.contactId),
+  ],
 );

@@ -45,6 +45,9 @@ services:
       # Verifies ESP webhooks (NFR-S4); give the same value to the ESP webhook settings.
       - key: ESP_WEBHOOK_SECRET
         generateValue: true
+      # Verifies Event Hub webhooks (EVT-02); give the same value to the Event Hub team.
+      - key: EVENT_HUB_WEBHOOK_SECRET
+        generateValue: true
       # Aggregate metrics for Command Center (ANL-13); give the same value to Project 15.
       - key: COMMAND_CENTER_API_KEY
         generateValue: true

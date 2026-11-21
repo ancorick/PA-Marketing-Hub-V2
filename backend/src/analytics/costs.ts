@@ -62,6 +62,20 @@ export class CostService {
     return view(row!);
   }
 
+  /**
+   * A cost sent by another system (Event Hub, EVT-02): created on first sight, replaced when the same reference
+   * arrives again. The campaign key is kept as given.
+   */
+  async upsertExternal(ref: string, input: CostInput, actor: string): Promise<ManualCost> {
+    const values = { ...(await this.validate({ ...input, campaign: null })), campaign: input.campaign ?? null };
+    const [row] = await this.db
+      .insert(manualCosts)
+      .values({ ...values, externalRef: ref, createdBy: actor, updatedBy: actor })
+      .onConflictDoUpdate({ target: manualCosts.externalRef, set: { ...values, updatedBy: actor, deletedAt: null, deletedBy: null } })
+      .returning();
+    return view(row!);
+  }
+
   async update(id: string, input: CostInput, actor: string): Promise<ManualCost | null> {
     const values = await this.validate(input);
     const [row] = await this.db
