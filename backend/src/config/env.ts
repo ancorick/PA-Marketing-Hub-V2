@@ -52,6 +52,7 @@ const envSchema = z.object({
   // NWS-04: Slack incoming webhook for "draft ready" (a secret) and editor emails, comma-separated.
   SLACK_WEBHOOK_URL: z.string().optional().transform((value) => (value && value.trim().length > 0 ? value.trim() : undefined)).pipe(z.url().optional()),
   NEWSLETTER_EDITOR_EMAILS: z.string().default(''),
+  ADMIN_ALERT_EMAILS: z.string().default(''),
   // NWS-07 AI writing assist (Claude API). Empty key: the feature is off.
   ANTHROPIC_API_KEY: z.string().optional().transform((value) => (value && value.trim().length > 0 ? value.trim() : undefined)),
   AI_MODEL: z.string().min(3).default('claude-opus-5-5'),
@@ -102,6 +103,8 @@ export type AppConfig = {
   anthropicApiKey: string | null;
   aiModel: string;
   newsletterEditorEmails: string[];
+  /** Data source failures (ANL-11) and other admin alerts by email. */
+  adminAlertEmails: string[];
 };
 
 /** Development only: links signed with it stop working on any real deploy, where the secret is required. */
@@ -147,6 +150,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     anthropicApiKey: env.ANTHROPIC_API_KEY ?? null,
     aiModel: env.AI_MODEL,
     newsletterEditorEmails: env.NEWSLETTER_EDITOR_EMAILS.split(',').map((item) => item.trim()).filter((item) => item.includes('@')),
+    adminAlertEmails: env.ADMIN_ALERT_EMAILS.split(',').map((item) => item.trim()).filter((item) => item.includes('@')),
     dmarcKnownSources: env.DMARC_KNOWN_SOURCES.split(',').map((item) => item.trim()).filter(Boolean),
     seedList: env.SEED_LIST.split(',').map((item) => item.trim()).filter((item) => item.includes('@')),
     jobsEnabled: env.JOBS_ENABLED === undefined ? env.NODE_ENV !== 'test' : env.JOBS_ENABLED === 'true',

@@ -156,6 +156,18 @@ export class JobRunner {
     );
   }
 
+  /** Failed runs since the last successful one (ANL-11: alert when a source fails twice in a row). */
+  async consecutiveFailures(name: string): Promise<number> {
+    const runs = await this.history(name, 10);
+    let count = 0;
+    for (const run of runs) {
+      if (run.status === 'running') continue;
+      if (run.status !== 'failed') break;
+      count += 1;
+    }
+    return count;
+  }
+
   async history(name: string, limit = 20): Promise<SyncRunView[]> {
     const rows = await this.deps.db.select().from(syncRuns).where(eq(syncRuns.source, name)).orderBy(desc(syncRuns.startedAt)).limit(limit);
     return rows.map(view);

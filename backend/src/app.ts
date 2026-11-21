@@ -63,6 +63,7 @@ import { CostService } from './analytics/costs.js';
 import { AttributionService } from './analytics/attribution.js';
 import { OverviewService } from './analytics/overview.js';
 import { DetailService } from './analytics/detail.js';
+import { DataHealth } from './analytics/health.js';
 import type { AnalyticsSources } from './analytics/sources/contract.js';
 import { createMockAnalyticsSources } from './analytics/sources/mock.js';
 
@@ -248,12 +249,31 @@ export async function buildApp({
   const imports = new ImportService({ db: database.db, contacts: contactRepository, consentRepository, consent });
   const alerts = new AlertService(database.db, app.log);
   app.decorate('alerts', alerts);
-  const jobs = new JobRunner({
+  const notifier = new Notifier({
+    slackWebhookUrl: config.slackWebhookUrl,
+    editorEmails: config.newsletterEditorEmails,
+    email: app.email,
+    mail: { from: config.mailFrom, postalAddress: config.postalAddress },
+    logger: app.log,
+  });
+  const jobs: JobRunner = new JobRunner({
     db: database.db,
     logger: app.log,
-    // 14.4: every scheduled job alerts on failure (ANL-11 for data sources).
+    // 14.4: every scheduled job alerts in the app on failure. ANL-11: a second failure in a row is critical
+    // and also goes to Slack and the admins by email (once per streak).
     onFailure: async (job, error) => {
-      await alerts.raise({ level: 'warning', roles: ['admin'], title: `Job failed: ${job.description}`, message: error.message, link: '#/admin', dedupeKey: `job:${job.name}` });
+      const streak = await jobs.consecutiveFailures(job.name);
+      if (streak < 2) {
+        await alerts.raise({ level: 'warning', roles: ['admin'], title: `Job failed: ${job.description}`, message: error.message, link: '#/analytics/health', dedupeKey: `job:${job.name}` });
+        return;
+      }
+      await alerts.raise({ level: 'critical', roles: ['admin'], title: `Failing twice in a row: ${job.description}`, message: error.message, link: '#/analytics/health', dedupeKey: `job-streak:${job.name}` });
+      if (streak === 2) {
+        await notifier.notify(
+          { title: `Data source failing: ${job.description}`, text: `${job.name} failed twice in a row. Last error: ${error.message}`, link: `${config.publicAppUrl}/#/analytics/health` },
+          { to: config.adminAlertEmails, reason: 'You receive this because you administer Marketing Hub.' },
+        );
+      }
     },
   });
   const sync = new SyncService({
@@ -316,13 +336,6 @@ export async function buildApp({
     library: resolvedIntegrations.library,
     groupLaunchpad: resolvedIntegrations.groupLaunchpad,
   });
-  const notifier = new Notifier({
-    slackWebhookUrl: config.slackWebhookUrl,
-    editorEmails: config.newsletterEditorEmails,
-    email: app.email,
-    mail: { from: config.mailFrom, postalAddress: config.postalAddress },
-    logger: app.log,
-  });
   const newsletter = new NewsletterService({
     db: database.db,
     collectors,
@@ -383,7 +396,7 @@ export async function buildApp({
   app.decorate('overview', overview);
   const detail = new DetailService({ db: database.db, attribution, costs });
   app.decorate('detail', detail);
-  await app.register(analyticsRoutes, { pipeline, taxonomy, links: linkBuilder, costs, attribution, overview, detail, coreEngine: resolvedIntegrations.coreEngine });
+  await app.register(analyticsRoutes, { pipeline, taxonomy, links: linkBuilder, costs, attribution, overview, detail, health: new DataHealth({ jobs, pipeline, taxonomy }), coreEngine: resolvedIntegrations.coreEngine });
   await app.register(importRoutes, { imports, duplicates, merge, contacts, contactRepository, coreEngine: resolvedIntegrations.coreEngine });
 
   return app;

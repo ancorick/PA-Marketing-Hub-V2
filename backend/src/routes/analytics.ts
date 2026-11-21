@@ -5,6 +5,7 @@ import { RULE_KINDS, TaxonomyError, type ChannelTaxonomy } from '../analytics/ta
 import { ATTRIBUTION_MODELS, MODEL_LABEL, STAGES, type AttributionService } from '../analytics/attribution.js';
 import { suppress, type OverviewService } from '../analytics/overview.js';
 import type { DetailService } from '../analytics/detail.js';
+import type { DataHealth } from '../analytics/health.js';
 import type { StaffSession } from '../integrations/core-engine/contract.js';
 import { COST_CURRENCIES, CostError, type CostService } from '../analytics/costs.js';
 import { CHANNEL_MEDIUM, CHANNEL_SOURCES, LinkBuilderError, type LinkBuilder } from '../analytics/links.js';
@@ -58,7 +59,7 @@ const isShared = (staff: StaffSession | null) => !staff?.roles.some((role) => ro
 const csvBody = z.object({ platform: z.enum(['meta_ads', 'google_ads']), csv: z.string().min(1).max(5_000_000) });
 
 /** Analytics pipeline (PRD 9.1, 9.2): re-runs of a date range (admin) and the ad spend CSV fallback. */
-export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy, links, costs, attribution, overview, detail, coreEngine }: {
+export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy, links, costs, attribution, overview, detail, health, coreEngine }: {
     pipeline: AnalyticsPipeline;
     taxonomy: ChannelTaxonomy;
     links: LinkBuilder;
@@ -66,6 +67,7 @@ export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy
     attribution: AttributionService;
     overview: OverviewService;
     detail: DetailService;
+    health: DataHealth;
     coreEngine: Pick<CoreEngineClient, 'verifyStaffToken'> }) {
   const admin = requireRole(coreEngine, ['admin']);
   const managers = requireRole(coreEngine, ['admin', 'marketing_manager']);
@@ -267,6 +269,9 @@ export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy
       return taxonomyError(reply, error);
     }
   });
+
+  // Data Health (9.6, ANL-11): admins own integrations; marketing managers see whether numbers are fresh.
+  app.get('/api/analytics/health', { preHandler: managers }, async () => health.report());
 
   app.post('/api/analytics/pipeline/:source/rerun', { preHandler: admin }, async (request, reply) => {
     const { source } = request.params as { source: string };

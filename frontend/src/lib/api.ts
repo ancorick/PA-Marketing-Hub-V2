@@ -9,7 +9,7 @@ export class ApiError extends Error {
     /** Machine-readable code from the API body, e.g. "invalid_domain". */
     readonly code: string | null = null,
     /** Extra error fields: the input to fix (`field`) or the record that already exists (`existingId`). */
-    readonly details: { field?: string | null; existingId?: string | null } = {},
+    readonly details: { field?: string | null; existingId?: string | null; rows?: { line: number; message: string }[] } = {},
   ) {
     super(message);
     this.name = 'ApiError';
@@ -35,13 +35,14 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}, staff = 
       message?: string;
       field?: string | null;
       existingId?: string | null;
+      rows?: { line: number; message: string }[];
     } | null;
     throw new ApiError(
       response.status,
       body?.message ?? `${init.method ?? 'GET'} ${path} failed with ${response.status}`,
       requestId,
       body?.error ?? null,
-      { field: body?.field, existingId: body?.existingId },
+      { field: body?.field, existingId: body?.existingId, rows: body?.rows },
     );
   }
   if (response.status === 204) return undefined as T;
@@ -897,3 +898,29 @@ export const getCampaignDetail = (campaign: string, period: Period, model: Attri
   apiFetch<CampaignDetail>(`/api/analytics/campaigns/${encodeURIComponent(campaign)}?${modelQuery(period, model)}`);
 export const getCohorts = (model: AttributionModel, channel?: string) =>
   apiFetch<{ modelLabel: string; shared: boolean; channel: string | null; cohorts: CohortRow[] }>(`/api/analytics/cohorts?model=${model}${channel ? `&channel=${encodeURIComponent(channel)}` : ''}`);
+
+/* ---------- Analytics: Data Health and pipeline (ANL-01, ANL-02, ANL-11) ---------- */
+
+export type SourceHealth = {
+  name: string;
+  description: string;
+  kind: 'external' | 'internal';
+  schedule: string;
+  status: 'ok' | 'stale' | 'failing' | 'never_run' | 'running';
+  lastRun: SyncRun | null;
+  lastSuccessAt: string | null;
+  consecutiveFailures: number;
+  recentRuns: SyncRun[];
+};
+export type DataHealthReport = {
+  checkedAt: string;
+  sources: SourceHealth[];
+  tables: { webTraffic: number; social: number; adSpend: number };
+  unmapped: { source: string; count: number }[];
+};
+
+export const getDataHealth = () => apiFetch<DataHealthReport>('/api/analytics/health');
+export const rerunSource = (source: string, range: Period, mode: 'pull' | 'rebuild') =>
+  apiFetch<{ rowsIn: number; rowsUpserted: number }>(`/api/analytics/pipeline/${encodeURIComponent(source)}/rerun`, { method: 'POST', body: JSON.stringify({ ...range, mode }) });
+export const uploadAdSpendCsv = (platform: 'meta_ads' | 'google_ads', csv: string) =>
+  apiFetch<{ rowsIn: number; rowsUpserted: number; range: Period | null }>('/api/analytics/ad-spend/csv', { method: 'POST', body: JSON.stringify({ platform, csv }) });
