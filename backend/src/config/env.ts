@@ -21,6 +21,7 @@ const envSchema = z.object({
     .transform((value) => (value && value.trim().length > 0 ? value.trim() : undefined)),
   EMAIL_ADAPTER: z.enum(['log']).default('log'),
   INTEGRATIONS_MODE: z.enum(['mock']).default('mock'),
+  ANALYTICS_SOURCES_MODE: z.enum(['mock']).default('mock'),
   // rua= address in the DMARC record (PRD 7.2); defaults to dmarc-reports@<sending domain>.
   DMARC_REPORT_EMAIL: z
     .string()
@@ -78,6 +79,8 @@ export type AppConfig = {
   databaseUrl: string | undefined;
   emailAdapter: 'log';
   integrationsMode: 'mock';
+  /** Website analytics, social and ad platform clients (PRD 9.1); real ones need manual task 3. */
+  analyticsSourcesMode: 'mock';
   dmarcReportEmail: string | undefined;
   domainRecheckMinutes: number;
   /** Mock sign-in with fixed tokens; never on in production unless explicitly enabled. */
@@ -125,6 +128,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     databaseUrl: env.DATABASE_URL,
     emailAdapter: env.EMAIL_ADAPTER,
     integrationsMode: env.INTEGRATIONS_MODE,
+    analyticsSourcesMode: env.ANALYTICS_SOURCES_MODE,
     dmarcReportEmail: env.DMARC_REPORT_EMAIL,
     domainRecheckMinutes: env.DOMAIN_RECHECK_MINUTES,
     allowMockSignIn:

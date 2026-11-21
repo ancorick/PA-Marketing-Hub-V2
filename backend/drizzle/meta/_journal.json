@@ -141,6 +141,13 @@
       "when": 1795230307822,
       "tag": "0019_ab_test",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795230661950,
+      "tag": "0020_analytics_pipeline",
+      "breakpoints": true
     }
   ]
 }

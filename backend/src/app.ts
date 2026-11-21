@@ -55,6 +55,10 @@ import { createMailDomainChecker, type MailDomainChecker } from './contacts/addr
 import { contactRoutes } from './routes/contacts.js';
 import { domainRoutes } from './routes/domains.js';
 import { healthRoutes } from './routes/health.js';
+import { analyticsRoutes } from './routes/analytics.js';
+import { AnalyticsPipeline } from './analytics/pipeline.js';
+import type { AnalyticsSources } from './analytics/sources/contract.js';
+import { createMockAnalyticsSources } from './analytics/sources/mock.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -84,6 +88,7 @@ declare module 'fastify' {
     issueEditor: IssueEditor;
     publishing: NewsletterPublishing;
     uploads: UploadService;
+    pipeline: AnalyticsPipeline;
   }
 }
 
@@ -98,6 +103,8 @@ export type AppDeps = {
   mailChecker?: MailDomainChecker;
   linkChecker?: LinkChecker;
   writingAssistant?: WritingAssistant;
+  /** External analytics sources (PRD 9.1); mocks by default. */
+  analyticsSources?: AnalyticsSources;
   /** Tests skip the pause between batches. */
   sleep?: (ms: number) => Promise<void>;
 };
@@ -112,6 +119,7 @@ export async function buildApp({
   linkChecker,
   sleep,
   writingAssistant,
+  analyticsSources,
 }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
     logger: {
@@ -341,6 +349,10 @@ export async function buildApp({
   });
   await app.register(newsletterRoutes, { newsletter, editor: issueEditor, publishing, uploads: uploadService, seedList: config.seedList, coreEngine: resolvedIntegrations.coreEngine });
   const merge = new MergeService({ db: database.db, coreEngine: resolvedIntegrations.coreEngine, logger: app.log });
+  const pipeline = new AnalyticsPipeline({ db: database.db, sources: analyticsSources ?? createMockAnalyticsSources() });
+  app.decorate('pipeline', pipeline);
+  for (const job of pipeline.jobs()) jobs.register(job);
+  await app.register(analyticsRoutes, { pipeline, coreEngine: resolvedIntegrations.coreEngine });
   await app.register(importRoutes, { imports, duplicates, merge, contacts, contactRepository, coreEngine: resolvedIntegrations.coreEngine });
 
   return app;

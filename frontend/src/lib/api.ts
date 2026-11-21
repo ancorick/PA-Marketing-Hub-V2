@@ -362,6 +362,7 @@ export type JobStatus = {
   name: string;
   description: string;
   intervalMinutes: number;
+  dailyAtUtc: string | null;
   running: boolean;
   lastRun: SyncRun | null;
   lastSuccessAt: string | null;

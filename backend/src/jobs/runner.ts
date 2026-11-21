@@ -13,8 +13,10 @@ export type JobResult = { rowsIn: number; rowsUpserted: number };
 export type JobDefinition = {
   name: string;
   description: string;
-  /** How often the scheduler starts it; 0 = manual only. */
+  /** How often the scheduler starts it; 0 = manual only (or daily, see dailyAtUtc). */
   intervalMs: number;
+  /** Once a day at this UTC time ("HH:MM"), e.g. the nightly pipeline (NFR-F6); a missed slot runs on start-up. */
+  dailyAtUtc?: string;
   /** Re-read this much before the last window end, so late-arriving changes are not missed (9.2). */
   overlapMs?: number;
   run: (context: JobContext) => Promise<JobResult>;
@@ -24,6 +26,7 @@ export type JobStatus = {
   name: string;
   description: string;
   intervalMinutes: number;
+  dailyAtUtc: string | null;
   running: boolean;
   lastRun: SyncRunView | null;
   lastSuccessAt: string | null;
@@ -79,6 +82,14 @@ export class JobRunner {
   }
 
   start() {
+    const daily = [...this.jobs.values()].filter((job) => job.dailyAtUtc);
+    if (daily.length) {
+      const check = () => void this.runDueDaily(daily).catch(() => {});
+      const timer = setInterval(check, 60_000);
+      timer.unref();
+      this.timers.push(timer);
+      check();
+    }
     for (const job of this.jobs.values()) {
       if (job.intervalMs <= 0) continue;
       const timer = setInterval(() => {
@@ -91,6 +102,25 @@ export class JobRunner {
 
   stop() {
     for (const timer of this.timers.splice(0)) clearInterval(timer);
+  }
+
+  /** Today's slot of a daily job (UTC); before it, yesterday's. */
+  slotFor(job: JobDefinition, now = this.now()): Date | null {
+    if (!job.dailyAtUtc) return null;
+    const [hours, minutes] = job.dailyAtUtc.split(':').map(Number) as [number, number];
+    const slot = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), hours, minutes));
+    return slot > now ? new Date(slot.getTime() - 86_400_000) : slot;
+  }
+
+  /** Starts each daily job whose latest slot has no run yet (also after a restart or a sleeping instance). */
+  async runDueDaily(jobs = [...this.jobs.values()].filter((job) => job.dailyAtUtc)) {
+    for (const job of jobs) {
+      const slot = this.slotFor(job);
+      if (!slot || this.running.has(job.name)) continue;
+      const [last] = await this.deps.db.select({ startedAt: syncRuns.startedAt }).from(syncRuns).where(eq(syncRuns.source, job.name)).orderBy(desc(syncRuns.startedAt)).limit(1);
+      if (last && last.startedAt >= slot) continue;
+      await this.run(job.name, 'scheduler');
+    }
   }
 
   has(name: string) {
@@ -116,7 +146,8 @@ export class JobRunner {
         return {
           name: job.name,
           description: job.description,
-          intervalMinutes: Math.round(job.intervalMs / 60_000),
+          intervalMinutes: job.dailyAtUtc ? 1440 : Math.round(job.intervalMs / 60_000),
+          dailyAtUtc: job.dailyAtUtc ?? null,
           running: this.running.has(job.name),
           lastRun: last ? view(last) : null,
           lastSuccessAt: success?.finishedAt?.toISOString() ?? null,

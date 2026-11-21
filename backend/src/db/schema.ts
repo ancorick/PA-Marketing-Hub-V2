@@ -775,3 +775,95 @@ export const linkClicks = pgTable(
   },
   (table) => [index('link_clicks_send_idx').on(table.sendId, table.blockId)],
 );
+
+/**
+ * RawRecord (PRD 12.3): API responses stored unchanged with the pull time, so clean tables can be rebuilt
+ * after a logic change (9.2). Kept 13 months (12.4).
+ */
+export const rawRecords = pgTable(
+  'raw_records',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** website_analytics | social_meta | meta_ads | google_ads | ads_csv:<platform> */
+    source: text('source').notNull(),
+    endpoint: text('endpoint').notNull(),
+    windowFrom: date('window_from').notNull(),
+    windowTo: date('window_to').notNull(),
+    payload: jsonb('payload').$type<unknown>().notNull(),
+    pulledAt: timestamp('pulled_at', { withTimezone: true }).notNull(),
+    ...timestamps,
+  },
+  (table) => [index('raw_records_source_idx').on(table.source, table.windowFrom), index('raw_records_pulled_idx').on(table.pulledAt)],
+);
+
+/** Website sessions and form conversions per day and campaign parameters (9.1); anonymous, channel traffic only. */
+export const webTrafficDaily = pgTable(
+  'web_traffic_daily',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    date: date('date').notNull(),
+    utmSource: text('utm_source').notNull().default(''),
+    utmMedium: text('utm_medium').notNull().default(''),
+    utmCampaign: text('utm_campaign').notNull().default(''),
+    landingPage: text('landing_page').notNull(),
+    /** Taxonomy channel (9.3); null = unmapped, shown for review (ANL-03). */
+    channel: text('channel'),
+    sessions: integer('sessions').notNull(),
+    conversions: integer('conversions').notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex('web_traffic_daily_key').on(table.date, table.utmSource, table.utmMedium, table.utmCampaign, table.landingPage),
+    index('web_traffic_daily_channel_idx').on(table.channel, table.date),
+  ],
+);
+
+/** Social account metrics per day (9.1). */
+export const socialDaily = pgTable(
+  'social_daily',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    date: date('date').notNull(),
+    platform: text('platform').notNull(),
+    accountId: text('account_id').notNull(),
+    reach: integer('reach').notNull(),
+    engagement: integer('engagement').notNull(),
+    followers: integer('followers').notNull(),
+    leadForms: integer('lead_forms').notNull(),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex('social_daily_key').on(table.platform, table.accountId, table.date)],
+);
+
+/**
+ * Ad spend per platform campaign per day (9.1), from the platform API or a CSV upload. Stored in AMD at the
+ * CBA rate of the spend date, keeping the original amount and currency (9.2).
+ */
+export const adSpendDaily = pgTable(
+  'ad_spend_daily',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    date: date('date').notNull(),
+    /** meta_ads | google_ads */
+    platform: text('platform').notNull(),
+    platformCampaignId: text('platform_campaign_id').notNull(),
+    campaignName: text('campaign_name').notNull(),
+    /** Campaign key shared with touchpoints (utm_campaign). */
+    campaign: text('campaign').notNull(),
+    channel: text('channel').notNull(),
+    amountAmd: integer('amount_amd').notNull(),
+    originalAmount: text('original_amount').notNull(),
+    currency: text('currency').notNull(),
+    rateToAmd: text('rate_to_amd').notNull(),
+    impressions: integer('impressions').notNull(),
+    clicks: integer('clicks').notNull(),
+    leads: integer('leads').notNull(),
+    /** api | csv */
+    origin: text('origin').notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex('ad_spend_daily_key').on(table.platform, table.platformCampaignId, table.date),
+    index('ad_spend_daily_channel_idx').on(table.channel, table.date),
+  ],
+);

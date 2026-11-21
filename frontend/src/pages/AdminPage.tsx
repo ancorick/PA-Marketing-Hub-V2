@@ -12,6 +12,11 @@ const RUN_STATUS: Record<'running' | 'ok' | 'failed', { tone: Tone; label: strin
 };
 
 const formatTime = (iso: string) => formatDate(iso, undefined, { timeStyle: 'short' });
+/** "23:00" UTC → "03:00": Yerevan is UTC+4 all year. */
+const yerevanTime = (utc: string) => {
+  const [hours, minutes] = utc.split(':').map(Number) as [number, number];
+  return `${String((hours + 4) % 24).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
 
 /** PRD 4.3, shown so admins know what each role may do while roles live in the Core Engine. */
 const CAPABILITIES: [string, string[]][] = [
@@ -55,7 +60,7 @@ export function AdminPage() {
         </div>
       ),
     },
-    { key: 'every', header: 'Every', render: (job) => (job.intervalMinutes > 0 ? `${job.intervalMinutes} min` : 'Manual') },
+    { key: 'every', header: 'Every', render: (job) => (job.dailyAtUtc ? `Nightly, ${yerevanTime(job.dailyAtUtc)} Yerevan` : job.intervalMinutes > 0 ? `${job.intervalMinutes} min` : 'Manual') },
     {
       key: 'last',
       header: 'Last run',
