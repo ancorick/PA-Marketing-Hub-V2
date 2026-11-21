@@ -769,3 +769,31 @@ export type NewTrackedLink = { destinationUrl: string; channel: string; source: 
 
 export const listTrackedLinks = () => apiFetch<{ links: TrackedLink[]; campaigns: string[]; channels: LinkChannel[] }>('/api/analytics/links');
 export const createTrackedLink = (link: NewTrackedLink) => apiFetch<TrackedLink>('/api/analytics/links', { method: 'POST', body: JSON.stringify(link) });
+
+/* ---------- Analytics: manual costs (ANL-05) ---------- */
+
+export type Period = { from: string; to: string };
+export type ManualCost = {
+  id: string;
+  channel: string;
+  campaign: string | null;
+  description: string;
+  dateFrom: string;
+  dateTo: string;
+  amountAmd: number;
+  originalAmount: string;
+  currency: string;
+  rateToAmd: number;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: string;
+};
+export type ChannelCost = { channel: string; adSpendAmd: number; manualAmd: number; totalAmd: number };
+export type CostInput = { channel: string; campaign: string | null; description: string; dateFrom: string; dateTo: string; amount: number; currency: string };
+
+const periodQuery = (period: Period) => `from=${period.from}&to=${period.to}`;
+export const listCosts = (period: Period) => apiFetch<{ costs: ManualCost[]; channels: ChannelCost[]; currencies: string[] }>(`/api/analytics/costs?${periodQuery(period)}`);
+export const createCost = (cost: CostInput) => apiFetch<ManualCost>('/api/analytics/costs', { method: 'POST', body: JSON.stringify(cost) });
+export const updateCost = (id: string, cost: CostInput) => apiFetch<ManualCost>(`/api/analytics/costs/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(cost) });
+export const deleteCost = (id: string) => apiFetch<void>(`/api/analytics/costs/${encodeURIComponent(id)}`, { method: 'DELETE' });
+export const listAnalyticsChannels = () => apiFetch<{ channels: Channel[] }>('/api/analytics/channels');

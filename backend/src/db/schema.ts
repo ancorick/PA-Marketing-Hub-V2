@@ -933,3 +933,30 @@ export const trackedLinks = pgTable(
   },
   (table) => [uniqueIndex('tracked_links_code').on(table.code), index('tracked_links_campaign_idx').on(table.utmCampaign)],
 );
+
+/**
+ * Manual costs (PRD 9.1, ANL-05): agency fees, printed materials, sponsorships, venues. Stored in AMD at the
+ * CBA rate of the first spend day, keeping the original amount; spread evenly over the date range when a
+ * report covers part of it. Deleted entries are kept with who deleted them.
+ */
+export const manualCosts = pgTable(
+  'manual_costs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    channel: text('channel').notNull(),
+    campaign: text('campaign'),
+    description: text('description').notNull(),
+    dateFrom: date('date_from').notNull(),
+    dateTo: date('date_to').notNull(),
+    amountAmd: integer('amount_amd').notNull(),
+    originalAmount: text('original_amount').notNull(),
+    currency: text('currency').notNull(),
+    rateToAmd: text('rate_to_amd').notNull(),
+    createdBy: text('created_by').notNull(),
+    updatedBy: text('updated_by').notNull(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    deletedBy: text('deleted_by'),
+    ...timestamps,
+  },
+  (table) => [index('manual_costs_dates_idx').on(table.dateFrom, table.dateTo)],
+);

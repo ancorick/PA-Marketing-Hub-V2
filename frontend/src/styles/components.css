@@ -2349,3 +2349,26 @@ th[aria-sort='descending'] .sort-btn {
   padding-block: 0;
   font-size: var(--text-sm);
 }
+
+/* ---------- Analytics period picker ---------- */
+.period-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+  margin-block-end: var(--space-5);
+}
+
+.period-picker .segmented {
+  align-self: end;
+  margin-block-end: 2px;
+}
+
+.period-picker .segmented__btn {
+  padding: 0 var(--space-3);
+  min-height: 2.5rem;
+}
+
+.period-picker .field {
+  width: 11rem;
+}

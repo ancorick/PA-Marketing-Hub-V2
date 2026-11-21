@@ -162,6 +162,13 @@
       "when": 1795231266637,
       "tag": "0022_tracked_links",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795231415064,
+      "tag": "0023_manual_costs",
+      "breakpoints": true
     }
   ]
 }

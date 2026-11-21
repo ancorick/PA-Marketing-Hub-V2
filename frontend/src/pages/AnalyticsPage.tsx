@@ -1,11 +1,13 @@
 import { lazy, Suspense } from 'react';
 import { PageHeader, SkeletonCard } from '../ui';
 
+const CostsSection = lazy(() => import('./analytics/CostsSection').then((mod) => ({ default: mod.CostsSection })));
 const LinksSection = lazy(() => import('./analytics/LinksSection').then((mod) => ({ default: mod.LinksSection })));
 const TaxonomySection = lazy(() => import('./analytics/TaxonomySection').then((mod) => ({ default: mod.TaxonomySection })));
 
 /** Analytics sections (PRD 9.6); each has its own hash route under #/analytics. */
 export const ANALYTICS_SECTIONS = [
+  { path: '/analytics/costs', label: 'Costs' },
   { path: '/analytics/links', label: 'Link builder' },
   { path: '/analytics/taxonomy', label: 'Channel taxonomy' },
 ] as const;
@@ -23,6 +25,7 @@ export function AnalyticsPage({ path }: { path: string }) {
         ))}
       </nav>
       <Suspense fallback={<SkeletonCard />}>
+        {current.path === '/analytics/costs' && <CostsSection />}
         {current.path === '/analytics/links' && <LinksSection />}
         {current.path === '/analytics/taxonomy' && <TaxonomySection />}
       </Suspense>

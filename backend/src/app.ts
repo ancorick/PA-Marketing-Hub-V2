@@ -59,6 +59,7 @@ import { analyticsRoutes } from './routes/analytics.js';
 import { AnalyticsPipeline } from './analytics/pipeline.js';
 import { ChannelTaxonomy } from './analytics/taxonomy.js';
 import { LinkBuilder } from './analytics/links.js';
+import { CostService } from './analytics/costs.js';
 import type { AnalyticsSources } from './analytics/sources/contract.js';
 import { createMockAnalyticsSources } from './analytics/sources/mock.js';
 
@@ -93,6 +94,7 @@ declare module 'fastify' {
     pipeline: AnalyticsPipeline;
     taxonomy: ChannelTaxonomy;
     linkBuilder: LinkBuilder;
+    costs: CostService;
   }
 }
 
@@ -357,16 +359,19 @@ export async function buildApp({
   });
   await app.register(newsletterRoutes, { newsletter, editor: issueEditor, publishing, uploads: uploadService, seedList: config.seedList, coreEngine: resolvedIntegrations.coreEngine });
   const merge = new MergeService({ db: database.db, coreEngine: resolvedIntegrations.coreEngine, logger: app.log });
+  const sources = analyticsSources ?? createMockAnalyticsSources();
   const pipeline = new AnalyticsPipeline({
     db: database.db,
-    sources: analyticsSources ?? createMockAnalyticsSources(),
+    sources,
     mapChannel: (source, medium) => taxonomy.mapUtm(source, medium, 'website_analytics'),
   });
   app.decorate('pipeline', pipeline);
   for (const job of pipeline.jobs()) jobs.register(job);
   const linkBuilder = new LinkBuilder(database.db, taxonomy, config.publicApiUrl);
   app.decorate('linkBuilder', linkBuilder);
-  await app.register(analyticsRoutes, { pipeline, taxonomy, links: linkBuilder, coreEngine: resolvedIntegrations.coreEngine });
+  const costs = new CostService(database.db, sources.rates);
+  app.decorate('costs', costs);
+  await app.register(analyticsRoutes, { pipeline, taxonomy, links: linkBuilder, costs, coreEngine: resolvedIntegrations.coreEngine });
   await app.register(importRoutes, { imports, duplicates, merge, contacts, contactRepository, coreEngine: resolvedIntegrations.coreEngine });
 
   return app;
