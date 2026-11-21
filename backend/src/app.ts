@@ -61,6 +61,7 @@ import { ChannelTaxonomy } from './analytics/taxonomy.js';
 import { LinkBuilder } from './analytics/links.js';
 import { CostService } from './analytics/costs.js';
 import { AttributionService } from './analytics/attribution.js';
+import { OverviewService } from './analytics/overview.js';
 import type { AnalyticsSources } from './analytics/sources/contract.js';
 import { createMockAnalyticsSources } from './analytics/sources/mock.js';
 
@@ -97,6 +98,7 @@ declare module 'fastify' {
     linkBuilder: LinkBuilder;
     costs: CostService;
     attribution: AttributionService;
+    overview: OverviewService;
   }
 }
 
@@ -375,7 +377,9 @@ export async function buildApp({
   app.decorate('costs', costs);
   const attribution = new AttributionService(database.db);
   app.decorate('attribution', attribution);
-  await app.register(analyticsRoutes, { pipeline, taxonomy, links: linkBuilder, costs, attribution, coreEngine: resolvedIntegrations.coreEngine });
+  const overview = new OverviewService({ db: database.db, attribution, costs });
+  app.decorate('overview', overview);
+  await app.register(analyticsRoutes, { pipeline, taxonomy, links: linkBuilder, costs, attribution, overview, coreEngine: resolvedIntegrations.coreEngine });
   await app.register(importRoutes, { imports, duplicates, merge, contacts, contactRepository, coreEngine: resolvedIntegrations.coreEngine });
 
   return app;

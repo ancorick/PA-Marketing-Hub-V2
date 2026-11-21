@@ -1,5 +1,6 @@
 import { CaretDown, CaretUp, CaretUpDown } from '@phosphor-icons/react';
 import { useMemo, useState, type ReactNode } from 'react';
+import { Tooltip } from './Tooltip';
 
 export type Column<Row> = {
   key: string;
@@ -10,6 +11,8 @@ export type Column<Row> = {
   render?: (row: Row) => ReactNode;
   /** Value used for sorting; a column without it is not sortable. */
   sortValue?: (row: Row) => number | string;
+  /** Metric definition, shown in a tooltip next to the header (ANL-15). */
+  definition?: string;
 };
 
 type DataTableProps<Row> = {
@@ -132,6 +135,7 @@ export function DataTable<Row>({
                   ) : (
                     c.header
                   )}
+                  {c.definition && <Tooltip label={`Definition of ${c.header}`}>{c.definition}</Tooltip>}
                 </th>
               );
             })}

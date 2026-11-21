@@ -1,5 +1,5 @@
-import { useSyncExternalStore } from 'react';
-import type { Period } from '../../lib/api';
+import { useSyncExternalStore, type ReactNode } from 'react';
+import { MODEL_LABEL, type AttributionModel, type Period } from '../../lib/api';
 import { TextField } from '../../ui';
 
 /** Yerevan date (UTC+4, no daylight saving) as YYYY-MM-DD. */
@@ -29,7 +29,7 @@ function read(): string {
   } catch {
     // storage blocked: keep the in-memory value
   }
-  return cached ?? JSON.stringify(presets().find((preset) => preset.id === 'last_quarter')!.period);
+  return cached ?? JSON.stringify(presets().find((preset) => preset.id === 'last_12_months')!.period);
 }
 
 function write(period: Period) {
@@ -56,10 +56,11 @@ export function usePeriod(): [Period, (period: Period) => void] {
 }
 
 /** Preset pills plus custom from/to dates. */
-export function PeriodPicker({ period, onChange }: { period: Period; onChange: (period: Period) => void }) {
+export function PeriodPicker({ period, onChange, children }: { period: Period; onChange: (period: Period) => void; children?: ReactNode }) {
   const options = presets();
   return (
     <div className="period-picker">
+      {children}
       <div className="segmented" role="group" aria-label="Date range">
         {options.map((option) => (
           <button
@@ -75,6 +76,55 @@ export function PeriodPicker({ period, onChange }: { period: Period; onChange: (
       </div>
       <TextField label="From" type="date" value={period.from} max={period.to} onChange={(event) => event.target.value && onChange({ ...period, from: event.target.value })} />
       <TextField label="To" type="date" value={period.to} min={period.from} onChange={(event) => event.target.value && onChange({ ...period, to: event.target.value })} />
+    </div>
+  );
+}
+
+const MODEL_KEY = 'mh-analytics-model';
+let cachedModel: AttributionModel = 'first_touch';
+const readModel = (): AttributionModel => {
+  try {
+    const saved = sessionStorage.getItem(MODEL_KEY);
+    if (saved && saved in MODEL_LABEL) cachedModel = saved as AttributionModel;
+  } catch {
+    // storage blocked
+  }
+  return cachedModel;
+};
+
+/** The attribution model shared by analytics views (PRD 9.4: shown by name, never mixed). */
+export function useModel(): [AttributionModel, (model: AttributionModel) => void] {
+  const model = useSyncExternalStore(
+    (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    readModel,
+    readModel,
+  );
+  return [
+    model,
+    (next) => {
+      cachedModel = next;
+      try {
+        sessionStorage.setItem(MODEL_KEY, next);
+      } catch {
+        // storage blocked
+      }
+      listeners.forEach((listener) => listener());
+    },
+  ];
+}
+
+/** Segmented switch between attribution models. */
+export function ModelSwitch({ model, onChange }: { model: AttributionModel; onChange: (model: AttributionModel) => void }) {
+  return (
+    <div className="segmented" role="group" aria-label="Attribution model">
+      {(Object.keys(MODEL_LABEL) as AttributionModel[]).map((value) => (
+        <button key={value} type="button" className="segmented__btn" aria-pressed={model === value} onClick={() => onChange(value)}>
+          {MODEL_LABEL[value]}
+        </button>
+      ))}
     </div>
   );
 }

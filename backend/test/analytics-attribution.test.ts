@@ -82,7 +82,7 @@ describe('attribution over a period', () => {
     const campaigns = await app.attribution.byCampaign(range, 'last_touch', 'email');
     expect(campaigns).toEqual([expect.objectContaining({ key: 'monthly', applied: 1, enrolled: 1 })]);
 
-    const response = await app.inject({ method: 'GET', url: '/api/analytics/attribution?from=2026-04-01&to=2026-04-30&model=last_touch', headers: bearer('leadership') });
+    const response = await app.inject({ method: 'GET', url: '/api/analytics/attribution?from=2026-04-01&to=2026-04-30&model=last_touch', headers: bearer('marketing_manager') });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ model: 'last_touch', modelLabel: 'Last touch (before application)', lookbackDays: 365 });
     expect(response.json().rows.map((row: { channel: string; enrolled: number }) => [row.channel, row.enrolled]).sort()).toEqual([

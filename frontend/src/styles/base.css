@@ -225,3 +225,7 @@ button:disabled {
 .cluster--md {
   gap: var(--space-3);
 }
+
+.nowrap {
+  white-space: nowrap;
+}

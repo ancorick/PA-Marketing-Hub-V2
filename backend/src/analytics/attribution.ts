@@ -97,23 +97,39 @@ export class AttributionService {
     return rows.map((row) => ({ contactId: row.contactId, type: row.type as Stage, at: new Date(row.at) }));
   }
 
-  private async aggregate(range: DateRange, model: AttributionModel, keyOf: (credit: Credit) => string | null): Promise<AttributionRow[]> {
+  /** Visits every credit of every outcome in the period. */
+  private async walk(range: DateRange, model: AttributionModel, visit: (outcome: { contactId: string | null; type: Stage; at: Date }, credit: Credit) => void) {
     const rows = await this.outcomesIn(range);
     const people = await this.people([...new Set(rows.map((row) => row.contactId).filter((id): id is string => id !== null))]);
-    const totals = new Map<string, AttributionRow>();
     for (const row of rows) {
       const person = row.contactId ? people.get(row.contactId) : undefined;
       const credits = person ? credit(window(person.touches, person.appliedAt && person.appliedAt <= row.at ? person.appliedAt : row.at), model) : [{ channel: UNATTRIBUTED, campaign: null, share: 1 }];
-      for (const item of credits) {
-        const key = keyOf(item);
-        if (key === null) continue;
-        const total = totals.get(key) ?? { key, channel: item.channel, ...zero() };
-        total[row.type] += item.share;
-        totals.set(key, total);
-      }
+      for (const item of credits) visit(row, item);
     }
+  }
+
+  private async aggregate(range: DateRange, model: AttributionModel, keyOf: (credit: Credit) => string | null): Promise<AttributionRow[]> {
+    const totals = new Map<string, AttributionRow>();
+    await this.walk(range, model, (row, item) => {
+      const key = keyOf(item);
+      if (key === null) return;
+      const total = totals.get(key) ?? { key, channel: item.channel, ...zero() };
+      total[row.type] += item.share;
+      totals.set(key, total);
+    });
     // Shares are exact to the hundredth; reports round for display.
     return [...totals.values()].map((row) => ({ ...row, ...Object.fromEntries(STAGES.map((stage) => [stage, Math.round(row[stage] * 100) / 100])) }) as AttributionRow);
+  }
+
+  /** The people behind one number (ANL-15): contacts credited for a stage in a channel (and campaign), with their share. */
+  async contactsBehind(range: DateRange, model: AttributionModel, stage: Stage, channel: string, campaign?: string): Promise<{ contactId: string; share: number }[]> {
+    const shares = new Map<string, number>();
+    await this.walk(range, model, (row, item) => {
+      if (row.type !== stage || !row.contactId || item.channel !== channel) return;
+      if (campaign !== undefined && (item.campaign ?? '(no campaign)') !== campaign) return;
+      shares.set(row.contactId, (shares.get(row.contactId) ?? 0) + item.share);
+    });
+    return [...shares].map(([contactId, share]) => ({ contactId, share: Math.round(share * 100) / 100 }));
   }
 
   /** Touches (without estimated opens), the first application date and the source of each contact. */

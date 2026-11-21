@@ -815,3 +815,41 @@ export const getAttribution = (period: Period, model: AttributionModel, by: 'cha
   apiFetch<Attribution>(`/api/analytics/attribution?${periodQuery(period)}&model=${model}&by=${by}${channel ? `&channel=${encodeURIComponent(channel)}` : ''}`);
 export const contactAttribution = (id: string) =>
   apiFetch<{ anchor: string | null; models: Record<AttributionModel, Credit[]> }>(`/api/analytics/attribution/contacts/${encodeURIComponent(id)}`);
+
+/* ---------- Analytics: Overview (ANL-08, ANL-14, ANL-15) ---------- */
+
+/** A count of people, or the small-number marker for views shared outside marketing (ANL-14). */
+export type Count = number | 'fewer_than_3';
+export type OverviewRow = {
+  channel: string;
+  lead: Count;
+  applied: Count;
+  enrolled: Count;
+  hired: Count;
+  costAmd: number;
+  costPerLead: number | null;
+  costPerEnrolled: number | null;
+};
+export type Overview = {
+  period: Period;
+  previous: Period;
+  model: AttributionModel;
+  modelLabel: string;
+  shared: boolean;
+  tiles: {
+    subscribers: Count;
+    newsletterClickRate: { rate: number | null; delivered: number; previousRate: number | null };
+    newLeads: { value: Count; previous: Count };
+    enrolledFromLeads: { value: Count; previous: Count };
+  };
+  channels: OverviewRow[];
+  totals: Omit<OverviewRow, 'channel'>;
+  definitions: Record<string, string>;
+};
+export type PersonBehind = { id: string; firstName: string | null; lastName: string | null; email: string | null; type: string; status: string; share: number };
+
+export const getOverview = (period: Period, model: AttributionModel) => apiFetch<Overview>(`/api/analytics/overview?${periodQuery(period)}&model=${model}`);
+export const peopleBehind = (period: Period, model: AttributionModel, stage: Stage, channel: string, campaign?: string) =>
+  apiFetch<{ total: number; people: PersonBehind[]; modelLabel: string }>(
+    `/api/analytics/people?${periodQuery(period)}&model=${model}&stage=${stage}&channel=${encodeURIComponent(channel)}${campaign ? `&campaign=${encodeURIComponent(campaign)}` : ''}`,
+  );
