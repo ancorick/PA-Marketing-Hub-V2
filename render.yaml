@@ -69,12 +69,6 @@ services:
       - key: PUBLIC_API_URL
         sync: false
 
-  # Nightly analytics pipeline (PRD 9.2, NFR-F6, 07:00 Yerevan = 03:00 UTC) is added in phase 3
-  # as a cron service (cron jobs are paid on Render), for example:
-  # - type: cron
-  #   name: marketing-hub-etl
-  #   runtime: node
-  #   rootDir: backend
-  #   schedule: "0 3 * * *"
-  #   buildCommand: npm ci --include=dev && npm run build
-  #   startCommand: node dist/jobs/nightly-pipeline.js
+  # Nightly analytics pipeline (PRD 9.2, NFR-F6): runs inside the web service (JobRunner, 03:00 Yerevan =
+  # 23:00 UTC, a missed slot is caught up on start), so no separate cron service is needed. It needs the web
+  # service on an always-on plan; on the free plan the instance sleeps and the run happens on the next wake-up.
