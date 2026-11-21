@@ -7,6 +7,7 @@ import { useStaffRole } from '../lib/session';
 import { Disclosure } from '../motion';
 import { AccessNotice, accessProblem, Alert, Button, PageHeader, retryServerErrors, SkeletonCard, StatusBadge } from '../ui';
 import { IssueEditor } from './IssueEditor';
+import { IssueReport } from './IssueReport';
 import { IssueReview } from './IssueReview';
 import { ISSUE_STATUS } from './NewsletterPage';
 
@@ -100,6 +101,7 @@ export function IssuePage({ id }: { id: string }) {
           </section>
         )}
         {issue.status !== 'collecting' && <IssueEditor data={detail.data} />}
+        {issue.status === 'sent' && <IssueReport issueId={issue.id} archiveSlug={issue.archiveSlug} />}
         {issue.status !== 'collecting' && <IssueReview issue={issue} />}
         <section className="card stack" aria-labelledby="items-heading">
           <h2 id="items-heading">Collected items</h2>

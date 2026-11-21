@@ -1,6 +1,6 @@
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import type { AppPgDatabase } from '../db/client.js';
-import { issueComments, issues, newsletterCadences, newsletterTemplates, sends, type NewsletterTemplateRow, type SendRow } from '../db/schema.js';
+import { issueComments, issues, linkClicks, newsletterCadences, newsletterTemplates, outcomes, sends, touchpoints, type NewsletterTemplateRow, type SendRow } from '../db/schema.js';
 import type { DomainService } from '../domains/service.js';
 import type { EmailAdapter } from '../email/adapter.js';
 import { DEFAULT_THEME, type EmailTheme } from '../email/render.js';
@@ -314,8 +314,98 @@ export class NewsletterPublishing {
     if (sendIds.length === 0) return [];
     const finished = await this.deps.db.select({ id: sends.id }).from(sends).where(and(inArray(sends.id, sendIds), eq(sends.status, 'sent')));
     const done = scheduled.filter((issue) => finished.some((send) => send.id === issue.sendId)).map((issue) => issue.id);
-    for (const id of done) await this.setStatus(id, 'sent');
+    for (const id of done) {
+      const issue = scheduled.find((item) => item.id === id)!;
+      // NWS-12: a stable public address, e.g. 2026-12-hy.
+      let slug = `${issue.edition}-${issue.language}`;
+      const [taken] = await this.deps.db.select({ id: issues.id }).from(issues).where(eq(issues.archiveSlug, slug));
+      if (taken && taken.id !== id) slug = `${slug}-${id.slice(0, 6)}`;
+      await this.deps.db.update(issues).set({ status: 'sent', archiveSlug: slug }).where(eq(issues.id, id));
+    }
     return done;
+  }
+
+  /* ---------- Issue report (NWS-13) ---------- */
+
+  /**
+   * Deliveries, unique clicks per block, unsubscribes and complaints, plus applications and event registrations
+   * by people who clicked the issue and then applied or registered within 90 days (story NWS-S3). The report
+   * is final seven days after sending (8.1 step 8); before that it is labelled preliminary.
+   */
+  async report(issueId: string) {
+    const issue = await this.deps.newsletter.require(issueId);
+    if (!issue.sendId) throw new NewsletterError('invalid_state', 'This issue has not been sent');
+    const send = await this.deps.sends.require(issue.sendId);
+    const stats = await this.deps.sends.report(send.id);
+    const clicks = await this.deps.db.select().from(linkClicks).where(eq(linkClicks.sendId, send.id));
+    const firstClick = new Map<string, Date>();
+    for (const click of clicks) {
+      if (!click.contactId) continue;
+      const current = firstClick.get(click.contactId);
+      if (!current || click.occurredAt < current) firstClick.set(click.contactId, click.occurredAt);
+    }
+    const clickers = [...firstClick.keys()];
+    const WINDOW = 90 * 86_400_000;
+    const within = (contactId: string | null, at: Date) => {
+      const first = contactId ? firstClick.get(contactId) : undefined;
+      return first !== undefined && at >= first && at.getTime() - first.getTime() <= WINDOW;
+    };
+    const [applied, registered] =
+      clickers.length === 0
+        ? [[], []]
+        : await Promise.all([
+            this.deps.db.select({ contactId: outcomes.contactId, at: outcomes.occurredAt }).from(outcomes).where(and(eq(outcomes.type, 'applied'), inArray(outcomes.contactId, clickers))),
+            this.deps.db.select({ contactId: touchpoints.contactId, at: touchpoints.occurredAt }).from(touchpoints).where(and(eq(touchpoints.type, 'registration'), inArray(touchpoints.contactId, clickers))),
+          ]);
+    const appliedContacts = new Set(applied.filter((row) => within(row.contactId, row.at)).map((row) => row.contactId as string));
+    const registeredContacts = new Set(registered.filter((row) => within(row.contactId, row.at)).map((row) => row.contactId as string));
+
+    const blocks = ((send.blocks ?? []) as SnapshotBlock[]).map((block) => {
+      const people = new Set(clicks.filter((click) => click.blockId === block.id && click.contactId).map((click) => click.contactId as string));
+      return {
+        id: block.id,
+        title: block.title,
+        uniqueClicks: people.size,
+        applications: [...people].filter((id) => appliedContacts.has(id)).length,
+        registrations: [...people].filter((id) => registeredContacts.has(id)).length,
+      };
+    });
+    const by = stats.byStatus;
+    const finalAt = send.finishedAt ? new Date(new Date(send.finishedAt).getTime() + 7 * 86_400_000) : null;
+    return {
+      sentAt: send.finishedAt,
+      final: finalAt !== null && finalAt <= this.now(),
+      finalAt: finalAt?.toISOString() ?? null,
+      delivered: (by.delivered ?? 0) + (by.sent ?? 0),
+      bounced: (by.bounced_hard ?? 0) + (by.bounced_soft ?? 0),
+      complaints: by.complained ?? 0,
+      unsubscribes: stats.unsubscribed,
+      openedEstimated: stats.openedEstimated,
+      uniqueClicks: clickers.length,
+      applications: appliedContacts.size,
+      registrations: registeredContacts.size,
+      blocks,
+    };
+  }
+
+  /* ---------- Public archive (NWS-12) ---------- */
+
+  async archive(language?: string) {
+    const rows = await this.deps.db
+      .select({ slug: issues.archiveSlug, subject: issues.subject, edition: issues.edition, language: issues.language, sentAt: sends.finishedAt })
+      .from(issues)
+      .innerJoin(sends, eq(sends.id, issues.sendId))
+      .where(and(eq(issues.status, 'sent'), language ? eq(issues.language, language) : undefined))
+      .orderBy(desc(issues.edition));
+    return rows.filter((row) => row.slug).map((row) => ({ ...row, sentAt: row.sentAt?.toISOString() ?? null }));
+  }
+
+  async archived(slug: string) {
+    const [issue] = await this.deps.db.select().from(issues).where(and(eq(issues.archiveSlug, slug), eq(issues.status, 'sent')));
+    if (!issue?.sendId) return null;
+    const send = await this.deps.sends.require(issue.sendId);
+    const rendered = this.deps.sends.renderFor(send, null, { archive: true });
+    return { slug, subject: rendered.subject, edition: issue.edition, language: issue.language, sentAt: send.finishedAt, html: rendered.html };
   }
 
   private async setStatus(issueId: string, status: string) {

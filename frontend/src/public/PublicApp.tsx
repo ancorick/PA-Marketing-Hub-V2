@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'rea
 import logoUrl from '../assets/picsart-academy-logo.webp';
 import {
   ApiError,
+  archiveIssue,
+  archiveList,
   getPublicPreferences,
   publicConfirm,
   publicStay,
@@ -307,14 +309,64 @@ function PrivacyPage() {
   );
 }
 
+/** NWS-12: published issues in the reader's language. */
+function ArchiveList() {
+  const [language, t] = usePublicLanguage();
+  const list = useQuery({ queryKey: ['archive', language], queryFn: () => archiveList(language) });
+  return (
+    <section className="card public__card stack" aria-labelledby="archive-title">
+      <h1 id="archive-title" className="public__title">
+        {t.archiveTitle}
+      </h1>
+      {list.isError ? (
+        <LinkProblem error={list.error} />
+      ) : list.data && list.data.issues.length === 0 ? (
+        <p className="muted">{t.archiveEmpty}</p>
+      ) : (
+        <ul className="list-reset stack stack--sm">
+          {(list.data?.issues ?? []).map((issue) => (
+            <li key={issue.slug}>
+              <a href={`#/p/archive/${issue.slug}`}>{issue.subject ?? issue.edition}</a> <span className="muted num">· {issue.edition}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/** One archived issue at its stable URL (NWS-12); the email HTML is shown in a sandboxed frame. */
+function ArchiveIssue({ slug }: { slug: string }) {
+  const [, t] = usePublicLanguage();
+  const issue = useQuery({ queryKey: ['archive-issue', slug], queryFn: () => archiveIssue(slug), retry: false });
+  useEffect(() => {
+    if (issue.data) suggestPublicLanguage(issue.data.language);
+  }, [issue.data]);
+  if (issue.isError) return <LinkProblem error={issue.error} />;
+  if (!issue.data) return <SkeletonCard />;
+  return (
+    <section className="stack" aria-labelledby="archive-issue-title">
+      <a href="#/p/archive">{t.archiveBack}</a>
+      <h1 id="archive-issue-title" className="public__title">
+        {issue.data.subject ?? issue.data.edition}
+      </h1>
+      <div className="email-preview">
+        <iframe title={issue.data.subject ?? issue.data.edition} sandbox="allow-popups allow-popups-to-escape-sandbox" srcDoc={issue.data.html.replace('<head>', '<head><base target="_blank">')} />
+      </div>
+    </section>
+  );
+}
+
 /** Routes under "#/p/…": pages for contacts, outside the staff shell and without a staff session. */
 export function PublicApp({ path }: { path: string }) {
-  const [page, query = ''] = path.split('?');
+  const [page = '', query = ''] = path.split('?');
   const token = new URLSearchParams(query).get('t') ?? '';
   let content: ReactNode;
   if (page === '/p/unsubscribe') content = token ? <UnsubscribePage token={token} /> : <LinkProblem error={new ApiError(400, '', null, 'invalid_link')} />;
   else if (page === '/p/confirm') content = token ? <ConfirmPage token={token} /> : <LinkProblem error={new ApiError(400, '', null, 'invalid_link')} />;
   else if (page === '/p/preferences') content = token ? <PreferencesPage token={token} stay={new URLSearchParams(query).get('stay') === '1'} /> : <LinkProblem error={new ApiError(400, '', null, 'invalid_link')} />;
+  else if (page === '/p/archive') content = <ArchiveList />;
+  else if (page.startsWith('/p/archive/')) content = <ArchiveIssue slug={decodeURIComponent(page.slice('/p/archive/'.length))} />;
   else content = <PrivacyPage />;
   return <PublicLayout>{content}</PublicLayout>;
 }

@@ -213,6 +213,23 @@ export async function newsletterRoutes(app: FastifyInstance, { newsletter, edito
   }));
   app.post('/api/newsletter/issues/:id/unschedule', { preHandler: managers }, withId(async (id, request) => publishing.unschedule(id, request.staff!.userId)));
 
+  // Issue report (NWS-13).
+  app.get('/api/newsletter/issues/:id/report', { preHandler: canEdit }, withId(async (id) => publishing.report(id)));
+
+  // Public archive (NWS-12): no session; stable URLs by slug.
+  const archiveQuery = z.object({ language: z.enum(LANGUAGES).optional() });
+  const slugParams = z.object({ slug: z.string().regex(/^[a-z0-9-]{1,40}$/) });
+  app.get('/api/public/newsletter', async (request, reply) => {
+    const query = archiveQuery.safeParse(request.query);
+    if (!query.success) return reply.code(400).send({ error: 'invalid_request', message: 'language must be hy, en or ru' });
+    return { issues: await publishing.archive(query.data.language) };
+  });
+  app.get('/api/public/newsletter/:slug', async (request, reply) => {
+    const params = slugParams.safeParse(request.params);
+    const issue = params.success ? await publishing.archived(params.data.slug) : null;
+    return issue ? reply.header('cache-control', 'public, max-age=3600').send(issue) : reply.code(404).send({ error: 'not_found', message: 'Issue not found' });
+  });
+
   // NWS-07: AI writing assist; answers 503 when no API key is configured or the AI service fails.
   app.get('/api/newsletter/ai', { preHandler: canEdit }, async () => ({ enabled: editor.aiEnabled }));
   app.post('/api/newsletter/issues/:id/ai-draft', { preHandler: canEdit }, withId(async (id, request, reply) => {

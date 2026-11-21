@@ -127,6 +127,13 @@
       "when": 1795229846848,
       "tag": "0017_newsletter_send",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795230160735,
+      "tag": "0018_link_clicks",
+      "breakpoints": true
     }
   ]
 }

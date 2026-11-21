@@ -100,6 +100,12 @@ const REASON: Record<Language, (topic: Topic) => string> = {
   ru: (topic) => `Вы получили это письмо, потому что подписались на ${TOPIC_NAME.ru[topic]} Picsart Academy.`,
 };
 
+const ARCHIVE_NOTE: Record<Language, string> = {
+  en: 'This is the web version of the Picsart Academy newsletter.',
+  hy: 'Սա Picsart Academy-ի տեղեկագրի վեբ տարբերակն է։',
+  ru: 'Это веб-версия рассылки Picsart Academy.',
+};
+
 /** Gmail clips messages over ~102 KB, hiding the footer and its unsubscribe link. */
 const MAX_HTML_BYTES = 100 * 1024;
 
@@ -191,18 +197,23 @@ export class SendService {
   }
 
   /** Renders the email as one contact will see it (EML-11): personalized, tagged links, unsubscribe footer and headers. */
-  renderFor(send: SendView, contact: Pick<Contact, 'id' | 'firstName'> | null) {
+  /**
+   * `archive`: the public web version (NWS-12): no personal token, no unsubscribe links (there is no
+   * recipient), links tagged with medium "archive" so archive visits are not counted as email clicks.
+   */
+  renderFor(send: SendView, contact: Pick<Contact, 'id' | 'firstName'> | null, options: { archive?: boolean } = {}) {
     const language = send.language as Language;
+    const medium = options.archive ? 'archive' : 'email';
     const contactId = contact?.id ?? '00000000-0000-4000-8000-000000000000';
     const token = contact ? this.deps.signer.sign(contact.id, 'track') : undefined;
     const source = send.kind === 'newsletter' ? 'newsletter' : 'campaign';
-    const tag = (url: string) => tagUrl(url, { source, campaign: send.utmCampaign, token });
+    const tag = (url: string) => tagUrl(url, { source, campaign: send.utmCampaign, token, medium });
     const name = contact?.firstName ?? FALLBACK_NAME[language];
     const personalize = (value: string) => value.replace(/\{\{\s*first_name\s*\}\}/g, name);
     // Newsletters render their approved blocks, each link tagged with its block (NWS-14).
     const blocks = send.blocks
       ? (send.blocks as SnapshotBlock[]).map((block) => {
-          const blockTag = (url: string) => tagUrl(url, { source, campaign: send.utmCampaign, token, content: block.id });
+          const blockTag = (url: string) => tagUrl(url, { source, campaign: send.utmCampaign, token, content: block.id, medium });
           const inner = renderMarkup(personalize(block.body), blockTag);
           const image = block.imageUrl
             ? `<img src="${escapeHtml(block.imageUrl)}" alt="${escapeHtml(block.imageAlt ?? '')}" width="536" style="display:block;max-width:100%;height:auto;border-radius:12px;margin:0 0 16px;">`
@@ -228,12 +239,14 @@ export class SendService {
         ? // EML-15: "Keep me subscribed" opens the person's own preferences link, which records the answer.
           { button: { label: send.buttonLabel, url: `${this.deps.links.preferencesPage(contactId)}&stay=1` } }
         : send.buttonLabel && send.buttonUrl && { button: { label: send.buttonLabel, url: tag(send.buttonUrl) } }),
-      footer: {
-        reason: REASON[language](send.topic as Topic),
-        postalAddress: this.deps.postalAddress,
-        unsubscribeUrl: this.deps.links.unsubscribePage(contactId, send.id),
-        preferencesUrl: this.deps.links.preferencesPage(contactId),
-      },
+      footer: options.archive
+        ? { reason: ARCHIVE_NOTE[language], postalAddress: this.deps.postalAddress }
+        : {
+            reason: REASON[language](send.topic as Topic),
+            postalAddress: this.deps.postalAddress,
+            unsubscribeUrl: this.deps.links.unsubscribePage(contactId, send.id),
+            preferencesUrl: this.deps.links.preferencesPage(contactId),
+          },
     });
     return {
       from: `${send.fromName} <${send.fromAddress}>`,

@@ -2,7 +2,7 @@ import { and, count, eq, gte, inArray, isNotNull, isNull, sql } from 'drizzle-or
 import type { AlertService } from '../alerts/service.js';
 import type { ConsentService } from '../consent/service.js';
 import type { AppPgDatabase } from '../db/client.js';
-import { contactImports, contacts, deliveries, espEvents, sends } from '../db/schema.js';
+import { contactImports, contacts, deliveries, espEvents, linkClicks, sends } from '../db/schema.js';
 import type { EspEvent } from '../email/webhooks.js';
 import type { KillSwitch } from '../sends/kill-switch.js';
 import type { TouchpointRepository } from '../touchpoints/repository.js';
@@ -78,6 +78,15 @@ export class EspEventService {
       case 'clicked': {
         if (event.type === 'opened' && delivery && !delivery.openedAt) await update({ openedAt: at });
         if (event.type === 'clicked' && delivery && !delivery.firstClickAt) await update({ firstClickAt: at, ...(!delivery.openedAt && { openedAt: at }) });
+        if (event.type === 'clicked' && delivery && event.url) {
+          let blockId: string | null = null;
+          try {
+            blockId = new URL(event.url).searchParams.get('utm_content');
+          } catch {
+            // Not a URL we tagged; keep the click without a block.
+          }
+          await this.deps.db.insert(linkClicks).values({ deliveryId: delivery.id, sendId: delivery.sendId, contactId: delivery.contactId, url: event.url.slice(0, 2000), blockId, occurredAt: at });
+        }
         if (delivery?.contactId) {
           await this.deps.touchpoints.recordOnce({
             contactId: delivery.contactId,

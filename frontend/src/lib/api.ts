@@ -686,3 +686,25 @@ export const requestIssueChanges = (id: string, comment: string) => apiFetch<Iss
 export const approveIssue = (id: string, comment: string | null, scheduledAt: string | null) =>
   apiFetch<{ issue: Issue; sendId: string; scheduledAt: string }>(`${issuePath(id)}/approve`, { method: 'POST', body: JSON.stringify({ comment, scheduledAt }) });
 export const unscheduleIssue = (id: string) => apiFetch<Issue>(`${issuePath(id)}/unschedule`, { method: 'POST' });
+
+/* ---------- Issue report and public archive (NWS-12, NWS-13) ---------- */
+
+export type IssueReport = {
+  sentAt: string | null;
+  final: boolean;
+  finalAt: string | null;
+  delivered: number;
+  bounced: number;
+  complaints: number;
+  unsubscribes: number;
+  openedEstimated: number;
+  uniqueClicks: number;
+  applications: number;
+  registrations: number;
+  blocks: { id: string; title: string; uniqueClicks: number; applications: number; registrations: number }[];
+};
+export const issueReport = (id: string) => apiFetch<IssueReport>(`${issuePath(id)}/report`);
+
+export type ArchiveEntry = { slug: string; subject: string | null; edition: string; language: Language; sentAt: string | null };
+export const archiveList = (language?: Language) => publicFetch<{ issues: ArchiveEntry[] }>(`/api/public/newsletter${language ? `?language=${language}` : ''}`);
+export const archiveIssue = (slug: string) => publicFetch<ArchiveEntry & { html: string }>(`/api/public/newsletter/${encodeURIComponent(slug)}`);

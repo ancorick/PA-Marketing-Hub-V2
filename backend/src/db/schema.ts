@@ -743,3 +743,22 @@ export const issueComments = pgTable(
   },
   (table) => [index('issue_comments_issue_idx').on(table.issueId, table.createdAt)],
 );
+
+/** Every tracked click (EML-04 "clicked" events) with its URL and newsletter block, for clicks per block (NWS-13). */
+export const linkClicks = pgTable(
+  'link_clicks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    deliveryId: uuid('delivery_id')
+      .notNull()
+      .references(() => deliveries.id, { onDelete: 'cascade' }),
+    sendId: uuid('send_id').notNull(),
+    contactId: uuid('contact_id'),
+    url: text('url').notNull(),
+    /** utm_content of the clicked link: the newsletter block ID. */
+    blockId: text('block_id'),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    ...timestamps,
+  },
+  (table) => [index('link_clicks_send_idx').on(table.sendId, table.blockId)],
+);

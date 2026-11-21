@@ -20,11 +20,11 @@ export function extractUrls(body: string): { links: string[]; images: { url: str
  * Adds campaign parameters (9.3: medium email) and the contact token to a link, keeping existing
  * parameters. Links to other pages of the email system itself are left alone.
  */
-export function tagUrl(url: string, params: { source: string; campaign: string; token?: string; content?: string }): string {
+export function tagUrl(url: string, params: { source: string; campaign: string; token?: string; content?: string; medium?: string }): string {
   try {
     const parsed = new URL(url);
     if (!parsed.searchParams.has('utm_source')) parsed.searchParams.set('utm_source', params.source);
-    if (!parsed.searchParams.has('utm_medium')) parsed.searchParams.set('utm_medium', 'email');
+    if (!parsed.searchParams.has('utm_medium')) parsed.searchParams.set('utm_medium', params.medium ?? 'email');
     if (!parsed.searchParams.has('utm_campaign')) parsed.searchParams.set('utm_campaign', params.campaign);
     // NWS-14: which newsletter block the click came from.
     if (params.content && !parsed.searchParams.has('utm_content')) parsed.searchParams.set('utm_content', params.content);

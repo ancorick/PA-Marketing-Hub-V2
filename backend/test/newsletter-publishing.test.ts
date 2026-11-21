@@ -51,7 +51,7 @@ beforeEach(async () => {
 });
 afterEach(() => app.close());
 
-const post = (path: string, role: string, payload: unknown = {}) => app.inject({ method: 'POST', url: `/api/newsletter/issues/${issueId}/${path}`, headers: bearer(role), payload });
+const post = (path: string, role: string, payload: Record<string, unknown> = {}) => app.inject({ method: 'POST', url: `/api/newsletter/issues/${issueId}/${path}`, headers: bearer(role), payload });
 const checks = async () => (await app.inject({ method: 'GET', url: `/api/newsletter/issues/${issueId}/checks`, headers: bearer('editor') })).json().checks as { id: string; status: string }[];
 
 describe('templates (NWS-15)', () => {

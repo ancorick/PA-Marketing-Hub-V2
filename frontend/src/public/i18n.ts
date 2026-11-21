@@ -43,6 +43,9 @@ type Strings = {
   prefsUnsubscribedAll: string;
   prefsDataNote: string;
   stayDone: string;
+  archiveTitle: string;
+  archiveEmpty: string;
+  archiveBack: string;
   confirmWorking: string;
   confirmDoneTitle: string;
   confirmDoneText: string;
@@ -89,6 +92,9 @@ const en: Strings = {
   prefsUnsubscribedAll: 'You are unsubscribed from everything.',
   prefsDataNote:
     'We record which emails you open and which links you click, to send fewer and better emails. Opens are estimated. We do not use third-party tracking cookies.',
+  archiveTitle: 'Newsletter archive',
+  archiveEmpty: 'No issues have been published in this language yet.',
+  archiveBack: 'All issues',
   stayDone: 'Thank you! You stay subscribed. You can change topics below.',
   confirmWorking: 'Confirming your subscription…',
   confirmDoneTitle: 'Subscription confirmed',
@@ -146,6 +152,9 @@ const hy: Strings = {
   prefsUnsubscribedAll: 'Դուք ապաբաժանորդագրվել եք ամեն ինչից։',
   prefsDataNote:
     'Մենք գրանցում ենք, թե որ նամակներն եք բացում և որ հղումներով անցնում, որպեսզի ուղարկենք ավելի քիչ և ավելի օգտակար նամակներ։ Բացումները մոտավոր են։ Մենք չենք օգտագործում երրորդ կողմի հետևող cookie-ներ։',
+  archiveTitle: 'Տեղեկագրի արխիվ',
+  archiveEmpty: 'Այս լեզվով դեռ թողարկումներ չկան։',
+  archiveBack: 'Բոլոր թողարկումները',
   stayDone: 'Շնորհակալություն։ Դուք մնում եք բաժանորդագրված։ Թեմաները կարող եք փոխել ներքևում։',
   confirmWorking: 'Հաստատում ենք բաժանորդագրությունը…',
   confirmDoneTitle: 'Բաժանորդագրությունը հաստատված է',
@@ -203,6 +212,9 @@ const ru: Strings = {
   prefsUnsubscribedAll: 'Вы отписались от всего.',
   prefsDataNote:
     'Мы отмечаем, какие письма вы открываете и по каким ссылкам переходите, чтобы присылать меньше писем и полезнее. Открытия считаются приблизительно. Мы не используем сторонние отслеживающие cookie.',
+  archiveTitle: 'Архив рассылки',
+  archiveEmpty: 'На этом языке выпусков пока нет.',
+  archiveBack: 'Все выпуски',
   stayDone: 'Спасибо! Подписка сохранена. Темы можно изменить ниже.',
   confirmWorking: 'Подтверждаем подписку…',
   confirmDoneTitle: 'Подписка подтверждена',
