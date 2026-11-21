@@ -48,6 +48,9 @@ services:
       # Verifies Event Hub webhooks (EVT-02); give the same value to the Event Hub team.
       - key: EVENT_HUB_WEBHOOK_SECRET
         generateValue: true
+      # Event Hub sandbox signature secret (EVT-08); not sensitive, shared with Event Hub developers.
+      - key: EVENT_HUB_SANDBOX_SECRET
+        generateValue: true
       # Event Hub reads shared segments and checks suppression with it (EVT-07).
       - key: EVENT_HUB_API_KEY
         generateValue: true

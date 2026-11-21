@@ -23,8 +23,11 @@ Both are generated from the code (`src/eventhub/contract.ts`, `src/eventhub/fixt
   Retry `5xx` and network errors with exponential backoff for at least 24 hours.
 - **Order:** messages may arrive out of order. A registration or check-in for an event Marketing Hub has not seen yet
   is stored and linked when the event arrives; a check-in for an unknown registration answers `200 {"status":"ignored"}`.
-- **Sandbox:** `POST /api/sandbox/event-hub/webhooks` validates and signs the same way with
-  `EVENT_HUB_SANDBOX_SECRET` but writes nothing; `GET /api/sandbox/event-hub/fixtures` returns the examples (EVT-08).
+- **Sandbox (EVT-08):** `POST /api/sandbox/event-hub/webhooks` checks the signature (with `EVENT_HUB_SANDBOX_SECRET`,
+  not the production secret) and the schema exactly like the real endpoint, then answers
+  `{sandbox: true, status: "valid"|"duplicate", wouldDo: [...], warnings: [...]}` describing what Marketing Hub would
+  do. It writes nothing and reads no production data. `GET /api/sandbox/event-hub/fixtures` returns the six example
+  messages (synthetic people only), the JSON Schema and the signature format.
 
 ## Envelope
 

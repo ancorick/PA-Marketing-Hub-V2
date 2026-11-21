@@ -410,7 +410,7 @@ export async function buildApp({
     apiKey: config.eventHubApiKey,
     coreEngine: resolvedIntegrations.coreEngine,
   });
-  await app.register(webhookRoutes, { events: espEvents, secret: config.espWebhookSecret, eventHub, eventHubSecret: config.eventHubWebhookSecret });
+  await app.register(webhookRoutes, { events: espEvents, secret: config.espWebhookSecret, eventHub, eventHubSecret: config.eventHubWebhookSecret, sandboxSecret: config.eventHubSandboxSecret });
   app.decorate('costs', costs);
   const attribution = new AttributionService(database.db);
   app.decorate('attribution', attribution);
