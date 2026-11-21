@@ -983,3 +983,8 @@ export const importAttendees = (id: string, csv: string, attendedByDefault: bool
 
 export const shareSegmentWithEventHub = (id: string, shared: boolean) =>
   apiFetch<Segment>(`/api/audience/segments/${encodeURIComponent(id)}/event-hub`, { method: 'PUT', body: JSON.stringify({ shared }) });
+
+/* ---------- Success metrics M1–M11 (PRD 3.2, 17.1) ---------- */
+
+export type ProgramMetric = { id: string; name: string; value: string; target: string; status: 'meets' | 'misses' | 'no_data'; detail: string; source: string };
+export const getProgramMetrics = () => apiFetch<{ checkedAt: string; metrics: ProgramMetric[] }>('/api/analytics/metrics');

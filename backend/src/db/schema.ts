@@ -1007,3 +1007,16 @@ export const eventRegistrations = pgTable(
     uniqueIndex('event_registrations_contact_event').on(table.eventId, table.contactId),
   ],
 );
+
+/** Staff who opened the dashboard per ISO week (M11: weekly active staff users); first-party, no tracking tools. */
+export const staffActivity = pgTable(
+  'staff_activity',
+  {
+    userId: text('user_id').notNull(),
+    week: text('week').notNull(),
+    role: text('role').notNull(),
+    views: integer('views').notNull().default(1),
+    ...timestamps,
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.week] })],
+);

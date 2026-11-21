@@ -7,6 +7,7 @@ import { suppress, type OverviewService } from '../analytics/overview.js';
 import type { DetailService } from '../analytics/detail.js';
 import type { DataHealth } from '../analytics/health.js';
 import type { SelfReportedService } from '../analytics/self-reported.js';
+import type { ProgramMetrics } from '../analytics/metrics.js';
 import type { StaffSession } from '../integrations/core-engine/contract.js';
 import { COST_CURRENCIES, CostError, type CostService } from '../analytics/costs.js';
 import { CHANNEL_MEDIUM, CHANNEL_SOURCES, LinkBuilderError, type LinkBuilder } from '../analytics/links.js';
@@ -60,7 +61,7 @@ const isShared = (staff: StaffSession | null) => !staff?.roles.some((role) => ro
 const csvBody = z.object({ platform: z.enum(['meta_ads', 'google_ads']), csv: z.string().min(1).max(5_000_000) });
 
 /** Analytics pipeline (PRD 9.1, 9.2): re-runs of a date range (admin) and the ad spend CSV fallback. */
-export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy, links, costs, attribution, overview, detail, health, selfReported, coreEngine }: {
+export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy, links, costs, attribution, overview, detail, health, selfReported, metrics, coreEngine }: {
     pipeline: AnalyticsPipeline;
     taxonomy: ChannelTaxonomy;
     links: LinkBuilder;
@@ -70,6 +71,7 @@ export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy
     detail: DetailService;
     health: DataHealth;
     selfReported: SelfReportedService;
+    metrics: ProgramMetrics;
     coreEngine: Pick<CoreEngineClient, 'verifyStaffToken'> }) {
   const admin = requireRole(coreEngine, ['admin']);
   const managers = requireRole(coreEngine, ['admin', 'marketing_manager']);
@@ -114,6 +116,8 @@ export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy
     if (!period.success) return invalid(reply, period.error);
     const options = attributionQuery.safeParse(request.query);
     if (!options.success) return invalid(reply, options.error);
+    // M11: who opens the dashboard each week (first-party, no tracking tools).
+    await metrics.recordView(request.staff!.userId, request.staff!.roles[0] ?? 'viewer').catch(() => {});
     return overview.overview(period.data, options.data.model, isShared(request.staff));
   });
 
@@ -155,6 +159,9 @@ export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy
     if (channel && !channel.success) return reply.code(400).send({ error: 'invalid_request', message: 'Unknown channel', field: 'channel' });
     return detail.cohorts(options.data.model, isShared(request.staff), channel?.data);
   });
+
+  // Success metrics M1–M11 (PRD 3.2) for the final acceptance (17.1): aggregates for every role.
+  app.get('/api/analytics/metrics', { preHandler: anyStaff }, async () => ({ checkedAt: new Date().toISOString(), metrics: await metrics.all() }));
 
   // Self-reported source against tracked first touch (9.4, ANL-16): a check on tracking gaps.
   app.get('/api/analytics/self-reported', { preHandler: anyStaff }, async (request, reply) => {

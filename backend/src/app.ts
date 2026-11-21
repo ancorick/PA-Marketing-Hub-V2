@@ -72,6 +72,7 @@ import { OverviewService } from './analytics/overview.js';
 import { DetailService } from './analytics/detail.js';
 import { DataHealth } from './analytics/health.js';
 import { SelfReportedService } from './analytics/self-reported.js';
+import { ProgramMetrics } from './analytics/metrics.js';
 import type { AnalyticsSources } from './analytics/sources/contract.js';
 import { createMockAnalyticsSources } from './analytics/sources/mock.js';
 
@@ -112,6 +113,7 @@ declare module 'fastify' {
     attribution: AttributionService;
     overview: OverviewService;
     detail: DetailService;
+    metrics: ProgramMetrics;
   }
 }
 
@@ -426,7 +428,11 @@ export async function buildApp({
   app.decorate('overview', overview);
   const detail = new DetailService({ db: database.db, attribution, costs });
   app.decorate('detail', detail);
-  await app.register(analyticsRoutes, { pipeline, taxonomy, links: linkBuilder, costs, attribution, overview, detail, health: new DataHealth({ jobs, pipeline, taxonomy }),
+  const health = new DataHealth({ jobs, pipeline, taxonomy });
+  const metrics = new ProgramMetrics({ db: database.db, attribution, health, duplicates });
+  app.decorate('metrics', metrics);
+  await app.register(analyticsRoutes, { pipeline, taxonomy, links: linkBuilder, costs, attribution, overview, detail, health,
+    metrics,
     selfReported: new SelfReportedService({ db: database.db, attribution }),
     coreEngine: resolvedIntegrations.coreEngine });
   await app.register(commandCenterRoutes, { overview, detail, apiKey: config.commandCenterApiKey });

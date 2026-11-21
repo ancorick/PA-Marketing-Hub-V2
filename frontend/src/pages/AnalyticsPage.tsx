@@ -6,6 +6,7 @@ const ChannelSection = lazy(() => import('./analytics/ChannelSection').then((mod
 const CampaignsSection = lazy(() => import('./analytics/CampaignsSection').then((mod) => ({ default: mod.CampaignsSection })));
 const CampaignSection = lazy(() => import('./analytics/CampaignsSection').then((mod) => ({ default: mod.CampaignSection })));
 const CohortsSection = lazy(() => import('./analytics/CohortsSection').then((mod) => ({ default: mod.CohortsSection })));
+const MetricsSection = lazy(() => import('./analytics/MetricsSection').then((mod) => ({ default: mod.MetricsSection })));
 const HealthSection = lazy(() => import('./analytics/HealthSection').then((mod) => ({ default: mod.HealthSection })));
 const CostsSection = lazy(() => import('./analytics/CostsSection').then((mod) => ({ default: mod.CostsSection })));
 const LinksSection = lazy(() => import('./analytics/LinksSection').then((mod) => ({ default: mod.LinksSection })));
@@ -20,6 +21,7 @@ export const ANALYTICS_SECTIONS = [
   { path: '/analytics/links', label: 'Link builder' },
   { path: '/analytics/taxonomy', label: 'Channel taxonomy' },
   { path: '/analytics/health', label: 'Data health' },
+  { path: '/analytics/metrics', label: 'Success metrics' },
 ] as const;
 
 export function AnalyticsPage({ path }: { path: string }) {
@@ -53,6 +55,7 @@ export function AnalyticsPage({ path }: { path: string }) {
             {current?.path === '/analytics/links' && <LinksSection />}
             {current?.path === '/analytics/taxonomy' && <TaxonomySection />}
             {current?.path === '/analytics/health' && <HealthSection />}
+            {current?.path === '/analytics/metrics' && <MetricsSection />}
           </>
         )}
       </Suspense>
