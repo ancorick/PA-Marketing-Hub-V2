@@ -1,10 +1,10 @@
 import type { ChannelId } from './fields.js';
 
 /**
- * utm_source / utm_medium → channel of the 9.3 taxonomy (AUD-20, Flow A). The same table seeds the
- * Channel settings in phase 3 (ANL-03), where unmatched values are queued for review.
+ * Built-in utm_medium → channel rules of the 9.3 taxonomy (AUD-20, Flow A). Staff rules and the review
+ * queue for unmatched values are in analytics/taxonomy.ts (ANL-03).
  */
-const BY_MEDIUM: Record<string, ChannelId> = {
+export const BY_MEDIUM: Record<string, ChannelId> = {
   paid_social: 'paid_social',
   paidsocial: 'paid_social',
   social: 'organic_social',

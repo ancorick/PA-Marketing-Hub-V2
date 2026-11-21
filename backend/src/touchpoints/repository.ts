@@ -6,7 +6,8 @@ export const TOUCHPOINT_TYPES = ['visit', 'form', 'click', 'open', 'registration
 export type TouchpointType = (typeof TOUCHPOINT_TYPES)[number];
 
 export type Touchpoint = Omit<TouchpointRow, 'type'> & { type: TouchpointType };
-export type NewTouchpoint = Pick<Touchpoint, 'contactId' | 'channel' | 'campaign' | 'type' | 'occurredAt' | 'sourceSystem' | 'sourceRef'>;
+export type NewTouchpoint = Pick<Touchpoint, 'contactId' | 'channel' | 'campaign' | 'type' | 'occurredAt' | 'sourceSystem' | 'sourceRef'> &
+  Partial<Pick<Touchpoint, 'utmSource' | 'utmMedium'>>;
 
 /** Touchpoints (PRD 12.1): the raw material of attribution (9.4) and the contact timeline (AUD-16). */
 export class TouchpointRepository {

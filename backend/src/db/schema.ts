@@ -221,6 +221,9 @@ export const touchpoints = pgTable(
     sourceSystem: text('source_system').notNull(),
     /** ID or URL in the source system, for idempotent re-imports. */
     sourceRef: text('source_ref'),
+    /** Campaign parameters as received, so a later taxonomy rule can map an unmapped touchpoint (ANL-03). */
+    utmSource: text('utm_source'),
+    utmMedium: text('utm_medium'),
     ...timestamps,
   },
   (table) => [
@@ -866,4 +869,42 @@ export const adSpendDaily = pgTable(
     uniqueIndex('ad_spend_daily_key').on(table.platform, table.platformCampaignId, table.date),
     index('ad_spend_daily_channel_idx').on(table.channel, table.date),
   ],
+);
+
+/**
+ * Channel taxonomy rules (PRD 9.3, ANL-03): settings that map campaign parameters or CRM channel labels to a
+ * channel. Built-in rules live in code; these are added by staff, usually when resolving an unmapped value.
+ */
+export const channelRules = pgTable(
+  'channel_rules',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** source_medium ("instagram/paid_social") | medium | source | crm_label */
+    kind: text('kind').notNull(),
+    value: text('value').notNull(),
+    channel: text('channel').notNull(),
+    createdBy: text('created_by').notNull(),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex('channel_rules_key').on(table.kind, table.value)],
+);
+
+/** UnmappedValue (PRD 12.3): the taxonomy review queue, never silently folded into "other". */
+export const unmappedValues = pgTable(
+  'unmapped_values',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    source: text('source').notNull(),
+    /** utm (value "source / medium") | crm_label */
+    field: text('field').notNull(),
+    value: text('value').notNull(),
+    firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull(),
+    count: integer('count').notNull().default(1),
+    resolvedChannelId: text('resolved_channel_id'),
+    resolvedBy: text('resolved_by'),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex('unmapped_values_key').on(table.source, table.field, table.value)],
 );

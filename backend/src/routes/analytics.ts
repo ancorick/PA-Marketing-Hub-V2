@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { CsvRowError, type AnalyticsPipeline } from '../analytics/pipeline.js';
+import { RULE_KINDS, TaxonomyError, type ChannelTaxonomy } from '../analytics/taxonomy.js';
 import { requireRole } from '../auth/staff.js';
 import type { CoreEngineClient } from '../integrations/core-engine/contract.js';
 
@@ -9,12 +10,57 @@ const rerunBody = z
   .object({ from: day, to: day, mode: z.enum(['pull', 'rebuild']).default('pull') })
   .refine((value) => value.from <= value.to, { message: 'from must not be after to', path: ['to'] })
   .refine((value) => Date.parse(value.to) - Date.parse(value.from) <= 400 * 86_400_000, { message: 'At most 400 days at a time', path: ['to'] });
+const ruleBody = z.object({ kind: z.enum(RULE_KINDS), value: z.string().trim().min(1).max(200), channel: z.string() });
+const resolveBody = z.object({ channel: z.string() });
+const idParams = z.object({ id: z.string().uuid() });
 const csvBody = z.object({ platform: z.enum(['meta_ads', 'google_ads']), csv: z.string().min(1).max(5_000_000) });
 
 /** Analytics pipeline (PRD 9.1, 9.2): re-runs of a date range (admin) and the ad spend CSV fallback. */
-export async function analyticsRoutes(app: FastifyInstance, { pipeline, coreEngine }: { pipeline: AnalyticsPipeline; coreEngine: Pick<CoreEngineClient, 'verifyStaffToken'> }) {
+export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy, coreEngine }: { pipeline: AnalyticsPipeline; taxonomy: ChannelTaxonomy; coreEngine: Pick<CoreEngineClient, 'verifyStaffToken'> }) {
   const admin = requireRole(coreEngine, ['admin']);
   const costs = requireRole(coreEngine, ['admin', 'marketing_manager']);
+  const marketing = requireRole(coreEngine, ['admin', 'marketing_manager', 'editor']);
+  const invalid = (reply: { code: (n: number) => { send: (b: unknown) => unknown } }, error: z.ZodError) =>
+    reply.code(400).send({ error: 'invalid_request', message: error.issues[0]?.message, field: error.issues[0]?.path.join('.') });
+  const taxonomyError = (reply: { code: (n: number) => { send: (b: unknown) => unknown } }, error: unknown) => {
+    if (error instanceof TaxonomyError) return reply.code(error.field === 'id' ? 404 : 400).send({ error: error.field === 'id' ? 'not_found' : 'invalid_request', message: error.message, field: error.field });
+    throw error;
+  };
+
+  // Channel taxonomy (9.3, ANL-03): marketing staff see it; managers and admins change it.
+  app.get('/api/analytics/taxonomy', { preHandler: marketing }, async () => ({
+    channels: taxonomy.channels(),
+    rules: await taxonomy.rules(),
+    unmapped: await taxonomy.unmapped({ includeResolved: true }),
+  }));
+
+  app.post('/api/analytics/taxonomy/rules', { preHandler: costs }, async (request, reply) => {
+    const body = ruleBody.safeParse(request.body);
+    if (!body.success) return invalid(reply, body.error);
+    try {
+      return reply.code(201).send(await taxonomy.addRule(body.data, request.staff!.userId));
+    } catch (error) {
+      return taxonomyError(reply, error);
+    }
+  });
+
+  app.delete('/api/analytics/taxonomy/rules/:id', { preHandler: costs }, async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    if (!params.success || !(await taxonomy.deleteRule(params.data.id))) return reply.code(404).send({ error: 'not_found', message: 'Unknown rule (built-in rules cannot be deleted)' });
+    return reply.code(204).send();
+  });
+
+  app.post('/api/analytics/unmapped/:id/resolve', { preHandler: costs }, async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    if (!params.success) return reply.code(404).send({ error: 'not_found', message: 'Unknown value' });
+    const body = resolveBody.safeParse(request.body);
+    if (!body.success) return invalid(reply, body.error);
+    try {
+      return await taxonomy.resolve(params.data.id, body.data.channel, request.staff!.userId);
+    } catch (error) {
+      return taxonomyError(reply, error);
+    }
+  });
 
   app.post('/api/analytics/pipeline/:source/rerun', { preHandler: admin }, async (request, reply) => {
     const { source } = request.params as { source: string };

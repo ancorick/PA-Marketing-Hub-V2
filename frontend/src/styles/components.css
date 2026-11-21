@@ -2316,3 +2316,36 @@ th[aria-sort='descending'] .sort-btn {
 .edit-after {
   background: var(--color-success-soft);
 }
+
+/* ---------- Section sub-navigation (Analytics) ---------- */
+.subnav {
+  margin-block-end: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.subnav .segmented__btn {
+  padding: 0 var(--space-3);
+  min-height: 2.25rem;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.subnav .segmented__btn[aria-current='page'] {
+  background: var(--color-secondary);
+  color: var(--color-on-secondary);
+}
+
+.form-row--end {
+  align-items: end;
+}
+
+.cluster--nowrap {
+  flex-wrap: nowrap;
+}
+
+.select--sm {
+  width: auto;
+  min-height: 2.25rem;
+  padding-block: 0;
+  font-size: var(--text-sm);
+}

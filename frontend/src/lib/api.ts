@@ -716,3 +716,31 @@ export const issueReport = (id: string) => apiFetch<IssueReport>(`${issuePath(id
 export type ArchiveEntry = { slug: string; subject: string | null; edition: string; language: Language; sentAt: string | null };
 export const archiveList = (language?: Language) => publicFetch<{ issues: ArchiveEntry[] }>(`/api/public/newsletter${language ? `?language=${language}` : ''}`);
 export const archiveIssue = (slug: string) => publicFetch<ArchiveEntry & { html: string }>(`/api/public/newsletter/${encodeURIComponent(slug)}`);
+
+/* ---------- Analytics: channel taxonomy (ANL-03) ---------- */
+
+export type RuleKind = 'source_medium' | 'medium' | 'source' | 'crm_label';
+export type ChannelRule = { id: string | null; kind: RuleKind; value: string; channel: string; builtIn: boolean; createdBy: string | null };
+export type UnmappedValue = {
+  id: string;
+  source: string;
+  field: 'utm' | 'crm_label';
+  value: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  count: number;
+  resolvedChannelId: string | null;
+  resolvedBy: string | null;
+  resolvedAt: string | null;
+};
+export type Taxonomy = { channels: Channel[]; rules: ChannelRule[]; unmapped: UnmappedValue[] };
+
+export const getTaxonomy = () => apiFetch<Taxonomy>('/api/analytics/taxonomy');
+export const addChannelRule = (rule: { kind: RuleKind; value: string; channel: string }) =>
+  apiFetch<ChannelRule>('/api/analytics/taxonomy/rules', { method: 'POST', body: JSON.stringify(rule) });
+export const deleteChannelRule = (id: string) => apiFetch<void>(`/api/analytics/taxonomy/rules/${encodeURIComponent(id)}`, { method: 'DELETE' });
+export const resolveUnmapped = (id: string, channel: string) =>
+  apiFetch<{ value: UnmappedValue; remapped: { webTraffic: number; touchpoints: number; contacts: number } }>(`/api/analytics/unmapped/${encodeURIComponent(id)}/resolve`, {
+    method: 'POST',
+    body: JSON.stringify({ channel }),
+  });

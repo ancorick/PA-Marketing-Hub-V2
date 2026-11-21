@@ -1,7 +1,7 @@
 import type { ConsentService } from '../consent/service.js';
 import { findWording, type Topic } from '../consent/wordings.js';
 import { isDisposable, type MailDomainChecker } from '../contacts/address-check.js';
-import { channelFromUtm } from '../contacts/channels.js';
+import type { ChannelTaxonomy } from '../analytics/taxonomy.js';
 import { ContactFieldError, normalizeCampaign, normalizeEmail, normalizeName } from '../contacts/fields.js';
 import { DuplicateContactError, type Contact, type ContactRepository } from '../contacts/repository.js';
 import type { ContactService } from '../contacts/service.js';
@@ -66,6 +66,8 @@ type SignupServiceDeps = {
   links: ContactLinks;
   signer: LinkSigner;
   crm: Pick<NavigatorCrmClient, 'createLead'>;
+  /** utm → channel; unknown parameters are queued for review, not folded into a default (ANL-03). */
+  taxonomy: Pick<ChannelTaxonomy, 'mapUtm'>;
   mailChecker: MailDomainChecker;
   mail: { from: string; postalAddress: string };
   logger: { warn: (obj: object, msg: string) => void; error: (obj: object, msg: string) => void };
@@ -92,7 +94,7 @@ export class SignupService {
       if (!wording || wording.topic !== topic) throw new ContactFieldError('consent', `Unknown consent wording ${wordingVersion} for ${topic}`);
     }
 
-    const channel = channelFromUtm(input.utmSource, input.utmMedium);
+    const channel = await this.deps.taxonomy.mapUtm(input.utmSource, input.utmMedium, 'website_form');
     const campaign = safeCampaign(input.utmCampaign);
     const contact = await this.findOrCreate(email, input, channel, campaign);
 
@@ -116,6 +118,8 @@ export class SignupService {
       occurredAt: this.now(),
       sourceSystem: input.form === 'social_lead_form' ? 'social_lead_form' : 'website',
       sourceRef: input.pageUrl ?? null,
+      utmSource: input.utmSource?.trim().slice(0, 200) || null,
+      utmMedium: input.utmMedium?.trim().slice(0, 200) || null,
     });
 
     if (input.wantsToApply || input.courseInterest) {
@@ -125,7 +129,8 @@ export class SignupService {
           firstName: normalizeName(input.firstName) ?? '',
           lastName: normalizeName(input.lastName) ?? '',
           ...(input.courseInterest && { courseInterest: input.courseInterest }),
-          channel,
+          // The CRM needs a label; an unmapped one is resolved in Marketing Hub's review queue.
+          channel: channel ?? 'unmapped',
           ...(campaign && { campaign }),
         });
       } catch (error) {
@@ -158,7 +163,7 @@ export class SignupService {
     if (accepts === false) throw new ContactFieldError('email', 'This email domain cannot receive mail; check the address');
   }
 
-  private async findOrCreate(email: string, input: SignupInput, channel: string, campaign: string | null): Promise<Contact> {
+  private async findOrCreate(email: string, input: SignupInput, channel: string | null, campaign: string | null): Promise<Contact> {
     const existing = await this.deps.contactRepository.findByEmail(email);
     if (existing) {
       // Never overwrite what is known (first touch, source); only fill empty names.

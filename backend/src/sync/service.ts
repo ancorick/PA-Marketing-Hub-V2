@@ -1,7 +1,7 @@
 import { and, eq, gte, isNotNull, lte } from 'drizzle-orm';
 import type { ConsentService } from '../consent/service.js';
 import { CHANNEL_IDS, normalizeName, normalizePhone, type ChannelId, type ContactType } from '../contacts/fields.js';
-import { channelFromUtm } from '../contacts/channels.js';
+import type { ChannelTaxonomy } from '../analytics/taxonomy.js';
 import type { Contact, ContactRepository } from '../contacts/repository.js';
 import type { AppPgDatabase } from '../db/client.js';
 import { contacts, outcomes, touchpoints } from '../db/schema.js';
@@ -28,16 +28,6 @@ const STAGE_TYPE: Record<CrmStage, ContactType> = {
 const EPOCH = new Date(0);
 const MINUTE = 60_000;
 
-/** CRM channel labels → taxonomy; null = unmapped, shown for review in phase 3 (ANL-03). */
-function channelFromLabel(label: string | null): ChannelId | null {
-  if (!label) return null;
-  const value = label.trim().toLowerCase();
-  if ((CHANNEL_IDS as string[]).includes(value)) return value as ChannelId;
-  if (value === 'website' || value === 'web' || value === 'site') return 'search_website';
-  const mapped = channelFromUtm(value, value);
-  return mapped === 'search_website' ? null : mapped;
-}
-
 type SyncDeps = {
   db: AppPgDatabase;
   contacts: Pick<ContactRepository, 'findByEmail' | 'findByCorePersonId' | 'insert' | 'update'>;
@@ -45,6 +35,8 @@ type SyncDeps = {
   coreEngine: Pick<CoreEngineClient, 'listPeopleChangedSince' | 'listOutcomesSince' | 'addMarketingTouches'>;
   crm: Pick<NavigatorCrmClient, 'listLeadsChangedSince' | 'listStageChangesSince'>;
   alumni: Pick<AlumniTrackerClient, 'listEmploymentChangedSince' | 'listReferralsSince'>;
+  /** CRM channel labels → taxonomy; unknown labels are queued for review (ANL-03). */
+  taxonomy: Pick<ChannelTaxonomy, 'mapCrmLabel'>;
 };
 
 /**
@@ -258,6 +250,7 @@ export class SyncService {
       (lead.corePersonId ? await this.deps.contacts.findByCorePersonId(lead.corePersonId) : null) ??
       (await this.deps.contacts.findByEmail(email));
     const actor = 'sync:navigator_crm';
+    const leadChannel = await this.deps.taxonomy.mapCrmLabel(lead.sourceChannel);
     const crmFields = { crmLeadId: lead.id, crmStage: lead.stage, selfReportedSource: lead.selfReportedSource };
     if (!contact) {
       const created = await this.deps.contacts.insert(
@@ -269,7 +262,7 @@ export class SyncService {
           phone: safePhone(lead.phone),
           language: 'hy',
           type: STAGE_TYPE[lead.stage],
-          sourceChannel: channelFromLabel(lead.sourceChannel),
+          sourceChannel: leadChannel,
           sourceCampaign: lead.sourceCampaign,
           firstTouchAt: new Date(lead.createdAt),
           tags: [],
@@ -285,7 +278,7 @@ export class SyncService {
       ...(contact.selfReportedSource !== lead.selfReportedSource && { selfReportedSource: lead.selfReportedSource }),
       // A Core Engine link decides the type; otherwise the CRM stage does.
       ...(!contact.corePersonId && contact.type !== STAGE_TYPE[lead.stage] && { type: STAGE_TYPE[lead.stage] }),
-      ...(!contact.sourceChannel && channelFromLabel(lead.sourceChannel) && { sourceChannel: channelFromLabel(lead.sourceChannel) }),
+      ...(!contact.sourceChannel && leadChannel && { sourceChannel: leadChannel }),
       ...(new Date(lead.createdAt) < contact.firstTouchAt && { firstTouchAt: new Date(lead.createdAt) }),
     };
     if (Object.keys(changes).length === 0) return contact;

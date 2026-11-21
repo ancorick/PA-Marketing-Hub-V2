@@ -57,6 +57,7 @@ import { domainRoutes } from './routes/domains.js';
 import { healthRoutes } from './routes/health.js';
 import { analyticsRoutes } from './routes/analytics.js';
 import { AnalyticsPipeline } from './analytics/pipeline.js';
+import { ChannelTaxonomy } from './analytics/taxonomy.js';
 import type { AnalyticsSources } from './analytics/sources/contract.js';
 import { createMockAnalyticsSources } from './analytics/sources/mock.js';
 
@@ -89,6 +90,7 @@ declare module 'fastify' {
     publishing: NewsletterPublishing;
     uploads: UploadService;
     pipeline: AnalyticsPipeline;
+    taxonomy: ChannelTaxonomy;
   }
 }
 
@@ -192,6 +194,8 @@ export async function buildApp({
   app.decorate('links', links);
   const touchpoints = new TouchpointRepository(database.db);
   app.decorate('touchpoints', touchpoints);
+  const taxonomy = new ChannelTaxonomy(database.db);
+  app.decorate('taxonomy', taxonomy);
   const sunset = new SunsetPolicy({ db: database.db, mailFrom: config.mailFrom });
   app.decorate('sunset', sunset);
   const signup = new SignupService({
@@ -203,6 +207,7 @@ export async function buildApp({
     links,
     signer,
     crm: resolvedIntegrations.navigatorCrm,
+    taxonomy,
     mailChecker: mailChecker ?? createMailDomainChecker(),
     mail: { from: config.mailFrom, postalAddress: config.postalAddress },
     logger: app.log,
@@ -248,6 +253,7 @@ export async function buildApp({
     coreEngine: resolvedIntegrations.coreEngine,
     crm: resolvedIntegrations.navigatorCrm,
     alumni: resolvedIntegrations.alumniTracker,
+    taxonomy,
   });
   for (const job of sync.jobs()) jobs.register(job);
   app.decorate('jobs', jobs);
@@ -349,10 +355,14 @@ export async function buildApp({
   });
   await app.register(newsletterRoutes, { newsletter, editor: issueEditor, publishing, uploads: uploadService, seedList: config.seedList, coreEngine: resolvedIntegrations.coreEngine });
   const merge = new MergeService({ db: database.db, coreEngine: resolvedIntegrations.coreEngine, logger: app.log });
-  const pipeline = new AnalyticsPipeline({ db: database.db, sources: analyticsSources ?? createMockAnalyticsSources() });
+  const pipeline = new AnalyticsPipeline({
+    db: database.db,
+    sources: analyticsSources ?? createMockAnalyticsSources(),
+    mapChannel: (source, medium) => taxonomy.mapUtm(source, medium, 'website_analytics'),
+  });
   app.decorate('pipeline', pipeline);
   for (const job of pipeline.jobs()) jobs.register(job);
-  await app.register(analyticsRoutes, { pipeline, coreEngine: resolvedIntegrations.coreEngine });
+  await app.register(analyticsRoutes, { pipeline, taxonomy, coreEngine: resolvedIntegrations.coreEngine });
   await app.register(importRoutes, { imports, duplicates, merge, contacts, contactRepository, coreEngine: resolvedIntegrations.coreEngine });
 
   return app;

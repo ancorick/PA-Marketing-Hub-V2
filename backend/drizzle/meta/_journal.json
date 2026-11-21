@@ -148,6 +148,13 @@
       "when": 1795230661950,
       "tag": "0020_analytics_pipeline",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795230918557,
+      "tag": "0021_channel_taxonomy",
+      "breakpoints": true
     }
   ]
 }
