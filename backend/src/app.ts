@@ -23,6 +23,7 @@ import { sendRoutes } from './routes/sends.js';
 import { webhookRoutes } from './routes/webhooks.js';
 import { EventHubService } from './eventhub/service.js';
 import { EventsView } from './eventhub/events-view.js';
+import { ManualEvents } from './eventhub/manual.js';
 import { eventRoutes } from './routes/events.js';
 import { alertRoutes } from './routes/alerts.js';
 import { privacyRoutes } from './routes/privacy.js';
@@ -396,7 +397,11 @@ export async function buildApp({
   const costs = new CostService(database.db, sources.rates);
   const eventHub = new EventHubService({ db: database.db, contacts, contactRepository, consent, touchpoints, taxonomy, costs, logger: app.log });
   app.decorate('eventHub', eventHub);
-  await app.register(eventRoutes, { view: new EventsView(database.db), coreEngine: resolvedIntegrations.coreEngine });
+  await app.register(eventRoutes, {
+    view: new EventsView(database.db),
+    manual: new ManualEvents({ db: database.db, eventHub, consent, touchpoints }),
+    coreEngine: resolvedIntegrations.coreEngine,
+  });
   await app.register(webhookRoutes, { events: espEvents, secret: config.espWebhookSecret, eventHub, eventHubSecret: config.eventHubWebhookSecret });
   app.decorate('costs', costs);
   const attribution = new AttributionService(database.db);

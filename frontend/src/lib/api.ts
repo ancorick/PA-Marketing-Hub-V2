@@ -962,3 +962,19 @@ export type EventRow = {
 };
 export type EventTotals = Omit<EventRow, 'id' | 'externalId' | 'title' | 'type' | 'startsAt' | 'language' | 'public' | 'source' | 'campaign'>;
 export const listEvents = (period: Period) => apiFetch<{ period: Period; shared: boolean; events: EventRow[]; totals: EventTotals }>(`/api/events?${periodQuery(period)}`);
+
+export type ManualEventInput = {
+  title: string;
+  type: string;
+  startsAt: string;
+  language: 'hy' | 'en' | 'ru' | null;
+  public: boolean;
+  registrationUrl: string | null;
+  registrationOpen: boolean;
+};
+export const createManualEvent = (event: ManualEventInput) => apiFetch<{ id: string }>('/api/events', { method: 'POST', body: JSON.stringify(event) });
+export const importAttendees = (id: string, csv: string, attendedByDefault: boolean) =>
+  apiFetch<{ rows: number; newRegistrations: number; attended: number; consentRecords: number }>(`/api/events/${encodeURIComponent(id)}/attendees/csv`, {
+    method: 'POST',
+    body: JSON.stringify({ csv, attendedByDefault }),
+  });

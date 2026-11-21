@@ -1,20 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { listEvents, type EventRow } from '../lib/api';
 import { formatAmd, formatDate } from '../lib/format';
+import { EVENT_TYPE_LABEL } from '../lib/events';
 import { useStaffRole } from '../lib/session';
 import { AccessNotice, accessProblem, Alert, DataTable, PageHeader, StatTile, StatusBadge, type Column } from '../ui';
 import { CountCell, countCsv, countText, countValue } from './analytics/numbers';
 import { PeriodPicker, usePeriod } from './analytics/period';
+import { ManualEvents } from './ManualEvents';
 
-export const EVENT_TYPE_LABEL: Record<string, string> = {
-  open_day: 'Open day',
-  workshop: 'Workshop',
-  info_session: 'Info session',
-  meetup: 'Meetup',
-  graduation: 'Graduation',
-  guest_visit: 'Guest visit',
-  other: 'Other',
-};
 
 const tile = (value: EventRow['leads']) => (value === 'fewer_than_3' ? null : countText(value));
 
@@ -106,6 +99,7 @@ export function EventsPage() {
               }
             />
           </section>
+          {['editor', 'marketing_manager', 'admin'].includes(role) && <ManualEvents events={data.events} />}
         </div>
       )}
     </>
