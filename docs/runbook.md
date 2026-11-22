@@ -63,7 +63,7 @@ unsubscribe links in email already sent: avoid it unless the secret leaked.
 
 Neon keeps daily backups and point-in-time restore (the history depends on the plan). Test once per milestone:
 create a branch from yesterday in Neon, point a staging backend at it (`DATABASE_URL`), open the app and check a
-few contacts and the last send. Record the date of the test in `docs/progress.md` (NFR-S9).
+few contacts and the last send. Record the date of the test in the project log (NFR-S9).
 
 ## Plans
 

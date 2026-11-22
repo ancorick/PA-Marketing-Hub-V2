@@ -5,3 +5,12 @@ dist/
 !.env.example
 *.log
 .DS_Store
+
+# Private working documents: kept locally, never published
+CLAUDE.md
+docs/PLAYBOOK.md
+docs/RESTRUCTURE.md
+docs/progress.md
+docs/prd.md
+docs/brief.md
+docs/references/

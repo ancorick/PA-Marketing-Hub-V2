@@ -2,15 +2,15 @@
 
 One place for the Academy's marketing: a deduplicated contact base with consent (Audience), campaign email
 and the monthly newsletter from authenticated domains (Email, Newsletter), analytics that measure channels by
-who enrolls and gets hired (Analytics), and a ready slot for Event Hub (Project 13). Requirements: `docs/prd.md`.
+who enrolls and gets hired (Analytics), and a ready slot for Event Hub (Project 13). Built for the Picsart Academy
+Student Fellowship Program; the requirements document is kept outside this repository.
 
 | Part | Stack | Hosting |
 |---|---|---|
 | `frontend/` | React 19, Vite, TypeScript, TanStack Query; design system in `frontend/design-system/` | Netlify (`netlify.toml`) |
 | `backend/` | Node 24, Fastify 5, TypeScript, Zod, Drizzle ORM | Render (`render.yaml`), Postgres on Neon (Frankfurt) |
 
-More: [architecture](docs/architecture.md) · [runbook](docs/runbook.md) · [progress and open items](docs/progress.md) ·
-contracts in `backend/docs/` (Event Hub, Command Center, sign-up form, personal data inventory).
+More: [architecture](docs/architecture.md) · [runbook](docs/runbook.md) · contracts in `backend/docs/` (Event Hub, Command Center, sign-up form, personal data inventory).
 
 ## Run it locally
 
@@ -29,7 +29,8 @@ npm run dev
 ```
 
 Sign-in uses mock staff tokens until the Core Engine (Project 1) is connected: the role switcher in the header
-chooses viewer, editor, marketing manager, admin or leadership.
+chooses viewer, editor, marketing manager, admin or leadership. The interface is in Armenian, English and Russian,
+with dark and light themes.
 
 Demo data: start the backend with `DEMO_SEED=true npm run dev` (or set it in `backend/.env`) to load a synthetic
 data set into an empty database: about 1,800 made-up contacts in hy/en/ru over 18 months, costs and exchange
@@ -40,7 +41,7 @@ the flag at start-up. With the embedded database the set is rebuilt on every sta
 ## Checks
 
 ```sh
-cd backend && npm run typecheck && npm test && npm run build   # ~250 tests, embedded Postgres per test file
+cd backend && npm run typecheck && npm test && npm run build   # ~270 tests, embedded Postgres per test file
 cd frontend && npm run build                                    # type check + production bundle
 ```
 
@@ -54,6 +55,6 @@ addresses, and the Claude API key for the newsletter writing assistant.
 
 ## What still needs people
 
-See "Что нужно от пользователя" under "Ручные задачи пользователя" in `docs/progress.md`: the email service and DNS for the sending domain, API
+Before real sending and reporting: the email service and DNS for the sending domain, API
 access to ad and analytics platforms, the real APIs of Projects 1, 2, 11 and 13, deploy on paid always-on plans,
-legal review and answers to the open questions in PRD 16.3.
+legal review and answers to the open questions of the requirements (PRD 16.3).
