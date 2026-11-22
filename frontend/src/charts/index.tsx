@@ -8,7 +8,9 @@ import {
   LineChart as RLineChart,
   Pie,
   PieChart,
+  Rectangle,
   Tooltip,
+  type BarShapeProps,
   XAxis,
   YAxis,
 } from 'recharts';
@@ -97,12 +99,22 @@ export function BarChart<Row extends Record<string, unknown>>({
   const animate = useAnimate();
   const horizontal = layout === 'horizontal';
   const rows = horizontal ? Math.max(data.length, 1) : 0;
+  // Rounded data ends (4px), at the far end from the baseline.
+  const ends: [number, number, number, number] = horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0];
+  // For each row, the last series with a value: the segment that ends the stack.
+  const topOf = data.map((row) => series.reduce((top, item, i) => (Number(row[item.key] ?? 0) > 0 ? i : top), -1));
+  // Each category needs room for all its bars; long names are shortened on the axis, the tooltip has them whole.
+  const rowHeight = series.length > 1 && !stacked ? 18 * series.length + 14 : 34;
+  const shortName = (value: unknown) => {
+    const text = String(value);
+    return text.length > 24 ? `${text.slice(0, 23)}…` : text;
+  };
   return (
     <div className="chart-frame">
       <ChartLegend series={series} />
       <RBarChart
         responsive
-        style={{ width: '100%', height: horizontal ? Math.max(height, rows * 34 + 24) : height }}
+        style={{ width: '100%', height: horizontal ? Math.max(height, rows * rowHeight + 24) : height }}
         data={data}
         layout={horizontal ? 'vertical' : 'horizontal'}
         margin={{ top: 8, right: horizontal ? 48 : 8, bottom: 0, left: 0 }}
@@ -114,7 +126,7 @@ export function BarChart<Row extends Record<string, unknown>>({
         {horizontal ? (
           <>
             <XAxis type="number" tick={AXIS} axisLine={false} tickLine={false} tickFormatter={format} />
-            <YAxis type="category" dataKey={categoryKey as never} tick={AXIS} axisLine={false} tickLine={false} width={140} />
+            <YAxis type="category" dataKey={categoryKey as never} tick={AXIS} axisLine={false} tickLine={false} width={160} tickFormatter={shortName} />
           </>
         ) : (
           <>
@@ -130,7 +142,12 @@ export function BarChart<Row extends Record<string, unknown>>({
             name={item.label}
             fill={colorOf(item, index)}
             stackId={stacked ? 'stack' : undefined}
-            radius={horizontal ? [0, 6, 6, 0] : [6, 6, 0, 0]}
+            radius={stacked ? 0 : ends}
+            // Stacks: a 2px gap in the surface colour between segments, and only the top segment of each
+            // column is rounded (the data end), never the joints inside the stack.
+            shape={stacked ? (props: BarShapeProps) => <Rectangle {...(props as object)} radius={topOf[props.index] === index ? ends : 0} /> : undefined}
+            stroke={stacked ? 'var(--color-surface)' : undefined}
+            strokeWidth={stacked ? 1 : 0}
             maxBarSize={horizontal ? 22 : 40}
             isAnimationActive={animate}
           >

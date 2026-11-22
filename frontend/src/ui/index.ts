@@ -4,7 +4,7 @@ export { AppShell, PageHeader, SectionTitle } from './AppShell';
 export { Button } from './Button';
 export { ConfirmDialog } from './ConfirmDialog';
 export { CopyButton } from './CopyButton';
-export { DataTable, tableCsv, type Column } from './DataTable';
+export { DataTable, downloadCsv, tableCsv, type Column } from './DataTable';
 export { EmptyState } from './EmptyState';
 export { SelectField, TextField } from './Field';
 export { Skeleton, SkeletonCard, SkeletonTile } from './Skeleton';

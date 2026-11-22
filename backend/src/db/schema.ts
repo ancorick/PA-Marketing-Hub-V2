@@ -1020,3 +1020,26 @@ export const staffActivity = pgTable(
   },
   (table) => [primaryKey({ columns: [table.userId, table.week] })],
 );
+
+/**
+ * Campaign (PRD 12.3, RESTRUCTURE R3): the campaign list of Campaigns & links with its channel, dates and
+ * budget. The key is the utm_campaign shared with touchpoints, ad spend and manual costs, so results join by it.
+ * Campaigns seen only in links, ad spend or costs are listed too; saving one here gives it a name and budget.
+ */
+export const marketingCampaigns = pgTable(
+  'marketing_campaigns',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    key: text('key').notNull(),
+    name: text('name').notNull(),
+    channel: text('channel').notNull(),
+    dateFrom: date('date_from'),
+    dateTo: date('date_to'),
+    /** Planned spend in AMD; null when no budget was set. */
+    budgetAmd: integer('budget_amd'),
+    createdBy: text('created_by').notNull(),
+    updatedBy: text('updated_by').notNull(),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex('marketing_campaigns_key').on(table.key)],
+);

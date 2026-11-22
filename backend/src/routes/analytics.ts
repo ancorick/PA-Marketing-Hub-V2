@@ -2,7 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { CsvRowError, type AnalyticsPipeline } from '../analytics/pipeline.js';
 import { RULE_KINDS, TaxonomyError, type ChannelTaxonomy } from '../analytics/taxonomy.js';
-import { ATTRIBUTION_MODELS, MODEL_LABEL, STAGES, type AttributionService } from '../analytics/attribution.js';
+import { ATTRIBUTION_MODELS, MODEL_LABEL, STAGES, VIEWS, type AttributionService } from '../analytics/attribution.js';
+import { CampaignError, type CampaignRegistry } from '../analytics/campaigns.js';
+import { RateError, type StoredExchangeRates } from '../analytics/rates.js';
 import { suppress, type OverviewService } from '../analytics/overview.js';
 import type { DetailService } from '../analytics/detail.js';
 import type { DataHealth } from '../analytics/health.js';
@@ -10,7 +12,7 @@ import type { SelfReportedService } from '../analytics/self-reported.js';
 import type { ProgramMetrics } from '../analytics/metrics.js';
 import type { StaffSession } from '../integrations/core-engine/contract.js';
 import { COST_CURRENCIES, CostError, type CostService } from '../analytics/costs.js';
-import { CHANNEL_MEDIUM, CHANNEL_SOURCES, LinkBuilderError, type LinkBuilder } from '../analytics/links.js';
+import { CHANNEL_DEFAULT_SOURCE, CHANNEL_GROUP, CHANNEL_MEDIUM, CHANNEL_SOURCES, LinkBuilderError, type LinkBuilder } from '../analytics/links.js';
 import { requireRole } from '../auth/staff.js';
 import { CHANNEL_IDS, CHANNELS } from '../contacts/fields.js';
 import { rateLimit } from '../public/rate-limit.js';
@@ -49,6 +51,16 @@ const attributionQuery = z.object({
   model: z.enum(ATTRIBUTION_MODELS).default('first_touch'),
   by: z.enum(['channel', 'campaign']).default('channel'),
   channel: z.string().max(60).optional(),
+  view: z.enum(VIEWS).default('period'),
+});
+const rateBody = z.object({ currency: z.string().max(3), date: z.string(), rateToAmd: z.number() });
+const campaignBody = z.object({
+  key: z.string().max(100).nullish(),
+  name: z.string().max(300),
+  channel: z.string(),
+  dateFrom: z.string().nullish(),
+  dateTo: z.string().nullish(),
+  budgetAmd: z.number().nullish(),
 });
 const peopleQuery = z.object({
   model: z.enum(ATTRIBUTION_MODELS).default('first_touch'),
@@ -61,8 +73,10 @@ const isShared = (staff: StaffSession | null) => !staff?.roles.some((role) => ro
 const csvBody = z.object({ platform: z.enum(['meta_ads', 'google_ads']), csv: z.string().min(1).max(5_000_000) });
 
 /** Analytics pipeline (PRD 9.1, 9.2): re-runs of a date range (admin) and the ad spend CSV fallback. */
-export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy, links, costs, attribution, overview, detail, health, selfReported, metrics, coreEngine }: {
+export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy, links, costs, attribution, overview, detail, health, selfReported, metrics, rates, campaigns, coreEngine }: {
     pipeline: AnalyticsPipeline;
+    rates: StoredExchangeRates;
+    campaigns: CampaignRegistry;
     taxonomy: ChannelTaxonomy;
     links: LinkBuilder;
     costs: CostService;
@@ -118,7 +132,7 @@ export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy
     if (!options.success) return invalid(reply, options.error);
     // M11: who opens the dashboard each week (first-party, no tracking tools).
     await metrics.recordView(request.staff!.userId, request.staff!.roles[0] ?? 'viewer').catch(() => {});
-    return overview.overview(period.data, options.data.model, isShared(request.staff));
+    return overview.overview(period.data, options.data.model, isShared(request.staff), options.data.view);
   });
 
   // Channel, campaign and cohort views (9.6, ANL-09, ANL-10): aggregates for every role.
@@ -194,7 +208,58 @@ export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy
   app.get('/api/analytics/costs', { preHandler: anyStaff }, async (request, reply) => {
     const query = periodQuery.safeParse(request.query);
     if (!query.success) return invalid(reply, query.error);
-    return { costs: await costs.list(query.data), channels: await costs.channelCosts(query.data), currencies: COST_CURRENCIES };
+    const [list, channels, trend] = await Promise.all([costs.list(query.data), costs.channelCosts(query.data), costs.trend(query.data)]);
+    return { costs: list, channels, trend, currencies: COST_CURRENCIES };
+  });
+
+  // Every cost entry of the period with its source (RESTRUCTURE R3): ad APIs, CSV uploads, manual, Event Hub.
+  app.get('/api/analytics/costs/entries', { preHandler: anyStaff }, async (request, reply) => {
+    const query = periodQuery.safeParse(request.query);
+    if (!query.success) return invalid(reply, query.error);
+    return { entries: await costs.entries(query.data) };
+  });
+
+  // Exchange rates (9.2): stored rates (demo or entered) win; managers and admins enter them.
+  app.get('/api/analytics/rates', { preHandler: anyStaff }, async () => rates.list());
+
+  app.post('/api/analytics/rates', { preHandler: managers }, async (request, reply) => {
+    const body = rateBody.safeParse(request.body);
+    if (!body.success) return invalid(reply, body.error);
+    try {
+      return reply.code(201).send(await rates.save(body.data, request.staff!.userId));
+    } catch (error) {
+      if (error instanceof RateError) return reply.code(400).send({ error: 'invalid_request', message: error.message, field: error.field });
+      throw error;
+    }
+  });
+
+  // Campaign list (9.3, 12.3): the marketing team sees it; managers and admins create campaigns and set budgets.
+  const campaignError = (reply: { code: (n: number) => { send: (b: unknown) => unknown } }, error: unknown) => {
+    if (error instanceof CampaignError) return reply.code(error.field === 'key' && /exists/.test(error.message) ? 409 : 400).send({ error: 'invalid_request', message: error.message, field: error.field });
+    throw error;
+  };
+  app.get('/api/analytics/campaign-registry', { preHandler: marketing }, async () => ({ campaigns: await campaigns.list() }));
+
+  app.post('/api/analytics/campaign-registry', { preHandler: managers }, async (request, reply) => {
+    const body = campaignBody.safeParse(request.body);
+    if (!body.success) return invalid(reply, body.error);
+    try {
+      return reply.code(201).send(await campaigns.save(body.data, request.staff!.userId));
+    } catch (error) {
+      return campaignError(reply, error);
+    }
+  });
+
+  app.put('/api/analytics/campaign-registry/:key', { preHandler: managers }, async (request, reply) => {
+    const key = z.string().regex(/^[a-z0-9][a-z0-9_-]{0,99}$/).safeParse((request.params as { key: string }).key);
+    if (!key.success) return reply.code(404).send({ error: 'not_found', message: 'Unknown campaign' });
+    const body = campaignBody.safeParse(request.body);
+    if (!body.success) return invalid(reply, body.error);
+    try {
+      return await campaigns.save(body.data, request.staff!.userId, key.data);
+    } catch (error) {
+      return campaignError(reply, error);
+    }
   });
 
   app.post('/api/analytics/costs', { preHandler: managers }, async (request, reply) => {
@@ -229,7 +294,7 @@ export async function analyticsRoutes(app: FastifyInstance, { pipeline, taxonomy
   app.get('/api/analytics/links', { preHandler: marketing }, async () => ({
     links: await links.list(),
     campaigns: await links.campaigns(),
-    channels: CHANNELS.map((channel) => ({ ...channel, medium: CHANNEL_MEDIUM[channel.id], sources: CHANNEL_SOURCES[channel.id] })),
+    channels: CHANNELS.map((channel) => ({ ...channel, medium: CHANNEL_MEDIUM[channel.id], sources: CHANNEL_SOURCES[channel.id], group: CHANNEL_GROUP[channel.id], defaultSource: CHANNEL_DEFAULT_SOURCE[channel.id] })),
   }));
 
   app.post('/api/analytics/links', { preHandler: marketing }, async (request, reply) => {

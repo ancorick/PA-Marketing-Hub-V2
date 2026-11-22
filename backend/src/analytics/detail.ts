@@ -207,6 +207,8 @@ export class DetailService {
           costPerEnrolled: this.costPer(costAmd, values.enrolled, shared),
           // Hiring lags enrollment by a year or more: never a final number before 12 months (ANL-10).
           costPerHired: maturing ? null : this.costPer(costAmd, values.hired, shared),
+          // For a maturing cohort, the cost per hired graduate so far, shown as provisional ("so far").
+          costPerHiredSoFar: maturing ? this.costPer(costAmd, values.hired, shared) : null,
         };
       }),
     );

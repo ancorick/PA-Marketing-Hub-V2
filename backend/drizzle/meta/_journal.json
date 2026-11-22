@@ -190,6 +190,13 @@
       "when": 1795285153912,
       "tag": "0026_staff_activity",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1795305639742,
+      "tag": "0027_marketing_campaigns",
+      "breakpoints": true
     }
   ]
 }

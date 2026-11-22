@@ -3035,3 +3035,113 @@ th[aria-sort='descending'] .sort-btn {
     translate: 24px 0;
   }
 }
+
+/* =====================================================================
+ * MEASURE pages (RESTRUCTURE R3): footnotes, trust callout, rate list, file picker. Tokens only.
+ * ===================================================================== */
+
+/* Footnote under a table or chart: what the numbers include. */
+.note {
+  max-width: 120ch;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.text-xs {
+  font-size: var(--text-xs);
+}
+
+/* Long user content in table cells wraps instead of widening the table. */
+.text-wrap {
+  display: inline-block;
+  min-width: 12rem;
+  max-width: 32rem;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+/* Inset with an icon at the first line ("attribution shows association, not cause"). */
+.callout {
+  align-items: flex-start;
+}
+
+.callout p {
+  font-size: var(--text-sm);
+}
+
+.callout svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-secondary-text);
+}
+
+.cluster--end {
+  align-items: flex-end;
+}
+
+/* Latest exchange rate per currency, with where it came from. */
+.rate-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+
+.rate-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.rate-list__origin {
+  font-size: var(--text-xs);
+}
+
+
+.table--dense th,
+.table--dense td {
+  padding-inline: var(--space-3);
+}
+
+/* A row of metric tiles keeps one height whether or not a tile has a trend line. */
+.grid-12 > .span-3 {
+  display: flex;
+  flex-direction: column;
+}
+
+.grid-12 > .span-3 > * {
+  flex: 1;
+}
+
+.page-notice {
+  margin-block-end: var(--space-5);
+}
+
+.file-input {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+}
+
+.file-input input:focus-visible + .btn {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+.file-input__name {
+  max-width: 16rem;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Segmented filters inside a card header keep each option on one line. */
+.card__header > .segmented {
+  flex: none;
+}
+
+.segmented__btn.nowrap {
+  flex: none;
+  white-space: nowrap;
+}

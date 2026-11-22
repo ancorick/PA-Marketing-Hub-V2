@@ -1,4 +1,4 @@
-import { and, gte, inArray, lt, ne, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, lt, ne, sql } from 'drizzle-orm';
 import type { AppPgDatabase } from '../db/client.js';
 import { contacts, outcomes, touchpoints } from '../db/schema.js';
 import type { DateRange } from './sources/contract.js';
@@ -19,6 +19,12 @@ export type Stage = (typeof STAGES)[number];
 
 /** Touches with a channel nothing maps (ANL-03) and people with no recorded touch at all (R6) stay visible. */
 export const UNMAPPED = 'unmapped';
+/**
+ * Period view: outcomes dated in the range. Cohort view: every outcome so far of the people whose first touch
+ * falls in the range, so cost and outcomes belong to the same people (9.5, RESTRUCTURE §4 View switch).
+ */
+export const VIEWS = ['period', 'cohort'] as const;
+export type View = (typeof VIEWS)[number];
 export const UNATTRIBUTED = 'unattributed';
 
 const LOOKBACK_MS = 365 * 86_400_000;
@@ -73,8 +79,8 @@ export function anchorFor(person: Pick<Person, 'appliedAt' | 'enrolledAt'>, outc
 export class AttributionService {
   constructor(private readonly db: AppPgDatabase) {}
 
-  async byChannel(range: DateRange, model: AttributionModel): Promise<AttributionRow[]> {
-    return this.aggregate(range, model, (c) => c.channel);
+  async byChannel(range: DateRange, model: AttributionModel, view: View = 'period'): Promise<AttributionRow[]> {
+    return this.aggregate(range, model, (c) => c.channel, view);
   }
 
   async byCampaign(range: DateRange, model: AttributionModel, channel?: string): Promise<AttributionRow[]> {
@@ -94,9 +100,18 @@ export class AttributionService {
   }
 
   /** People with an outcome in the period: each counted once per stage, at their first outcome of that stage. */
-  async outcomesIn(range: DateRange): Promise<{ contactId: string | null; type: Stage; at: Date }[]> {
+  async outcomesIn(range: DateRange, view: View = 'period'): Promise<{ contactId: string | null; type: Stage; at: Date }[]> {
     const start = new Date(`${range.from}T00:00:00+04:00`);
     const end = new Date(new Date(`${range.to}T00:00:00+04:00`).getTime() + DAY);
+    if (view === 'cohort') {
+      const rows = await this.db
+        .select({ contactId: outcomes.contactId, type: outcomes.type, at: sql<Date>`min(${outcomes.occurredAt})` })
+        .from(outcomes)
+        .innerJoin(contacts, eq(contacts.id, outcomes.contactId))
+        .where(and(gte(contacts.firstTouchAt, start), lt(contacts.firstTouchAt, end), inArray(outcomes.type, [...STAGES])))
+        .groupBy(outcomes.contactId, outcomes.type);
+      return rows.map((row) => ({ contactId: row.contactId, type: row.type as Stage, at: new Date(row.at) }));
+    }
     const rows = await this.db
       .select({ contactId: outcomes.contactId, type: outcomes.type, at: sql<Date>`min(${outcomes.occurredAt})` })
       .from(outcomes)
@@ -107,8 +122,8 @@ export class AttributionService {
   }
 
   /** Visits every credit of every outcome in the period. */
-  async walk(range: DateRange, model: AttributionModel, visit: (outcome: { contactId: string | null; type: Stage; at: Date }, credit: Credit) => void) {
-    const rows = await this.outcomesIn(range);
+  async walk(range: DateRange, model: AttributionModel, visit: (outcome: { contactId: string | null; type: Stage; at: Date }, credit: Credit) => void, view: View = 'period') {
+    const rows = await this.outcomesIn(range, view);
     const people = await this.people([...new Set(rows.map((row) => row.contactId).filter((id): id is string => id !== null))]);
     for (const row of rows) {
       const person = row.contactId ? people.get(row.contactId) : undefined;
@@ -117,15 +132,20 @@ export class AttributionService {
     }
   }
 
-  private async aggregate(range: DateRange, model: AttributionModel, keyOf: (credit: Credit) => string | null): Promise<AttributionRow[]> {
+  private async aggregate(range: DateRange, model: AttributionModel, keyOf: (credit: Credit) => string | null, view: View = 'period'): Promise<AttributionRow[]> {
     const totals = new Map<string, AttributionRow>();
-    await this.walk(range, model, (row, item) => {
-      const key = keyOf(item);
-      if (key === null) return;
-      const total = totals.get(key) ?? { key, channel: item.channel, ...zero() };
-      total[row.type] += item.share;
-      totals.set(key, total);
-    });
+    await this.walk(
+      range,
+      model,
+      (row, item) => {
+        const key = keyOf(item);
+        if (key === null) return;
+        const total = totals.get(key) ?? { key, channel: item.channel, ...zero() };
+        total[row.type] += item.share;
+        totals.set(key, total);
+      },
+      view,
+    );
     // Shares are exact to the hundredth; reports round for display.
     return [...totals.values()].map((row) => ({ ...row, ...Object.fromEntries(STAGES.map((stage) => [stage, Math.round(row[stage] * 100) / 100])) }) as AttributionRow);
   }

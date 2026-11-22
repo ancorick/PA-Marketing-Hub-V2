@@ -1,5 +1,6 @@
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { MODEL_LABEL, type AttributionModel, type Period } from '../../lib/api';
+import { presetRange } from '../../lib/periods';
 import { TextField } from '../../ui';
 
 /** Yerevan date (UTC+4, no daylight saving) as YYYY-MM-DD. */
@@ -29,7 +30,8 @@ function read(): string {
   } catch {
     // storage blocked: keep the in-memory value
   }
-  return cached ?? JSON.stringify(presets().find((preset) => preset.id === 'last_12_months')!.period);
+  // MEASURE pages open on the last full quarter (RESTRUCTURE R3, as in the reference).
+  return cached ?? JSON.stringify(presetRange('last_quarter'));
 }
 
 function write(period: Period) {

@@ -30,11 +30,12 @@ const NewContactPage = lazy(() => import('./pages/ContactPage').then((mod) => ({
 
 /** Route pages of the restructure (RESTRUCTURE R1): former Analytics tabs and new destinations. */
 const Sections = () => import('./pages/SectionPages');
-const CohortsPage = lazy(() => Sections().then((mod) => ({ default: mod.CohortsPage })));
-const CostsPage = lazy(() => Sections().then((mod) => ({ default: mod.CostsPage })));
-const CampaignsLinksPage = lazy(() => Sections().then((mod) => ({ default: mod.CampaignsLinksPage })));
 const CampaignDetailPage = lazy(() => Sections().then((mod) => ({ default: mod.CampaignDetailPage })));
-const DataHealthPage = lazy(() => Sections().then((mod) => ({ default: mod.DataHealthPage })));
+/** MEASURE pages rebuilt in RESTRUCTURE R3. */
+const CohortsPage = lazy(() => import('./pages/measure/CohortsPage').then((mod) => ({ default: mod.CohortsPage })));
+const CostsPage = lazy(() => import('./pages/measure/CostsPage').then((mod) => ({ default: mod.CostsPage })));
+const CampaignsLinksPage = lazy(() => import('./pages/measure/CampaignsLinksPage').then((mod) => ({ default: mod.CampaignsLinksPage })));
+const DataHealthPage = lazy(() => import('./pages/measure/DataHealthPage').then((mod) => ({ default: mod.DataHealthPage })));
 const AudienceHealthPage = lazy(() => Sections().then((mod) => ({ default: mod.AudienceHealthPage })));
 const ChannelPage = lazy(() => Sections().then((mod) => ({ default: mod.ChannelPage })));
 const PeoplePage = lazy(() => Sections().then((mod) => ({ default: mod.PeoplePage })));

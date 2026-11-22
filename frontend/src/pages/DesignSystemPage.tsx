@@ -84,7 +84,7 @@ const CHART_SERIES = [
   { token: '--chart-3', dash: '2 3', name: 'Email' },
   { token: '--chart-4', dash: '8 3 2 3', name: 'Events' },
   { token: '--chart-5', dash: '12 4', name: 'Referral' },
-  { token: '--chart-6', dash: undefined, name: 'Direct' },
+  { token: '--chart-6', dash: undefined, name: 'Other' },
 ] as const;
 
 const FILTERS = [

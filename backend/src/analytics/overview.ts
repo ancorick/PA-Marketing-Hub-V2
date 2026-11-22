@@ -2,7 +2,7 @@ import { and, eq, gte, inArray, isNotNull, lt, sql } from 'drizzle-orm';
 import type { ChannelId } from '../contacts/fields.js';
 import type { AppPgDatabase } from '../db/client.js';
 import { consentRecords, contacts, deliveries, outcomes, sends } from '../db/schema.js';
-import { MODEL_LABEL, STAGES, UNATTRIBUTED, UNMAPPED, type AttributionModel, type AttributionService, type Stage } from './attribution.js';
+import { MODEL_LABEL, STAGES, UNATTRIBUTED, UNMAPPED, type AttributionModel, type AttributionService, type Stage, type View } from './attribution.js';
 import type { CostService } from './costs.js';
 import type { DateRange } from './sources/contract.js';
 
@@ -34,17 +34,22 @@ export type OverviewRow = {
   lead: Count;
   applied: Count;
   enrolled: Count;
+  completed: Count;
   hired: Count;
   costAmd: number;
   costPerLead: number | null;
   costPerEnrolled: number | null;
 };
 
+/** Leads and enrolled students per week (ranges up to 120 days) or month, for the trend line. */
+export type TrendPoint = { start: string; lead: Count; enrolled: Count };
+
 export type Overview = {
   period: DateRange;
   previous: DateRange;
   model: AttributionModel;
   modelLabel: string;
+  view: View;
   /** True for roles outside marketing: counts of 1 or 2 people are hidden (ANL-14). */
   shared: boolean;
   tiles: {
@@ -55,6 +60,12 @@ export type Overview = {
   };
   channels: OverviewRow[];
   totals: Omit<OverviewRow, 'channel'>;
+  trend: { granularity: 'week' | 'month'; points: TrendPoint[] };
+  /**
+   * "Can we trust these numbers?": M1 for the period (enrolled students with a known first-touch channel, always
+   * measured by first touch) and the people no recorded touch explains (the same under every model).
+   */
+  trust: { enrolled: Count; attributedEnrolled: Count; unattributed: { lead: Count; enrolled: Count }; unmapped: { lead: Count; enrolled: Count } };
   definitions: typeof DEFINITIONS;
 };
 
@@ -79,13 +90,15 @@ const ratio = (cost: number, count: number) => (count > 0 ? Math.round(cost / co
  */
 export class OverviewService {
   constructor(
-    private readonly deps: { db: AppPgDatabase; attribution: AttributionService; costs: CostService },
+    private readonly deps: { db: AppPgDatabase; attribution: AttributionService; costs: CostService; now?: () => Date },
   ) {}
 
-  async overview(range: DateRange, model: AttributionModel, shared: boolean): Promise<Overview> {
+  async overview(range: DateRange, model: AttributionModel, shared: boolean, mode: View = 'period'): Promise<Overview> {
     const previous = previousPeriod(range);
-    const [rows, costs, subscribers, clicks, previousClicks, leads, previousLeads] = await Promise.all([
-      this.deps.attribution.byChannel(range, model),
+    const [rows, firstTouch, trend, costs, subscribers, clicks, previousClicks, leads, previousLeads] = await Promise.all([
+      this.deps.attribution.byChannel(range, model, mode),
+      model === 'first_touch' ? null : this.deps.attribution.byChannel(range, 'first_touch', mode),
+      this.trend(range, mode, shared),
       this.deps.costs.channelCosts(range),
       this.subscribers(),
       this.clickRate(range),
@@ -106,6 +119,7 @@ export class OverviewService {
         lead: suppress(counts.lead, shared),
         applied: suppress(counts.applied, shared),
         enrolled: suppress(counts.enrolled, shared),
+        completed: suppress(counts.completed, shared),
         hired: suppress(counts.hired, shared),
         costAmd,
         // A cost per person over 1 or 2 people would reveal the count.
@@ -115,11 +129,16 @@ export class OverviewService {
     };
     const sum = (stage: Stage) => Math.round(raw.reduce((total, row) => total + row.counts[stage], 0) * 100) / 100;
     const totalCounts = Object.fromEntries(STAGES.map((stage) => [stage, sum(stage)])) as Record<Stage, number>;
+    const byFirstTouch = firstTouch ?? rows;
+    const credited = (list: typeof rows, channel: string, stage: Stage) => list.find((row) => row.channel === channel)?.[stage] ?? 0;
+    const enrolledAll = byFirstTouch.reduce((total, row) => total + row.enrolled, 0);
+    const unknown = credited(byFirstTouch, UNATTRIBUTED, 'enrolled') + credited(byFirstTouch, UNMAPPED, 'enrolled');
     return {
       period: range,
       previous,
       model,
       modelLabel: MODEL_LABEL[model],
+      view: mode,
       shared,
       tiles: {
         subscribers: suppress(subscribers, shared),
@@ -129,8 +148,44 @@ export class OverviewService {
       },
       channels: raw.map((row) => ({ channel: row.channel, ...view(row.counts, row.costAmd) })),
       totals: view(totalCounts, raw.reduce((total, row) => total + row.costAmd, 0)),
+      trend,
+      trust: {
+        enrolled: suppress(Math.round(enrolledAll * 100) / 100, shared),
+        attributedEnrolled: suppress(Math.round((enrolledAll - unknown) * 100) / 100, shared),
+        unattributed: { lead: suppress(credited(rows, UNATTRIBUTED, 'lead'), shared), enrolled: suppress(credited(rows, UNATTRIBUTED, 'enrolled'), shared) },
+        unmapped: { lead: suppress(credited(rows, UNMAPPED, 'lead'), shared), enrolled: suppress(credited(rows, UNMAPPED, 'enrolled'), shared) },
+      },
       definitions: DEFINITIONS,
     };
+  }
+
+  /**
+   * Leads and enrolled students over time: by week for ranges up to 120 days, otherwise by month. The cohort view
+   * runs on to today, since the people of the range keep converting after it.
+   */
+  private async trend(range: DateRange, view: View, shared: boolean): Promise<Overview['trend']> {
+    const today = new Date((this.deps.now?.() ?? new Date()).getTime() + 4 * 3_600_000).toISOString().slice(0, 10);
+    const end = view === 'cohort' && today > range.to ? today : range.to;
+    const spanDays = Math.round((Date.parse(end) - Date.parse(range.from)) / DAY) + 1;
+    const granularity = spanDays <= 120 ? 'week' : 'month';
+    const bucketOf = (day: string) => {
+      if (granularity === 'month') return `${day.slice(0, 7)}-01`;
+      const weekday = (new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7;
+      return shift(day, -weekday);
+    };
+    const starts: string[] = [];
+    for (let bucket = bucketOf(range.from); bucket <= end; ) {
+      starts.push(bucket);
+      bucket = granularity === 'week' ? shift(bucket, 7) : bucketOf(shift(`${bucket.slice(0, 7)}-28`, 7));
+    }
+    const counts = new Map(starts.map((start) => [start, { lead: 0, enrolled: 0 }]));
+    for (const outcome of await this.deps.attribution.outcomesIn(range, view)) {
+      if (outcome.type !== 'lead' && outcome.type !== 'enrolled') continue;
+      const day = new Date(outcome.at.getTime() + 4 * 3_600_000).toISOString().slice(0, 10);
+      const bucket = counts.get(bucketOf(day < range.from ? range.from : day));
+      if (bucket) bucket[outcome.type] += 1;
+    }
+    return { granularity, points: starts.map((start) => ({ start, lead: suppress(counts.get(start)!.lead, shared), enrolled: suppress(counts.get(start)!.enrolled, shared) })) };
   }
 
   /** Contacts behind one number (ANL-15), with their share of the credit; at most 500 listed. */

@@ -45,6 +45,7 @@ const ORDER: [keyof DemoData, PgTable][] = [
   ['channelRules', schema.channelRules],
   ['unmappedValues', schema.unmappedValues],
   ['trackedLinks', schema.trackedLinks],
+  ['marketingCampaigns', schema.marketingCampaigns],
   ['syncRuns', schema.syncRuns],
   ['alerts', schema.alerts],
   ['auditEvents', schema.auditEvents],

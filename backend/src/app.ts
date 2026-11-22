@@ -67,6 +67,8 @@ import { AnalyticsPipeline } from './analytics/pipeline.js';
 import { ChannelTaxonomy } from './analytics/taxonomy.js';
 import { LinkBuilder } from './analytics/links.js';
 import { CostService } from './analytics/costs.js';
+import { StoredExchangeRates } from './analytics/rates.js';
+import { CampaignRegistry } from './analytics/campaigns.js';
 import { AttributionService } from './analytics/attribution.js';
 import { OverviewService } from './analytics/overview.js';
 import { DetailService } from './analytics/detail.js';
@@ -396,7 +398,10 @@ export async function buildApp({
   });
   await app.register(newsletterRoutes, { newsletter, editor: issueEditor, publishing, uploads: uploadService, seedList: config.seedList, coreEngine: resolvedIntegrations.coreEngine });
   const merge = new MergeService({ db: database.db, coreEngine: resolvedIntegrations.coreEngine, logger: app.log });
-  const sources = analyticsSources ?? createMockAnalyticsSources();
+  const baseSources = analyticsSources ?? createMockAnalyticsSources();
+  // Rates entered on the Costs page (or loaded with the demo set) win over the rate client (9.2).
+  const rates = new StoredExchangeRates(database.db, baseSources.rates);
+  const sources = { ...baseSources, rates };
   const pipeline = new AnalyticsPipeline({
     db: database.db,
     sources,
@@ -433,6 +438,8 @@ export async function buildApp({
   app.decorate('metrics', metrics);
   await app.register(analyticsRoutes, { pipeline, taxonomy, links: linkBuilder, costs, attribution, overview, detail, health,
     metrics,
+    rates,
+    campaigns: new CampaignRegistry(database.db),
     selfReported: new SelfReportedService({ db: database.db, attribution }),
     coreEngine: resolvedIntegrations.coreEngine });
   await app.register(commandCenterRoutes, { overview, detail, apiKey: config.commandCenterApiKey });

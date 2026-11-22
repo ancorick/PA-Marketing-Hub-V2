@@ -28,6 +28,29 @@ export type CostInput = { channel: string; campaign?: string | null; description
 /** Channel cost for a period (9.5): ad spend plus manual costs allocated to the days inside the period. */
 export type ChannelCost = { channel: ChannelId; adSpendAmd: number; manualAmd: number; totalAmd: number };
 
+/** One row of the Costs table: ad spend of one campaign on one day, or a manual or Event Hub cost. */
+export type CostEntry = {
+  id: string;
+  dateFrom: string;
+  dateTo: string;
+  channel: ChannelId;
+  campaign: string | null;
+  /** Ad platform and campaign name for ad spend rows. */
+  campaignName: string | null;
+  amountAmd: number;
+  originalAmount: string;
+  currency: string;
+  rateToAmd: number;
+  /** api = ad platform API, csv = ad report upload, manual = entered here, event_hub = sent by Event Hub. */
+  source: 'api' | 'csv' | 'manual' | 'event_hub';
+  note: string;
+  /** Set for manual costs that can be edited or deleted here. */
+  manualId: string | null;
+};
+
+const PLATFORM_LABEL: Record<string, string> = { meta_ads: 'Meta Ads', google_ads: 'Google Ads' };
+const shiftDay = (day: string, n: number) => new Date(Date.parse(`${day}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+
 export class CostError extends Error {
   constructor(
     readonly field: string,
@@ -133,6 +156,90 @@ export class CostService {
     }
     for (const [key, value] of totals) totals.set(key, Math.round(value));
     return totals;
+  }
+
+  /**
+   * Every cost entry that overlaps the period, newest first (RESTRUCTURE R3, Costs table): ad spend per campaign
+   * and day from the platform APIs or CSV exports, manual costs, and costs sent by Event Hub.
+   */
+  async entries(range: DateRange): Promise<CostEntry[]> {
+    const [ads, manual] = await Promise.all([
+      this.db
+        .select()
+        .from(adSpendDaily)
+        .where(and(gte(adSpendDaily.date, range.from), lte(adSpendDaily.date, range.to))),
+      this.list(range),
+    ]);
+    const external = await this.db
+      .select({ id: manualCosts.id, ref: manualCosts.externalRef })
+      .from(manualCosts)
+      .where(and(isNull(manualCosts.deletedAt), lte(manualCosts.dateFrom, range.to), gte(manualCosts.dateTo, range.from)));
+    const refs = new Map(external.map((row) => [row.id, row.ref]));
+    const entries: CostEntry[] = [
+      ...ads.map(
+        (row): CostEntry => ({
+          id: row.id,
+          dateFrom: row.date,
+          dateTo: row.date,
+          channel: row.channel as ChannelId,
+          campaign: row.campaign,
+          campaignName: `${PLATFORM_LABEL[row.platform] ?? row.platform} · ${row.campaignName}`,
+          amountAmd: row.amountAmd,
+          originalAmount: row.originalAmount,
+          currency: row.currency,
+          rateToAmd: Number(row.rateToAmd),
+          source: row.origin === 'csv' ? 'csv' : 'api',
+          note: `${row.impressions} impressions, ${row.clicks} clicks`,
+          manualId: null,
+        }),
+      ),
+      ...manual.map((cost): CostEntry => {
+        const ref = refs.get(cost.id) ?? null;
+        return {
+          id: cost.id,
+          dateFrom: cost.dateFrom,
+          dateTo: cost.dateTo,
+          channel: cost.channel,
+          campaign: cost.campaign,
+          campaignName: null,
+          amountAmd: cost.amountAmd,
+          originalAmount: cost.originalAmount,
+          currency: cost.currency,
+          rateToAmd: cost.rateToAmd,
+          source: ref?.startsWith('event_hub:') ? 'event_hub' : 'manual',
+          note: cost.description,
+          // Costs sent by Event Hub are replaced on the next message, so they are not edited here.
+          manualId: ref ? null : cost.id,
+        };
+      }),
+    ];
+    return entries.sort((a, b) => b.dateFrom.localeCompare(a.dateFrom) || b.amountAmd - a.amountAmd);
+  }
+
+  /** Channel cost per week (ranges up to 120 days) or month inside the period, for the spend-over-time chart. */
+  async trend(range: DateRange): Promise<{ granularity: 'week' | 'month'; points: { start: string; channels: Record<string, number> }[] }> {
+    const granularity = days(range.from, range.to) <= 120 ? 'week' : 'month';
+    const buckets: DateRange[] = [];
+    for (let from = range.from; from <= range.to; ) {
+      let to: string;
+      if (granularity === 'week') {
+        const weekday = (new Date(`${from}T00:00:00Z`).getUTCDay() + 6) % 7;
+        to = shiftDay(from, 6 - weekday);
+      } else {
+        const [y, m] = from.split('-').map(Number) as [number, number];
+        to = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+      }
+      if (to > range.to) to = range.to;
+      buckets.push({ from, to });
+      from = shiftDay(to, 1);
+    }
+    const points = await Promise.all(
+      buckets.map(async (bucket) => ({
+        start: bucket.from,
+        channels: Object.fromEntries((await this.channelCosts(bucket)).map((row) => [row.channel, row.totalAmd])),
+      })),
+    );
+    return { granularity, points };
   }
 
   private async validate(input: CostInput) {

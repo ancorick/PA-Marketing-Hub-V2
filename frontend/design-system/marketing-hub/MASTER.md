@@ -63,12 +63,14 @@ Yellow is the brand primary, so **warning is orange**, never yellow. Status is a
 
 | Token | Dark | Light | Line style |
 |---|---|---|---|
-| `--chart-1` | `#FFE433` | `#8A6A00` | solid |
-| `--chart-2` | `#7DFFEC` | `#00786A` | dashed `6 4` |
-| `--chart-3` | `#FF70F8` | `#B000A6` | dotted `2 3` |
-| `--chart-4` | `#5CF59B` | `#0E7A36` | dash-dot |
-| `--chart-5` | `#FFB547` | `#C2410C` | long dash |
-| `--chart-6` | `#B4BEFF` | `#4F46E5` | solid + square markers |
+| `--chart-1` gold | `#BD8703` | `#BD8703` | solid |
+| `--chart-2` aqua | `#02A99B` | `#099B8F` | dashed `6 4` |
+| `--chart-3` magenta | `#D535CF` | `#BD0DB7` | dotted `2 3` |
+| `--chart-4` green | `#1BAB49` | `#0E9A3F` | dash-dot |
+| `--chart-5` violet | `#8267E2` | `#664FD8` | long dash |
+| `--chart-6` neutral "Other" | `#7F8392` | `#868A99` | solid + square markers |
+
+Series colours are the brand hues stepped to mid lightness and full chroma (R3): validated with the dataviz checks against `--color-surface` in both themes (lightness band, chroma ≥ 0.10, adjacent pairs ΔE ≥ 8 under protan/deutan, ≥ 15 normal, ≥ 3:1 contrast). The order is fixed and never cycled; more than five series fold into slot 6 "Other". Orange and red are not series colours (warning, danger). Stacked bars: 2px surface gap between segments, only the top segment of a column has the 4px rounded end.
 
 Gridlines `--chart-grid`. Bars and lines in the brand colors on dark cards, like the "Growth" card in `tables.png`. Every chart has a table alternative and a one-sentence summary.
 

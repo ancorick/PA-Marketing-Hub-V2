@@ -75,13 +75,18 @@
   --color-on-brand-tint: rgb(19 19 23 / 0.1);
   --color-on-brand-line: rgb(19 19 23 / 0.16);
 
-  /* Charts: pair every color with a line style or marker */
-  --chart-1: #ffe433;
-  --chart-2: #7dffec;
-  --chart-3: #ff70f8;
-  --chart-4: #5cf59b;
-  --chart-5: #ffb547;
-  --chart-6: #b4beff;
+  /*
+   * Charts (RESTRUCTURE R3, checked with the dataviz validator against --color-surface): brand hues stepped to
+   * mid lightness and full chroma so series stay apart on the dark surface. Order is fixed (adjacent pairs pass
+   * the colour-blind check): gold, aqua, magenta, green, violet; slot 6 is the neutral "Other". Orange and red
+   * stay out: they are warning and danger. Pair every colour with a line style or marker.
+   */
+  --chart-1: #bd8703;
+  --chart-2: #02a99b;
+  --chart-3: #d535cf;
+  --chart-4: #1bab49;
+  --chart-5: #8267e2;
+  --chart-6: #7f8392;
   --chart-grid: #313138;
 
   /* Typography */
@@ -197,12 +202,12 @@
   --color-on-danger: #ffffff;
   --color-ring: #b000a6;
   --color-scrim: rgb(19 19 23 / 0.5);
-  --chart-1: #8a6a00;
-  --chart-2: #00786a;
-  --chart-3: #b000a6;
-  --chart-4: #0e7a36;
-  --chart-5: #c2410c;
-  --chart-6: #4f46e5;
+  --chart-1: #bd8703;
+  --chart-2: #099b8f;
+  --chart-3: #bd0db7;
+  --chart-4: #0e9a3f;
+  --chart-5: #664fd8;
+  --chart-6: #868a99;
   --chart-grid: #e0ddeb;
   --shadow-hover: 0 12px 24px -10px rgb(40 20 80 / 0.25), 0 2px 6px rgb(40 20 80 / 0.08);
   --shadow-overlay: 0 24px 48px rgb(19 19 23 / 0.18), 0 2px 8px rgb(19 19 23 / 0.1);

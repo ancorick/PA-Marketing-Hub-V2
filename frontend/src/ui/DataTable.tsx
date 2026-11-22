@@ -31,7 +31,8 @@ export function tableCsv<Row>(columns: Column<Row>[], rows: Row[]): string {
   );
 }
 
-function download(name: string, text: string) {
+/** Saves text as a CSV file in the browser (page-level Export CSV buttons use it too). */
+export function downloadCsv(name: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
   const link = Object.assign(document.createElement('a'), { href: url, download: name.endsWith('.csv') ? name : `${name}.csv` });
   document.body.append(link);
@@ -59,6 +60,8 @@ type DataTableProps<Row> = {
   totals?: Partial<Record<string, ReactNode>>;
   /** Long lists are shown page by page; CSV still exports every row. */
   pageSize?: number;
+  /** Tighter cell padding for wide numeric tables (cohorts). */
+  dense?: boolean;
 };
 
 /** Accessible data table: real <table>, sortable headers with aria-sort, scroll wrapper on narrow screens. */
@@ -76,6 +79,7 @@ export function DataTable<Row>({
   exportFile,
   totals,
   pageSize,
+  dense = false,
 }: DataTableProps<Row>) {
   const t = useT();
   const [sort, setSort] = useState(initialSort ?? null);
@@ -170,7 +174,7 @@ export function DataTable<Row>({
 
   const table = (
     <div className="table-wrap" role="region" aria-label={caption} tabIndex={0}>
-      <table className="table" aria-busy={loading || undefined}>
+      <table className={dense ? 'table table--dense' : 'table'} aria-busy={loading || undefined}>
         <caption className={captionHidden ? 'visually-hidden' : undefined}>{caption}</caption>
         <thead>
           <tr>
@@ -241,7 +245,7 @@ export function DataTable<Row>({
   return (
     <div className="stack stack--sm">
       <div className="table-tools no-print">
-        <Button size="sm" variant="ghost" icon={<DownloadSimple size={16} aria-hidden />} disabled={loading || sorted.length === 0} onClick={() => download(exportFile, tableCsv(columns, sorted))}>
+        <Button size="sm" variant="ghost" icon={<DownloadSimple size={16} aria-hidden />} disabled={loading || sorted.length === 0} onClick={() => downloadCsv(exportFile, tableCsv(columns, sorted))}>
           Download CSV<span className="visually-hidden">: {caption}</span>
         </Button>
       </div>

@@ -18,6 +18,32 @@ export const CHANNEL_MEDIUM: Record<ChannelId, string> = {
   partners_press: 'partner',
 };
 
+/** Channel group in the taxonomy table (RESTRUCTURE R3): paid, organic, owned, offline or referral. */
+export const CHANNEL_GROUP: Record<ChannelId, 'paid' | 'organic' | 'owned' | 'offline' | 'referral'> = {
+  paid_social: 'paid',
+  organic_social: 'organic',
+  search_website: 'organic',
+  paid_search: 'paid',
+  email: 'owned',
+  events: 'offline',
+  referrals: 'referral',
+  chatbot: 'owned',
+  partners_press: 'referral',
+};
+
+/** Default utm_source per channel: the link builder uses it unless another source is chosen. */
+export const CHANNEL_DEFAULT_SOURCE: Record<ChannelId, string> = {
+  paid_social: 'instagram',
+  organic_social: 'instagram',
+  search_website: 'google',
+  paid_search: 'google',
+  email: 'newsletter',
+  events: 'event',
+  referrals: 'referral',
+  chatbot: 'chatbot',
+  partners_press: 'partner',
+};
+
 /** Suggested utm_source values per channel; any lower-case slug is accepted. */
 export const CHANNEL_SOURCES: Record<ChannelId, string[]> = {
   paid_social: ['instagram', 'facebook', 'linkedin', 'tiktok'],

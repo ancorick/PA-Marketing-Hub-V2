@@ -767,7 +767,8 @@ export type TrackedLink = {
   createdBy: string;
   createdAt: string;
 };
-export type LinkChannel = Channel & { medium: string; sources: string[] };
+export type ChannelGroup = 'paid' | 'organic' | 'owned' | 'offline' | 'referral';
+export type LinkChannel = Channel & { medium: string; sources: string[]; group: ChannelGroup; defaultSource: string };
 export type NewTrackedLink = { destinationUrl: string; channel: string; source: string; campaign: string; content?: string | null; label?: string | null };
 
 export const listTrackedLinks = () => apiFetch<{ links: TrackedLink[]; campaigns: string[]; channels: LinkChannel[] }>('/api/analytics/links');
@@ -795,7 +796,51 @@ export type ChannelCost = { channel: string; adSpendAmd: number; manualAmd: numb
 export type CostInput = { channel: string; campaign: string | null; description: string; dateFrom: string; dateTo: string; amount: number; currency: string };
 
 const periodQuery = (period: Period) => `from=${period.from}&to=${period.to}`;
-export const listCosts = (period: Period) => apiFetch<{ costs: ManualCost[]; channels: ChannelCost[]; currencies: string[] }>(`/api/analytics/costs?${periodQuery(period)}`);
+export type CostTrend = { granularity: 'week' | 'month'; points: { start: string; channels: Record<string, number> }[] };
+export const listCosts = (period: Period) =>
+  apiFetch<{ costs: ManualCost[]; channels: ChannelCost[]; trend: CostTrend; currencies: string[] }>(`/api/analytics/costs?${periodQuery(period)}`);
+
+/** One row of the Costs table (RESTRUCTURE R3): ad spend per campaign and day, a manual cost or an Event Hub cost. */
+export type CostSource = 'api' | 'csv' | 'manual' | 'event_hub';
+export type CostEntry = {
+  id: string;
+  dateFrom: string;
+  dateTo: string;
+  channel: string;
+  campaign: string | null;
+  campaignName: string | null;
+  amountAmd: number;
+  originalAmount: string;
+  currency: string;
+  rateToAmd: number;
+  source: CostSource;
+  note: string;
+  manualId: string | null;
+};
+export const listCostEntries = (period: Period) => apiFetch<{ entries: CostEntry[] }>(`/api/analytics/costs/entries?${periodQuery(period)}`);
+
+export type ExchangeRate = { currency: string; date: string; rateToAmd: number; enteredBy?: string; origin?: 'demo' | 'manual' | 'cba' };
+export const getRates = () => apiFetch<{ source: 'demo' | 'manual' | null; note: string | null; latest: ExchangeRate[]; rates: ExchangeRate[] }>('/api/analytics/rates');
+export const saveRate = (rate: { currency: string; date: string; rateToAmd: number }) => apiFetch<ExchangeRate>('/api/analytics/rates', { method: 'POST', body: JSON.stringify(rate) });
+
+/* ---------- Analytics: campaign list with budgets (RESTRUCTURE R3) ---------- */
+
+export type CampaignRecord = {
+  key: string;
+  name: string;
+  channel: string | null;
+  dateFrom: string | null;
+  dateTo: string | null;
+  budgetAmd: number | null;
+  registered: boolean;
+  seenIn: ('links' | 'ad_spend' | 'costs' | 'events' | 'emails')[];
+  updatedAt: string | null;
+};
+export type CampaignInput = { key?: string | null; name: string; channel: string; dateFrom: string | null; dateTo: string | null; budgetAmd: number | null };
+export const listCampaignRegistry = () => apiFetch<{ campaigns: CampaignRecord[] }>('/api/analytics/campaign-registry');
+export const createCampaignRecord = (input: CampaignInput) => apiFetch<CampaignRecord>('/api/analytics/campaign-registry', { method: 'POST', body: JSON.stringify(input) });
+export const updateCampaignRecord = (key: string, input: CampaignInput) =>
+  apiFetch<CampaignRecord>(`/api/analytics/campaign-registry/${encodeURIComponent(key)}`, { method: 'PUT', body: JSON.stringify(input) });
 export const createCost = (cost: CostInput) => apiFetch<ManualCost>('/api/analytics/costs', { method: 'POST', body: JSON.stringify(cost) });
 export const updateCost = (id: string, cost: CostInput) => apiFetch<ManualCost>(`/api/analytics/costs/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(cost) });
 export const deleteCost = (id: string) => apiFetch<void>(`/api/analytics/costs/${encodeURIComponent(id)}`, { method: 'DELETE' });
@@ -828,16 +873,20 @@ export type OverviewRow = {
   lead: Count;
   applied: Count;
   enrolled: Count;
+  completed: Count;
   hired: Count;
   costAmd: number;
   costPerLead: number | null;
   costPerEnrolled: number | null;
 };
+/** Period: outcomes dated in the range. Cohort: what happened to people first reached in the range. */
+export type ViewMode = 'period' | 'cohort';
 export type Overview = {
   period: Period;
   previous: Period;
   model: AttributionModel;
   modelLabel: string;
+  view: ViewMode;
   shared: boolean;
   tiles: {
     subscribers: Count;
@@ -847,11 +896,14 @@ export type Overview = {
   };
   channels: OverviewRow[];
   totals: Omit<OverviewRow, 'channel'>;
+  trend: { granularity: 'week' | 'month'; points: { start: string; lead: Count; enrolled: Count }[] };
+  trust: { enrolled: Count; attributedEnrolled: Count; unattributed: { lead: Count; enrolled: Count }; unmapped: { lead: Count; enrolled: Count } };
   definitions: Record<string, string>;
 };
 export type PersonBehind = { id: string; firstName: string | null; lastName: string | null; email: string | null; type: string; status: string; share: number };
 
-export const getOverview = (period: Period, model: AttributionModel) => apiFetch<Overview>(`/api/analytics/overview?${periodQuery(period)}&model=${model}`);
+export const getOverview = (period: Period, model: AttributionModel, view: ViewMode = 'period') =>
+  apiFetch<Overview>(`/api/analytics/overview?${periodQuery(period)}&model=${model}&view=${view}`);
 export const peopleBehind = (period: Period, model: AttributionModel, stage: Stage, channel: string, campaign?: string) =>
   apiFetch<{ total: number; people: PersonBehind[]; modelLabel: string }>(
     `/api/analytics/people?${periodQuery(period)}&model=${model}&stage=${stage}&channel=${encodeURIComponent(channel)}${campaign ? `&campaign=${encodeURIComponent(campaign)}` : ''}`,
@@ -889,7 +941,16 @@ export type CampaignDetail = Counts & {
   costPerEnrolled: number | null;
   channels: string[];
 };
-export type CohortRow = Counts & { month: string; maturing: boolean; people: Count; costAmd: number; costPerEnrolled: number | null; costPerHired: number | null };
+export type CohortRow = Counts & {
+  month: string;
+  maturing: boolean;
+  people: Count;
+  costAmd: number;
+  costPerEnrolled: number | null;
+  costPerHired: number | null;
+  /** Maturing cohorts: cost per hired graduate so far (provisional). */
+  costPerHiredSoFar: number | null;
+};
 
 const modelQuery = (period: Period, model: AttributionModel) => `${periodQuery(period)}&model=${model}`;
 export const getChannelDetail = (channel: string, period: Period, model: AttributionModel) =>

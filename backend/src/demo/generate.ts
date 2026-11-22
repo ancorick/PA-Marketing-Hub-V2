@@ -195,6 +195,7 @@ export type DemoData = {
   exportLog: Row<typeof schema.exportLog>[];
   staffActivity: Row<typeof schema.staffActivity>[];
   appSettings: Row<typeof schema.appSettings>[];
+  marketingCampaigns: Row<typeof schema.marketingCampaigns>[];
 };
 
 const STAFF = { editor: 'staff-editor', manager: 'staff-marketing_manager', admin: 'staff-admin' } as const;
@@ -212,7 +213,7 @@ class DemoBuilder {
     eventRegistrations: [], segments: [], segmentMembers: [], manualCosts: [], adSpendDaily: [], webTrafficDaily: [], socialDaily: [],
     newsletterTemplates: [], newsletterCadences: [], collectedItems: [], issues: [], issueBlocks: [], issueEdits: [], issueComments: [],
     sends: [], deliveries: [], linkClicks: [], dmarcReports: [], dmarcRecords: [], channelRules: [], unmappedValues: [], trackedLinks: [],
-    syncRuns: [], alerts: [], auditEvents: [], exportLog: [], staffActivity: [], appSettings: [],
+    syncRuns: [], alerts: [], auditEvents: [], exportLog: [], staffActivity: [], appSettings: [], marketingCampaigns: [],
   };
   private readonly people: Person[] = [];
   private readonly calendar: DemoEvent[] = [];
@@ -241,6 +242,7 @@ class DemoBuilder {
     this.finishPeople();
     this.buildEventRows();
     this.buildCosts();
+    this.buildCampaigns();
     this.buildChannelData();
     this.buildTaxonomy();
     this.buildEmailSetup();
@@ -1117,6 +1119,44 @@ class DemoBuilder {
     }
     for (const currency of ['USD', 'EUR', 'RUB', 'GBP']) rates.push({ date: this.today, currency, rateToAmd: demoRate(currency, this.today) });
     this.data.appSettings.push({ key: 'exchange_rates', value: { source: 'demo', note: 'Synthetic Central Bank of Armenia rates (demo data set)', rates }, updatedBy: 'demo-seed' });
+  }
+
+  /* ---------- Campaign list with budgets (RESTRUCTURE R3, Campaigns & links) ---------- */
+
+  private buildCampaigns() {
+    // Ad campaigns: dates from their spend, budget a little above what was spent, rounded to 100,000 AMD.
+    const ads = new Map<string, { name: string; platform: string; channel: string; from: string; to: string; spend: number }>();
+    for (const row of this.data.adSpendDaily) {
+      const item = ads.get(row.campaign) ?? { name: row.campaignName, platform: row.platform, channel: row.channel, from: row.date, to: row.date, spend: 0 };
+      item.from = row.date < item.from ? row.date : item.from;
+      item.to = row.date > item.to ? row.date : item.to;
+      item.spend += row.amountAmd;
+      ads.set(row.campaign, item);
+    }
+    const created = (day: string) => at(day < this.today ? addDays(day, -3) : addDays(this.today, -1), 11, 0);
+    let n = 0;
+    const add = (key: string, name: string, channel: ChannelId, from: string | null, to: string | null, budgetAmd: number | null, by: string = STAFF.manager) => {
+      n += 1;
+      const when = created(from ?? this.today);
+      this.data.marketingCampaigns.push({ id: demoId('campaign', n), key, name, channel, dateFrom: from, dateTo: to, budgetAmd, createdBy: by, updatedBy: by, createdAt: when, updatedAt: when });
+    };
+    for (const [key, item] of [...ads].sort((a, b) => a[1].from.localeCompare(b[1].from))) {
+      // Always-on campaigns run without an end date and get a monthly budget.
+      const alwaysOn = key === 'always-on-retargeting' || key === 'brand-search' || key === 'generic-courses' || key === 'open-day-reminders';
+      const budget = alwaysOn ? Math.ceil((item.spend / DEMO_MONTHS) * 1.1 / 100_000) * 100_000 : Math.ceil((item.spend * 1.15) / 100_000) * 100_000;
+      const label = item.platform === 'meta_ads' ? 'Instagram' : 'Google Ads';
+      add(key, `${label} · ${item.name}${alwaysOn ? ' (monthly budget)' : ''}`, item.channel as ChannelId, item.from, alwaysOn ? null : item.to, budget);
+    }
+    // Events: the budget is the venue, catering and print cost with a reserve.
+    for (const event of this.calendar) {
+      const cost = this.data.manualCosts.find((row) => row.campaign === event.campaign && !row.deletedAt);
+      add(event.campaign, event.title, 'events', event.day, event.day, cost ? Math.ceil((cost.amountAmd * 1.2) / 10_000) * 10_000 : null, STAFF.editor);
+    }
+    add('instagram-reels', 'Instagram Reels with content creators', 'organic_social', monthsBack(this.today, DEMO_MONTHS - 1), null, 250_000);
+    add('alumni-referral', 'Alumni referral programme', 'referrals', monthsBack(this.today, DEMO_MONTHS - 1), null, 300_000);
+    add('tech-press', 'Tech media partnership', 'partners_press', monthsBack(this.today, DEMO_MONTHS - 1), null, null);
+    const fair = dayOf(this.importFair.at);
+    add('university-career-fair', 'University career fair', 'partners_press', fair, fair, 400_000);
   }
 
   /* ---------- Website and social daily metrics (9.1) ---------- */

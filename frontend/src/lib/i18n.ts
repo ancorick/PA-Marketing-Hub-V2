@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { MEASURE_STRINGS } from './strings/measure';
 
 /**
  * Staff interface language (RESTRUCTURE §3–4): the shell and the new analytics components speak Armenian,
@@ -12,7 +13,7 @@ export const STAFF_LANGS: { value: StaffLang; label: string }[] = [
   { value: 'ru', label: 'Русский' },
 ];
 
-const STRINGS = {
+const SHELL_STRINGS = {
   // Navigation groups and items (RESTRUCTURE §3).
   'group.measure': { en: 'Measure', hy: 'Չափում', ru: 'Измерение' },
   'group.reach': { en: 'Reach', hy: 'Լսարան', ru: 'Охват' },
@@ -89,6 +90,9 @@ const STRINGS = {
   'table.range': { en: '{from}–{to} of {total}', hy: '{from}–{to}՝ {total}-ից', ru: '{from}–{to} из {total}' },
   'dialog.close': { en: 'Close', hy: 'Փակել', ru: 'Закрыть' },
 } as const satisfies Record<string, Record<StaffLang, string>>;
+
+/** Shell and kit strings plus the pages rebuilt so far (R3: MEASURE). */
+const STRINGS = { ...SHELL_STRINGS, ...MEASURE_STRINGS } satisfies Record<string, Record<StaffLang, string>>;
 
 export type StringKey = keyof typeof STRINGS;
 

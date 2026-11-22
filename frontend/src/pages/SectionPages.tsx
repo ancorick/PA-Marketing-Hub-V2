@@ -6,16 +6,10 @@ import { EmptyState, PageHeader, SkeletonCard } from '../ui';
 import { AlertsPanel } from './AlertsPanel';
 
 /*
- * RESTRUCTURE R1: the tabs of the former Analytics page are pages of their own in the left navigation. Each
- * keeps its existing section component and logic; R3–R5 rebuild their content.
+ * RESTRUCTURE R1: the tabs of the former Analytics page are pages of their own in the left navigation. R3 rebuilt
+ * Cohorts, Costs, Campaigns & links and Data health in pages/measure; the detail pages below keep their sections.
  */
-const CohortsSection = lazy(() => import('./analytics/CohortsSection').then((mod) => ({ default: mod.CohortsSection })));
-const CostsSection = lazy(() => import('./analytics/CostsSection').then((mod) => ({ default: mod.CostsSection })));
-const LinksSection = lazy(() => import('./analytics/LinksSection').then((mod) => ({ default: mod.LinksSection })));
-const TaxonomySection = lazy(() => import('./analytics/TaxonomySection').then((mod) => ({ default: mod.TaxonomySection })));
-const CampaignsSection = lazy(() => import('./analytics/CampaignsSection').then((mod) => ({ default: mod.CampaignsSection })));
 const CampaignSection = lazy(() => import('./analytics/CampaignsSection').then((mod) => ({ default: mod.CampaignSection })));
-const HealthSection = lazy(() => import('./analytics/HealthSection').then((mod) => ({ default: mod.HealthSection })));
 const MetricsSection = lazy(() => import('./analytics/MetricsSection').then((mod) => ({ default: mod.MetricsSection })));
 const ChannelSection = lazy(() => import('./analytics/ChannelSection').then((mod) => ({ default: mod.ChannelSection })));
 const PeopleSection = lazy(() => import('./analytics/PeopleSection').then((mod) => ({ default: mod.PeopleSection })));
@@ -29,47 +23,10 @@ function SectionPage({ title, accent, description, children }: { title: string; 
   );
 }
 
-export function CohortsPage() {
-  return (
-    <SectionPage title="Cohorts" description="Outcomes grouped by the month of first touch, so cost and outcomes belong to the same people.">
-      <CohortsSection />
-    </SectionPage>
-  );
-}
-
-export function CostsPage() {
-  return (
-    <SectionPage title="Costs" description="Ad spend and manual costs per channel, in AMD at the Central Bank of Armenia rate.">
-      <CostsSection />
-    </SectionPage>
-  );
-}
-
-/** Campaigns & links = campaign results, the link builder and the channel taxonomy (RESTRUCTURE §3). */
-export function CampaignsLinksPage() {
-  return (
-    <SectionPage title="Campaigns" accent="& links" description="Campaign results, tracked links and the channel taxonomy that maps every visit to a channel.">
-      <div className="stack stack--lg">
-        <CampaignsSection />
-        <LinksSection />
-        <TaxonomySection />
-      </div>
-    </SectionPage>
-  );
-}
-
 export function CampaignDetailPage({ campaign }: { campaign: string }) {
   return (
     <SectionPage title="Campaign" description="Spend, credited outcomes and cost per outcome for one campaign.">
       <CampaignSection campaign={campaign} />
-    </SectionPage>
-  );
-}
-
-export function DataHealthPage() {
-  return (
-    <SectionPage title="Data health" description="Freshness, row counts and errors per source; unmapped values to review.">
-      <HealthSection />
     </SectionPage>
   );
 }
