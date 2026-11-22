@@ -30,11 +30,11 @@ if (config.integrationsMode === 'mock') {
   app.log.warn('INTEGRATIONS_MODE=mock: Core Engine, Navigator CRM and Alumni Tracker are stubs');
 }
 
-// DEMO_SEED=true (never in production, loadConfig refuses it): synthetic data before the scheduler starts,
+// DEMO_SEED=true (never in production; loadConfig allows it there only for a DEMO_MODE deploy on the embedded database): synthetic data before the scheduler starts,
 // so the jobs see the seeded run history instead of backfilling on their own.
 if (config.demoSeed) {
   try {
-    const result = await seedDemoData(database.db, { nodeEnv: config.nodeEnv });
+    const result = await seedDemoData(database.db, { nodeEnv: config.nodeEnv, demoMode: config.demoMode });
     if (result.status === 'seeded') app.log.warn({ rows: result.rows }, 'DEMO_SEED: synthetic demo data loaded');
     else app.log.warn(`DEMO_SEED: skipped, ${result.reason}`);
     // The Dev inbox is in memory, so it is filled on every start in demo mode.

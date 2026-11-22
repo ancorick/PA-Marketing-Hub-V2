@@ -24,6 +24,9 @@ export type NavGroup = { id: string; label: StringKey; items: NavItem[] };
 /** Dev inbox is a development and demo aid only (RESTRUCTURE §3); production builds never show it. */
 export const SHOW_DEV_TOOLS = import.meta.env.DEV || import.meta.env.VITE_DEMO_MODE === 'true';
 
+/** Public demo build (VITE_DEMO_MODE=true): every record is synthetic, and the top bar says so. */
+export const DEMO_DEPLOY = import.meta.env.VITE_DEMO_MODE === 'true';
+
 /** Left navigation, groups and order from RESTRUCTURE §3. */
 export const NAV_GROUPS: NavGroup[] = [
   {

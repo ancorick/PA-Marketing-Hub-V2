@@ -51,6 +51,13 @@ const SHELL_STRINGS = {
   'shell.staff': { en: 'Signed in as', hy: 'Մուտք է գործել որպես', ru: 'Вход выполнен как' },
   'shell.language': { en: 'Language', hy: 'Լեզու', ru: 'Язык' },
   'shell.theme': { en: 'Theme', hy: 'Թեմա', ru: 'Тема' },
+  'shell.demo': { en: 'Demo', hy: 'Դեմո', ru: 'Демо' },
+  'shell.demoData': { en: 'synthetic data', hy: 'հորինված տվյալներ', ru: 'вымышленные данные' },
+  'shell.demoHint': {
+    en: 'A demo site: every contact, campaign and number is made up, and no email is sent.',
+    hy: 'Ցուցադրական կայք է. բոլոր կոնտակտները, արշավները և թվերը հորինված են, նամակներ չեն ուղարկվում։',
+    ru: 'Демо-сайт: все контакты, кампании и цифры вымышлены, письма не отправляются.',
+  },
   'shell.signOut': { en: 'Sign out', hy: 'Դուրս գալ', ru: 'Выйти' },
   'shell.signOutLater': {
     en: 'Sign-out arrives with the Core Engine sign-in; until then the role switch stands in for it.',

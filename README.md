@@ -38,6 +38,23 @@ rates, events, three newsletter issues, campaign sends, sync runs, alerts and un
 (`backend/src/demo/`). A database that already has contacts is never touched, and `NODE_ENV=production` refuses
 the flag at start-up. With the embedded database the set is rebuilt on every start; the same day gives the same data.
 
+## Demo deploy (Render + Netlify)
+
+The public demo runs only synthetic data. `render.yaml` is the demo Blueprint (`DEMO_MODE`, `DEMO_SEED`, mock
+sign-in, emails to the log and the Dev inbox); `render.production.yaml` is kept for the real site.
+
+1. **Neon:** create a project only for the demo (region Frankfurt) and copy its connection string.
+2. **Render:** New → Blueprint → this repository. Enter `DATABASE_URL` (the demo Neon string); leave
+   `CORS_ORIGINS` and `PUBLIC_APP_URL` empty for now. The first start loads the demo data set (about a minute).
+   Check `https://<service>.onrender.com/api/health`.
+3. **Netlify:** Add new site → Import from GitHub → this repository (settings come from `netlify.toml`).
+   Add the environment variable `VITE_API_URL=https://<service>.onrender.com` and deploy.
+4. **Render again:** set `CORS_ORIGINS` and `PUBLIC_APP_URL` to the Netlify URL (`https://<site>.netlify.app`);
+   the service redeploys.
+
+The free Render plan sleeps after 15 minutes without visits; the first page then waits about a minute. The demo
+database keeps visitors' changes; to start over, empty the Neon database (or create a new branch) and restart.
+
 ## Checks
 
 ```sh

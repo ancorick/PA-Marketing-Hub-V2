@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } fro
 import logoUrl from '../assets/picsart-academy-logo.webp';
 import { listAlerts } from '../lib/api';
 import { setStaffLang, STAFF_LANGS, useStaffLang, useT } from '../lib/i18n';
-import { activeNavPath, NAV_GROUPS, SHOW_DEV_TOOLS } from '../lib/routes';
+import { activeNavPath, DEMO_DEPLOY, NAV_GROUPS, SHOW_DEV_TOOLS } from '../lib/routes';
 import { setMockRole, STAFF_ROLES, useStaffRole } from '../lib/session';
 import { ThemeSwitcher } from './ThemeSwitcher';
 
@@ -254,6 +254,12 @@ export function AppShell({ currentPath, children }: { currentPath: string; child
           <span className="topbar__brand">
             <Brand />
           </span>
+          {DEMO_DEPLOY && (
+            <span className="badge badge--warning topbar__demo" title={t('shell.demoHint')}>
+              {t('shell.demo')}
+              <span className="topbar__demo-data"> · {t('shell.demoData')}</span>
+            </span>
+          )}
           <TopLinks />
         </header>
         <main id="main" className="main" ref={mainRef} tabIndex={-1}>

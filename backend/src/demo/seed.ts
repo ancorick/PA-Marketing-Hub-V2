@@ -62,8 +62,8 @@ const MAX_PARAMETERS = 60_000;
  * and only ever writes into a database without contacts, so it can never mix with real data; a database that
  * already holds the demo set is left alone, which makes a restart against a persistent database a no-op.
  */
-export async function seedDemoData(db: AppPgDatabase, options: { nodeEnv: AppConfig['nodeEnv']; now?: Date }): Promise<DemoSeedResult> {
-  if (options.nodeEnv === 'production') throw new Error('Demo data is never loaded in production (DEMO_SEED)');
+export async function seedDemoData(db: AppPgDatabase, options: { nodeEnv: AppConfig['nodeEnv']; demoMode?: boolean; now?: Date }): Promise<DemoSeedResult> {
+  if (options.nodeEnv === 'production' && !options.demoMode) throw new Error('Demo data is never loaded in production (DEMO_SEED)');
   const [marker] = await db.select({ key: schema.appSettings.key }).from(schema.appSettings).where(eq(schema.appSettings.key, DEMO_MARKER_KEY));
   if (marker) return { status: 'skipped', reason: 'the demo data set is already loaded' };
   const [existing] = await db.select({ value: count() }).from(schema.contacts);

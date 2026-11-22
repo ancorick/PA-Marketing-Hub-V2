@@ -1,13 +1,16 @@
-# Render Blueprint: deploys only backend/ (Fastify API). Frontend lives on Netlify (netlify.toml).
-# Database: Neon Postgres (free, Frankfurt), not Render Postgres; DATABASE_URL is entered in the dashboard.
+# DEMO Render Blueprint: the public demo of Marketing Hub with synthetic data only (DEMO_MODE).
+# The real site uses render.production.yaml with its own database and without DEMO_* or mock sign-in.
 #
-# Free plan limits (development only): the service sleeps after 15 min without traffic and takes
-# ~1 min to wake. Before the first real send move to an always-on plan (PRD 14.4: unsubscribe 99.9%,
-# webhooks < 1 min, scheduled sends and the nightly pipeline need a service that does not sleep).
+# Deploys only backend/ (Fastify API); the frontend lives on Netlify (netlify.toml).
+# Database: a Neon Postgres project used ONLY for this demo (free, Frankfurt). On the first start the API loads
+# the synthetic data set into it (about 1,800 made-up contacts, campaigns, newsletter, events, costs). The seed
+# only ever writes into a database without contacts, so it skips on later starts and never touches real data.
+#
+# Free plan: the service sleeps after 15 min without traffic and takes about a minute to wake up.
 
 services:
   - type: web
-    name: marketing-hub-api
+    name: marketing-hub-demo-api
     runtime: node
     rootDir: backend
     plan: free
@@ -23,52 +26,38 @@ services:
         value: production
       - key: LOG_LEVEL
         value: info
+      # Emails are never sent: they are written to the log and shown on the Dev inbox page.
       - key: EMAIL_ADAPTER
         value: log
       - key: INTEGRATIONS_MODE
         value: mock
-      # Mock staff tokens ("mock-admin" etc.) are public: keep them off on the deployed API.
-      # Staff screens answer 401 until Core Engine sign-in exists (manual task 7). Turning this on
-      # for a demo lets anyone on the internet act as admin.
+      # Demo deploy: synthetic data on the first start, Dev inbox on.
+      - key: DEMO_MODE
+        value: "true"
+      - key: DEMO_SEED
+        value: "true"
+      # Anyone can pick a role in the sidebar (mock sign-in). Acceptable only because all data is synthetic.
       - key: ALLOW_MOCK_SIGN_IN
-        value: "false"
-      # Netlify site URL(s), comma-separated, e.g. https://<site>.netlify.app
+        value: "true"
+      # Netlify site URL of the demo, e.g. https://<site>.netlify.app (comma-separated if several).
       - key: CORS_ORIGINS
         sync: false
-      # Neon connection string with sslmode=require
-      - key: DATABASE_URL
-        sync: false
-      # Signs unsubscribe and preferences links (NFR-S5). Generated once by Render; never rotate casually,
-      # links already sent would stop working.
-      - key: LINK_SIGNING_SECRET
-        generateValue: true
-      # Verifies ESP webhooks (NFR-S4); give the same value to the ESP webhook settings.
-      - key: ESP_WEBHOOK_SECRET
-        generateValue: true
-      # Verifies Event Hub webhooks (EVT-02); give the same value to the Event Hub team.
-      - key: EVENT_HUB_WEBHOOK_SECRET
-        generateValue: true
-      # Event Hub sandbox signature secret (EVT-08); not sensitive, shared with Event Hub developers.
-      - key: EVENT_HUB_SANDBOX_SECRET
-        generateValue: true
-      # Event Hub reads shared segments and checks suppression with it (EVT-07).
-      - key: EVENT_HUB_API_KEY
-        generateValue: true
-      # Aggregate metrics for Command Center (ANL-13); give the same value to Project 15.
-      - key: COMMAND_CENTER_API_KEY
-        generateValue: true
-      # Slack incoming webhook for "newsletter draft ready" (NWS-04); create it in Slack (manual).
-      - key: SLACK_WEBHOOK_URL
-        sync: false
-      # NWS-07 AI writing assist (optional): Claude API key; empty keeps the feature off.
-      - key: ANTHROPIC_API_KEY
-        sync: false
-      # Netlify site URL (public unsubscribe/preferences pages) and this service's own HTTPS URL.
+      # Same Netlify URL: public unsubscribe and preferences pages live there.
       - key: PUBLIC_APP_URL
         sync: false
-      - key: PUBLIC_API_URL
+      # Connection string of the demo Neon database (with sslmode=require). Never the real database.
+      - key: DATABASE_URL
         sync: false
-
-  # Nightly analytics pipeline (PRD 9.2, NFR-F6): runs inside the web service (JobRunner, 03:00 Yerevan =
-  # 23:00 UTC, a missed slot is caught up on start), so no separate cron service is needed. It needs the web
-  # service on an always-on plan; on the free plan the instance sleeps and the run happens on the next wake-up.
+      # Signing secrets and keys, generated once by Render. PUBLIC_API_URL defaults to this service's own URL.
+      - key: LINK_SIGNING_SECRET
+        generateValue: true
+      - key: ESP_WEBHOOK_SECRET
+        generateValue: true
+      - key: EVENT_HUB_WEBHOOK_SECRET
+        generateValue: true
+      - key: EVENT_HUB_SANDBOX_SECRET
+        generateValue: true
+      - key: EVENT_HUB_API_KEY
+        generateValue: true
+      - key: COMMAND_CENTER_API_KEY
+        generateValue: true

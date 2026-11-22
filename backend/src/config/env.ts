@@ -28,7 +28,7 @@ const envSchema = z.object({
     .optional()
     .transform((value) => (value && value.trim().length > 0 ? value.trim() : undefined))
     .pipe(z.email().optional()),
-  // Accept the public "mock-<role>" staff tokens. Default: on, except NODE_ENV=production.
+  // Accept the public "mock-<role>" staff tokens. Default: on, except NODE_ENV=production without DEMO_MODE.
   ALLOW_MOCK_SIGN_IN: z.enum(['true', 'false']).optional(),
   // How old a "verified" verdict may be before a marketing send re-checks DNS live (EML-03).
   DOMAIN_RECHECK_MINUTES: z.coerce.number().int().min(1).max(1440).default(60),
@@ -40,7 +40,7 @@ const envSchema = z.object({
     .pipe(z.string().min(32, 'must be at least 32 characters').optional()),
   // Where people open public pages (frontend) and where mail clients POST one-click unsubscribes (backend).
   PUBLIC_APP_URL: z.url().default('http://localhost:5173'),
-  PUBLIC_API_URL: z.url().default('http://localhost:4000'),
+  PUBLIC_API_URL: z.url().optional(),
   // Sender of marketing and confirmation email (PRD 7.1: a named, monitored address on the sending subdomain).
   MAIL_FROM: z.string().min(3).default('Picsart Academy <news@news.academy-domain.invalid>'),
   // Physical address in every marketing email footer (EML-11, NFR-P3).
@@ -96,6 +96,15 @@ const envSchema = z.object({
   ACADEMY_POSTAL_ADDRESS: z.string().min(3).default('Picsart Academy, address to be confirmed, Yerevan, Armenia'),
   // Synthetic demo data on start-up (docs/RESTRUCTURE.md R2), only into an empty database. Never in production.
   DEMO_SEED: z.enum(['true', 'false']).optional(),
+  // Public demo deploy (synthetic data only): lets a production build load DEMO_SEED into its own, dedicated demo
+  // database, turns mock sign-in on by default and shows the Dev inbox. The real deploy never sets it.
+  DEMO_MODE: z.enum(['true', 'false']).optional(),
+  // Set by Render to the service's own https URL; the default for PUBLIC_API_URL when that is not given.
+  RENDER_EXTERNAL_URL: z
+    .string()
+    .optional()
+    .transform((value) => (value && value.trim().length > 0 ? value.trim() : undefined))
+    .pipe(z.url().optional()),
 });
 
 export type AppConfig = {
@@ -137,6 +146,8 @@ export type AppConfig = {
   adminAlertEmails: string[];
   /** Load the synthetic demo data set into an empty database on start-up (src/demo); refused in production. */
   demoSeed: boolean;
+  /** Public demo deploy: synthetic data in the embedded database, Dev inbox on (DEMO_MODE). */
+  demoMode: boolean;
 };
 
 /** Development only: links signed with it stop working on any real deploy, where the secret is required. */
@@ -155,9 +166,12 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   if (env.NODE_ENV === 'production' && !env.LINK_SIGNING_SECRET) {
     throw new Error('Invalid environment configuration: LINK_SIGNING_SECRET is required in production (NFR-S5)');
   }
-  // Demo data must never reach a real deployment (PRD 14.4: synthetic data stays out of production).
-  if (env.NODE_ENV === 'production' && env.DEMO_SEED === 'true') {
-    throw new Error('Invalid environment configuration: DEMO_SEED cannot be enabled in production');
+  // Demo data must never reach a real deployment (PRD 14.4: synthetic data stays out of production). A public demo
+  // deploy opts in with DEMO_MODE=true on a database of its own; the seed still writes only into a database without
+  // contacts, so pointing a demo at a real database cannot mix the two.
+  const demoMode = env.DEMO_MODE === 'true';
+  if (env.NODE_ENV === 'production' && env.DEMO_SEED === 'true' && !demoMode) {
+    throw new Error('Invalid environment configuration: DEMO_SEED cannot be enabled in production (only a demo deploy with DEMO_MODE=true)');
   }
   return {
     nodeEnv: env.NODE_ENV,
@@ -172,10 +186,10 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     domainRecheckMinutes: env.DOMAIN_RECHECK_MINUTES,
     allowMockSignIn:
       env.INTEGRATIONS_MODE === 'mock' &&
-      (env.ALLOW_MOCK_SIGN_IN === undefined ? env.NODE_ENV !== 'production' : env.ALLOW_MOCK_SIGN_IN === 'true'),
+      (env.ALLOW_MOCK_SIGN_IN === undefined ? env.NODE_ENV !== 'production' || demoMode : env.ALLOW_MOCK_SIGN_IN === 'true'),
     linkSigningSecret: env.LINK_SIGNING_SECRET ?? DEV_LINK_SECRET,
     publicAppUrl: env.PUBLIC_APP_URL.replace(/\/+$/, ''),
-    publicApiUrl: env.PUBLIC_API_URL.replace(/\/+$/, ''),
+    publicApiUrl: (env.PUBLIC_API_URL ?? env.RENDER_EXTERNAL_URL ?? 'http://localhost:4000').replace(/\/+$/, ''),
     mailFrom: env.MAIL_FROM,
     postalAddress: env.ACADEMY_POSTAL_ADDRESS,
     sendRatePerSecond: env.SEND_RATE_PER_SECOND,
@@ -195,5 +209,6 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     seedList: env.SEED_LIST.split(',').map((item) => item.trim()).filter((item) => item.includes('@')),
     jobsEnabled: env.JOBS_ENABLED === undefined ? env.NODE_ENV !== 'test' : env.JOBS_ENABLED === 'true',
     demoSeed: env.DEMO_SEED === 'true',
+    demoMode,
   };
 }

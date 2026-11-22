@@ -66,6 +66,26 @@ describe('DEMO_SEED flag', () => {
     expect(loadConfig({ DEMO_SEED: 'true' }).demoSeed).toBe(true);
     expect(loadConfig({}).demoSeed).toBe(false);
   });
+
+  it('is allowed in a production build only for a demo deploy', () => {
+    const demo = { NODE_ENV: 'production', LINK_SIGNING_SECRET: 's'.repeat(32), DEMO_SEED: 'true', DEMO_MODE: 'true', DATABASE_URL: 'postgresql://user:pass@db.example.test/demo' } as const;
+    const config = loadConfig(demo);
+    expect(config.demoSeed).toBe(true);
+    expect(config.demoMode).toBe(true);
+    expect(() => loadConfig({ ...demo, DEMO_MODE: 'false' })).toThrow(/DEMO_SEED/);
+  });
+
+  it('takes the public API URL from Render when it is not set', () => {
+    expect(loadConfig({ RENDER_EXTERNAL_URL: 'https://hub-api.onrender.com' }).publicApiUrl).toBe('https://hub-api.onrender.com');
+    expect(loadConfig({ RENDER_EXTERNAL_URL: 'https://hub-api.onrender.com', PUBLIC_API_URL: 'https://api.example.test/' }).publicApiUrl).toBe('https://api.example.test');
+    expect(loadConfig({}).publicApiUrl).toBe('http://localhost:4000');
+  });
+
+  it('turns mock sign-in on for the demo deploy unless it is switched off', () => {
+    const demo = { NODE_ENV: 'production', LINK_SIGNING_SECRET: 's'.repeat(32), DEMO_SEED: 'true', DEMO_MODE: 'true' } as const;
+    expect(loadConfig(demo).allowMockSignIn).toBe(true);
+    expect(loadConfig({ ...demo, ALLOW_MOCK_SIGN_IN: 'false' }).allowMockSignIn).toBe(false);
+  });
 });
 
 describe('seedDemoData', () => {
@@ -73,6 +93,7 @@ describe('seedDemoData', () => {
     const app = await buildTestApp();
     const database = await currentTestDatabase();
     await expect(seedDemoData(database.db, { nodeEnv: 'production' })).rejects.toThrow(/production/);
+    await expect(seedDemoData(database.db, { nodeEnv: 'production', demoMode: false })).rejects.toThrow(/production/);
 
     const result = await seedDemoData(database.db, { nodeEnv: 'test' });
     expect(result.status).toBe('seeded');

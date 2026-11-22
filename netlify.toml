@@ -1,5 +1,7 @@
-# Netlify: deploys only frontend/ (React SPA). Backend lives on Render (render.yaml).
-# Set VITE_API_URL in Netlify → Site configuration → Environment variables (manual task 4).
+# Netlify: deploys only frontend/ (React SPA). Backend lives on Render (render.yaml = demo API).
+# Set VITE_API_URL (the Render URL of the API) in Netlify → Site configuration → Environment variables.
+# This repository is the public DEMO: VITE_DEMO_MODE shows the "Demo · synthetic data" mark and the Dev inbox.
+# Remove it for the real site.
 
 [build]
   base = "frontend"
@@ -8,6 +10,7 @@
 
 [build.environment]
   NODE_VERSION = "24"
+  VITE_DEMO_MODE = "true"
 
 # SPA: every route is served by index.html; the client router handles it.
 [[redirects]]

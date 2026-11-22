@@ -353,9 +353,9 @@ export async function buildApp({
   const espEvents = new EspEventService({ db: database.db, consent, touchpoints, alerts, killSwitch, logger: app.log, onEngagement: (contactId) => sunset.reactivate(contactId) });
   jobs.register({ name: 'sunset_policy', description: 'Sunset policy: re-engagement emails and leaving regular sends', intervalMs: 24 * 60 * 60_000, run: () => sunset.run() });
   app.decorate('espEvents', espEvents);
-  // Activity log of the Admin page; the Dev inbox exists only outside production and with the log adapter.
+  // Activity log of the Admin page; the Dev inbox exists only outside production (or on the demo deploy) and with the log adapter.
   await app.register(activityRoutes, { activity: new ActivityLog(database.db), coreEngine: resolvedIntegrations.coreEngine });
-  const devInbox = config.nodeEnv !== 'production' && espAdapter instanceof LogEmailAdapter ? espAdapter : null;
+  const devInbox = (config.nodeEnv !== 'production' || config.demoMode) && espAdapter instanceof LogEmailAdapter ? espAdapter : null;
   app.decorate('devInbox', devInbox);
   if (devInbox) {
     await app.register(devInboxRoutes, { adapter: devInbox, coreEngine: resolvedIntegrations.coreEngine });

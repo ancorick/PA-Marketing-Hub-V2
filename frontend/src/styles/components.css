@@ -3489,3 +3489,15 @@ th[aria-sort='descending'] .sort-btn {
 .issue-cell {
   max-width: 20rem;
 }
+
+/* Demo deploy marker in the top bar (VITE_DEMO_MODE): visitors must not take the synthetic people for real ones. */
+.topbar__demo {
+  flex: none;
+  white-space: nowrap;
+}
+
+@media (max-width: 479px) {
+  .topbar__demo-data {
+    display: none;
+  }
+}
