@@ -9,7 +9,8 @@ import { AccessNotice, accessProblem, Alert, Button, PageHeader, retryServerErro
 import { IssueEditor } from './IssueEditor';
 import { IssueReport } from './IssueReport';
 import { IssueReview } from './IssueReview';
-import { ISSUE_STATUS } from './NewsletterPage';
+import { useT } from '../lib/i18n';
+import { ISSUE_TONE } from './send/shared';
 
 const SOURCE_LABEL: Record<CollectedItem['type'], string> = {
   upcoming_event: 'Upcoming event',
@@ -46,6 +47,7 @@ export function SkippedItems({ items }: { items: CollectedItem[] }) {
 }
 
 export function IssueHeader({ data, back }: { data: IssueDetail; back: React.ReactNode }) {
+  const t = useT();
   const { issue } = data;
   return (
     <>
@@ -55,7 +57,7 @@ export function IssueHeader({ data, back }: { data: IssueDetail; back: React.Rea
         description={`${LANGUAGE_LABEL[issue.language]} · planned ${formatTime(issue.plannedSendAt)} · items since ${formatDate(issue.periodStart)}`}
       />
       <div className="cluster">
-        <StatusBadge tone={ISSUE_STATUS[issue.status].tone}>{ISSUE_STATUS[issue.status].label}</StatusBadge>
+        <StatusBadge tone={ISSUE_TONE[issue.status]}>{t(`s.issue.${issue.status}`)}</StatusBadge>
       </div>
     </>
   );

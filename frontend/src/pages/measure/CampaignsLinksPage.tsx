@@ -43,7 +43,7 @@ import {
 } from '../../ui';
 import { campaignColumns } from '../analytics/campaignColumns';
 import { useModel, usePeriod } from '../analytics/period';
-import { amd, BarChart, chartCount, chartCountFormat, useDayLabel } from './shared';
+import { amd, BarChart, chartCount, chartCountFormat, modelName, useDayLabel } from './shared';
 
 const MARKETING = ['editor', 'marketing_manager', 'admin'];
 
@@ -95,7 +95,7 @@ export function CampaignsLinksPage() {
         )}
 
         <Suspense fallback={<SkeletonCard />}>
-          <ResultsChart rows={results.data?.campaigns ?? []} names={registry.data?.campaigns ?? []} shared={results.data?.shared ?? false} modelLabel={results.data?.modelLabel ?? ''} loading={results.isPending} error={results.error} period={period} model={model} />
+          <ResultsChart rows={results.data?.campaigns ?? []} names={registry.data?.campaigns ?? []} shared={results.data?.shared ?? false} modelLabel={modelName(t, results.data?.modelLabel ?? '')} loading={results.isPending} error={results.error} period={period} model={model} />
         </Suspense>
 
         {marketing && (

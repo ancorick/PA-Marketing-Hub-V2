@@ -2,7 +2,7 @@ import { DownloadSimple, Printer } from '@phosphor-icons/react';
 import { lazy } from 'react';
 import type { Channel, Count } from '../../lib/api';
 import { formatAmd, formatNumber, SMALL_NUMBER_TEXT } from '../../lib/format';
-import { useStaffLang, useT, type StaffLang } from '../../lib/i18n';
+import { useStaffLang, useT, type StaffLang, type StringKey } from '../../lib/i18n';
 import { Button } from '../../ui';
 import { countText } from '../analytics/numbers';
 
@@ -16,6 +16,18 @@ export const BarChart = lazy(() => Charts().then((mod) => ({ default: mod.BarCha
 export const LineChart = lazy(() => Charts().then((mod) => ({ default: mod.LineChart })));
 export const FunnelChart = lazy(() => Charts().then((mod) => ({ default: mod.FunnelChart })));
 export const DonutChart = lazy(() => Charts().then((mod) => ({ default: mod.DonutChart })));
+
+/** The API names attribution models in English; the interface shows the filter's name in the reader's language. */
+const MODEL_KEY: Record<string, StringKey> = {
+  'First touch': 'filter.firstTouch',
+  'Last touch (before application)': 'filter.lastTouch',
+  'Position-based (40/20/40)': 'filter.positionBased',
+};
+
+export function modelName(t: ReturnType<typeof useT>, label: string): string {
+  const key = MODEL_KEY[label];
+  return key ? t(key) : label;
+}
 
 const LOCALE: Record<StaffLang, string> = { en: 'en-GB', hy: 'hy-AM', ru: 'ru-RU' };
 
@@ -31,6 +43,13 @@ export function useDayLabel() {
   const lang = useStaffLang();
   return (day: string, withYear = false) =>
     new Date(`${day.slice(0, 10)}T00:00:00Z`).toLocaleDateString(LOCALE[lang], { day: 'numeric', month: 'short', ...(withYear ? { year: 'numeric' } : {}), timeZone: 'UTC' });
+}
+
+/** A moment as "28 Nov 2026, 18:30" in Yerevan time and the interface language. */
+export function useDateTimeLabel() {
+  const lang = useStaffLang();
+  return (iso: string) =>
+    new Date(iso).toLocaleString(LOCALE[lang], { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Yerevan' });
 }
 
 /** Bucket label of a trend point: weeks by their Monday, months by name. */

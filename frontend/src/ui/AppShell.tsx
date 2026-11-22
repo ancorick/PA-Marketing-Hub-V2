@@ -114,7 +114,7 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
         <select className="select select--sm" value={role} onChange={(event) => setMockRole(event.target.value as typeof role)}>
           {STAFF_ROLES.map((option) => (
             <option key={option.value} value={option.value}>
-              {option.label}
+              {t(`role.${option.value}`)}
             </option>
           ))}
         </select>

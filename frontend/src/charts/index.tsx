@@ -294,15 +294,16 @@ export function Sparkline({ values, color = CHART_COLORS[1], label }: { values: 
 type Point = { label: string; value: number };
 
 /** The same data as a table, behind "Show data as a table" (PRD 14.5: every chart has a table alternative). */
-function PointTable({ caption, data, unit, labelHeader = 'Month' }: { caption: string; data: Point[]; unit: string; labelHeader?: string }) {
+function PointTable({ caption, data, unit, labelHeader }: { caption: string; data: Point[]; unit: string; labelHeader?: string }) {
+  const t = useT();
   return (
-    <Disclosure title="Show data as a table">
+    <Disclosure title={t('chart.showTable')}>
       <div className="table-wrap">
         <table className="table">
           <caption className="visually-hidden">{caption}</caption>
           <thead>
             <tr>
-              <th scope="col">{labelHeader}</th>
+              <th scope="col">{labelHeader ?? t('chart.month')}</th>
               <th scope="col" className="is-num">
                 {unit}
               </th>

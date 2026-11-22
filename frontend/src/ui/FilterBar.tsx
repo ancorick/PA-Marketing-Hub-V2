@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useT } from '../lib/i18n';
 import { PERIOD_PRESETS, presetOf, presetRange, type DateRange } from '../lib/periods';
 import { Tooltip } from './Tooltip';
@@ -8,8 +8,29 @@ import { Tooltip } from './Tooltip';
  * model behind every number are always on screen.
  */
 export function FilterBar({ label, children }: { label: string; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  // The sticky panel must not hide the control that has keyboard focus (WCAG 2.4.11): its height feeds the
+  // page's scroll-padding, so focused elements and anchors scroll into view below it.
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    const root = document.documentElement;
+    const update = () => {
+      const sticky = getComputedStyle(element).position === 'sticky';
+      root.style.setProperty('--filterbar-height', sticky ? `${element.offsetHeight}px` : '0px');
+    };
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    window.addEventListener('resize', update);
+    update();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', update);
+      root.style.removeProperty('--filterbar-height');
+    };
+  }, []);
   return (
-    <div className="filterbar" role="group" aria-label={label}>
+    <div ref={ref} className="filterbar" role="group" aria-label={label}>
       {children}
     </div>
   );

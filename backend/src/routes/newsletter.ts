@@ -6,6 +6,7 @@ import type { CoreEngineClient } from '../integrations/core-engine/contract.js';
 import { AssistUnavailableError } from '../ai/writing-assistant.js';
 import type { IssueEditor } from '../newsletter/editor.js';
 import type { NewsletterPublishing } from '../newsletter/publishing.js';
+import { ITEM_TYPES, NewsletterRanking, RankingError } from '../newsletter/ranking.js';
 import { NewsletterError, type NewsletterService } from '../newsletter/service.js';
 import { UploadError, type UploadService } from '../uploads/service.js';
 
@@ -65,6 +66,7 @@ type NewsletterRoutesOptions = {
   newsletter: NewsletterService;
   editor: IssueEditor;
   publishing: NewsletterPublishing;
+  ranking: NewsletterRanking;
   uploads: UploadService;
   seedList: string[];
   coreEngine: Pick<CoreEngineClient, 'verifyStaffToken'>;
@@ -84,12 +86,25 @@ const templateBody = z
     footerNote: z.string().max(500).nullable(),
   })
   .strict();
+const rankingBody = z
+  .object({
+    weights: z.object({
+      upcoming_event: z.number().min(0).max(1),
+      recent_event: z.number().min(0).max(1),
+      library: z.number().min(0).max(1),
+      graduation: z.number().min(0).max(1),
+      hire: z.number().min(0).max(1),
+      new_group: z.number().min(0).max(1),
+    }),
+    halfLifeDays: z.number().min(1).max(120),
+  })
+  .strict();
 const commentBody = z.object({ comment: z.string().trim().min(1).max(2000) }).strict();
 const optionalCommentBody = z.object({ comment: z.string().trim().max(2000).nullable().optional() }).strict();
 const approveBody = z.object({ comment: z.string().trim().max(2000).nullable().optional(), scheduledAt: z.iso.datetime({ offset: true }).nullable().optional() }).strict();
 const testBody = z.object({ emails: z.array(z.email()).max(20).optional() }).strict();
 
-export async function newsletterRoutes(app: FastifyInstance, { newsletter, editor, publishing, uploads, seedList, coreEngine }: NewsletterRoutesOptions) {
+export async function newsletterRoutes(app: FastifyInstance, { newsletter, editor, publishing, ranking, uploads, seedList, coreEngine }: NewsletterRoutesOptions) {
   const canEdit = requireRole(coreEngine, ['editor', 'marketing_manager', 'admin']);
   const managers = requireRole(coreEngine, ['marketing_manager', 'admin']);
   const withId = (handler: (id: string, request: FastifyRequest, reply: FastifyReply) => Promise<unknown>) => async (request: FastifyRequest, reply: FastifyReply) => {
@@ -123,6 +138,21 @@ export async function newsletterRoutes(app: FastifyInstance, { newsletter, edito
   }));
 
   app.get('/api/newsletter/issues', { preHandler: canEdit }, async () => ({ issues: await newsletter.list() }));
+  // Blocks, AI text to review and skipped items per issue, for the Issues table (RESTRUCTURE R5).
+  app.get('/api/newsletter/issues/overview', { preHandler: canEdit }, async () => ({ overview: await newsletter.overview() }));
+
+  // Ranking of collected items (weight per type, half-life): editors see it, managers change it.
+  app.get('/api/newsletter/ranking', { preHandler: canEdit }, async () => ({ ranking: await ranking.get(), types: ITEM_TYPES }));
+  app.put('/api/newsletter/ranking', { preHandler: managers }, async (request, reply) => {
+    const body = rankingBody.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ error: 'invalid_request', message: body.error.issues[0]?.message ?? 'Invalid request' });
+    try {
+      return { ranking: await ranking.save(body.data, request.staff!.userId), types: ITEM_TYPES };
+    } catch (error) {
+      if (error instanceof RankingError) return reply.code(400).send({ error: 'invalid_request', message: error.message });
+      throw error;
+    }
+  });
   app.get('/api/newsletter/issues/:id', { preHandler: canEdit }, withId(async (id) => {
     const issue = await newsletter.require(id);
     const [blocks, items] = await Promise.all([newsletter.blocks(id), newsletter.items(issue)]);

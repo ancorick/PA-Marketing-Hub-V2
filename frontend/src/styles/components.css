@@ -395,6 +395,20 @@
   margin-bottom: var(--space-6);
 }
 
+/* Long labels (Armenian, Russian) wrap inside header buttons on a phone instead of pushing past the screen. */
+.page-header > .cluster {
+  max-width: 100%;
+}
+
+@media (max-width: 767px) {
+  .page-header .btn {
+    max-width: 100%;
+    padding-block: var(--space-2);
+    white-space: normal;
+    text-align: center;
+  }
+}
+
 .page-header__text {
   display: flex;
   flex-direction: column;
@@ -946,10 +960,21 @@
 .table th,
 .table td {
   height: var(--row-height);
-  padding: var(--space-2) var(--space-5);
+  padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--color-border);
   text-align: left;
   vertical-align: middle;
+}
+
+/* Tight gutters between columns so wide tables fit a 1440 px screen; the outer edges keep the card inset. */
+.table th:first-child,
+.table td:first-child {
+  padding-left: var(--space-5);
+}
+
+.table th:last-child,
+.table td:last-child {
+  padding-right: var(--space-5);
 }
 
 .table thead th {
@@ -962,8 +987,18 @@
   font-size: var(--text-2xs);
   font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-eyebrow);
+  line-height: 1.25;
   text-transform: uppercase;
-  white-space: nowrap;
+  /* Long headers ("Cost per enrolled") wrap onto two lines instead of forcing a horizontal scroll. */
+  text-wrap: balance;
+}
+
+.table thead th.is-num {
+  white-space: normal;
+}
+
+.table thead .sort-btn {
+  text-align: inherit;
 }
 
 .table tbody th {
@@ -2605,8 +2640,16 @@ th[aria-sort='descending'] .sort-btn {
     grid-column: span 4;
   }
 
+  .span-5 {
+    grid-column: span 5;
+  }
+
   .span-6 {
     grid-column: span 6;
+  }
+
+  .span-7 {
+    grid-column: span 7;
   }
 
   .span-8 {
@@ -2632,6 +2675,13 @@ th[aria-sort='descending'] .sort-btn {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
+}
+
+/* On a phone the wrapped panel is a third of the screen: let it scroll away with the page. */
+@media (max-width: 767px), (max-height: 600px) {
+  .filterbar {
+    position: static;
+  }
 }
 
 .filter {
@@ -2842,12 +2892,37 @@ th[aria-sort='descending'] .sort-btn {
   list-style: none;
 }
 
+/* Label | bar | value, with the step conversion under the bar: the bar keeps most of a half-width card. */
 .funnel__stage {
   display: grid;
-  grid-template-columns: minmax(6rem, 9rem) minmax(0, 1fr) 4.5rem minmax(7rem, 11rem);
+  grid-template-columns: minmax(5rem, 8rem) minmax(0, 1fr) auto;
+  grid-template-areas:
+    'label track value'
+    '. conversion conversion';
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-1) var(--space-3);
   font-size: var(--text-sm);
+}
+
+.funnel__label {
+  grid-area: label;
+}
+
+.funnel__track {
+  grid-area: track;
+}
+
+.funnel__value {
+  grid-area: value;
+  min-width: 3rem;
+}
+
+.funnel__conversion {
+  grid-area: conversion;
+}
+
+.funnel__conversion:empty {
+  display: none;
 }
 
 .funnel__label {
@@ -3088,8 +3163,10 @@ th[aria-sort='descending'] .sort-btn {
 
 .rate-list li {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .rate-list__origin {
@@ -3144,4 +3221,271 @@ th[aria-sort='descending'] .sort-btn {
 .segmented__btn.nowrap {
   flex: none;
   white-space: nowrap;
+}
+
+/* =====================================================================
+ * REACH pages (RESTRUCTURE R4). Tokens only.
+ * ===================================================================== */
+
+/* A button that reads as a link (opens the contact card in the side panel). */
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-link);
+  font: inherit;
+  font-weight: var(--weight-semibold);
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  text-decoration-thickness: 2px;
+}
+
+.link-button:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Search inside the filter bar: icon + compact input. */
+.filter--search {
+  position: relative;
+  flex: 1 1 18rem;
+  max-width: 26rem;
+}
+
+.filter--search svg {
+  position: absolute;
+  left: var(--space-3);
+  color: var(--color-text-subtle);
+  pointer-events: none;
+}
+
+.filter--search .input {
+  width: 100%;
+  padding-left: calc(var(--space-3) + 1.5rem);
+}
+
+/* Icon-only link (event recording, photos) with a comfortable hit area. */
+.icon-link {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-pill);
+  color: var(--color-link);
+}
+
+.icon-link:hover {
+  background: var(--color-surface-chip);
+}
+
+.icon-link:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+/* =====================================================================
+ * Tabs (RESTRUCTURE R5): Campaign emails and Admin. No scroll arrows; the strip scrolls sideways on narrow
+ * screens. Tokens only.
+ * ===================================================================== */
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  margin-block-end: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  min-height: 2.75rem;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  margin-block-end: -1px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+
+.tabs__tab:hover {
+  color: var(--color-text);
+  background: var(--color-surface-chip);
+}
+
+.tabs__tab[aria-selected='true'] {
+  color: var(--color-text);
+  border-bottom-color: var(--color-primary);
+}
+
+.tabs__tab:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+.tabs__count {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-chip);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+/* =====================================================================
+ * SEND and SETTINGS pages (RESTRUCTURE R5): Dev inbox split view, alert rows, form grids.
+ * ===================================================================== */
+.inbox {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .inbox {
+    grid-template-columns: minmax(18rem, 26rem) minmax(0, 1fr);
+  }
+}
+
+.inbox__list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 34rem;
+  overflow-y: auto;
+}
+
+.inbox__item {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.inbox__item:hover {
+  background: var(--color-surface-chip);
+}
+
+.inbox__item[aria-current='true'] {
+  border-color: var(--color-secondary);
+  background: var(--color-surface-raised);
+}
+
+.inbox__item:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+.inbox__subject {
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.inbox__meta {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.inbox__text {
+  max-height: 28rem;
+  overflow: auto;
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.alert-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-2) var(--space-4);
+  align-items: start;
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.alert-row:last-child {
+  border-bottom: 0;
+}
+
+.alert-row__title {
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.alert-row__meta {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 640px) {
+  .alert-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.weights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: var(--space-4);
+}
+
+.yes-no {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-weight: var(--weight-semibold);
+}
+
+.yes-no--yes {
+  color: var(--color-success);
+}
+
+.yes-no--no {
+  color: var(--color-text-subtle);
+  font-weight: var(--weight-regular);
+}
+
+.role-matrix__you {
+  background: var(--color-surface-raised);
+}
+
+.issue-cell {
+  max-width: 20rem;
 }

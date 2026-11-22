@@ -29,7 +29,7 @@ import {
 import { CountCell, countCsv, countText, countValue, peoplePath } from './analytics/numbers';
 import { useModel, usePeriod } from './analytics/period';
 import { SelfReportedCard } from './analytics/SelfReportedCard';
-import { amd, BarChart, channelName, chartCount, chartCountFormat, ExportCsvButton, FunnelChart, LineChart, numberOf, PrintButton, useBucketLabel } from './measure/shared';
+import { amd, BarChart, channelName, chartCount, chartCountFormat, ExportCsvButton, FunnelChart, LineChart, modelName, numberOf, PrintButton, useBucketLabel } from './measure/shared';
 
 function tone(value: string): Tone {
   if (value === 'ok') return 'success';
@@ -61,7 +61,7 @@ export function HomePage() {
   const bucketLabel = useBucketLabel();
   const data = overview.data;
   const definitions = data?.definitions ?? {};
-  const modelNote = data ? ` ${t('m.attributionNote', { model: data.modelLabel })}` : '';
+  const modelNote = data ? ` ${t('m.attributionNote', { model: modelName(t, data.modelLabel) })}` : '';
   const name = (id: string) => channelName(id, channels.data?.channels);
 
   const people = (stage: 'lead' | 'enrolled' | 'hired', row: OverviewRow) => (marketing ? peoplePath(stage, row.channel) : null);
@@ -137,7 +137,7 @@ export function HomePage() {
       </FilterBar>
       {data && (
         <p className="print-only">
-          Picsart Academy Marketing Hub · {data.period.from} – {data.period.to} · {data.modelLabel} · {data.view === 'cohort' ? t('filter.viewCohort') : t('filter.viewPeriod')} · AMD ·{' '}
+          Picsart Academy Marketing Hub · {data.period.from} – {data.period.to} · {modelName(t, data.modelLabel)} · {data.view === 'cohort' ? t('filter.viewCohort') : t('filter.viewPeriod')} · AMD ·{' '}
           {new Date().toISOString().slice(0, 10)}
           {data.shared && ' · counts of one or two people shown as “fewer than 3”'}
         </p>
@@ -218,10 +218,10 @@ export function HomePage() {
                 <h2 id="channel-table-heading">{t('ov.outcomesByChannel')}</h2>
                 <p className="muted">{modelQuestion}</p>
               </div>
-              <StatusBadge tone="neutral">{data.modelLabel}</StatusBadge>
+              <StatusBadge tone="neutral">{modelName(t, data.modelLabel)}</StatusBadge>
             </div>
             <DataTable
-              caption={`${t('ov.outcomesByChannel')}, ${data.period.from} – ${data.period.to}, ${data.modelLabel}`}
+              caption={`${t('ov.outcomesByChannel')}, ${data.period.from} – ${data.period.to}, ${modelName(t, data.modelLabel)}`}
               captionHidden
               columns={columns}
               rows={data.channels}
@@ -273,13 +273,13 @@ export function HomePage() {
             </Button>
           </div>
           <div role="status" aria-live="polite" className="cluster">
-            {health.isError && <Alert tone="danger" title="API unreachable">{health.error.message}. Check that the backend is running and VITE_API_URL points to it.</Alert>}
+            {health.isError && <Alert tone="danger" title={t('lg.api.unreachable')}>{health.error.message}. {t('lg.api.unreachableHint')}</Alert>}
             {health.isSuccess && (
               <>
                 <StatusBadge tone={health.data.status === 'ok' ? 'success' : 'warning'}>API {health.data.status}</StatusBadge>
-                <StatusBadge tone={tone(health.data.database)}>Database: {health.data.database.replace('_', ' ')}</StatusBadge>
-                <StatusBadge tone={tone(health.data.email.adapter)}>Email: {health.data.email.adapter}</StatusBadge>
-                <StatusBadge tone={tone(health.data.integrations.mode)}>Integrations: {health.data.integrations.mode}</StatusBadge>
+                <StatusBadge tone={tone(health.data.database)}>{t('lg.api.database', { v: health.data.database.replace('_', ' ') })}</StatusBadge>
+                <StatusBadge tone={tone(health.data.email.adapter)}>{t('lg.api.email', { v: health.data.email.adapter })}</StatusBadge>
+                <StatusBadge tone={tone(health.data.integrations.mode)}>{t('lg.api.integrations', { v: health.data.integrations.mode })}</StatusBadge>
               </>
             )}
           </div>
@@ -320,7 +320,7 @@ function OverviewCharts({ data, name, bucketLabel }: { data: Overview; name: (id
       <ChartCard
         className="span-6"
         title={t('ov.enrolledByChannel')}
-        description={t('ov.creditedBy', { model: data.modelLabel })}
+        description={t('ov.creditedBy', { model: modelName(t, data.modelLabel) })}
         summary={top && top.enrolled > 0 ? t('ov.enrolledSummary', { channel: top.name, n: format(top.enrolled) }) : t('chart.noData')}
         empty={ranked.every((row) => row.enrolled === 0)}
         table={{
@@ -439,7 +439,7 @@ function TrustCard({ data, selfReported, className }: { data: Overview; selfRepo
         </div>
         <div>
           <dt>{t('ov.model')}</dt>
-          <dd>{t('ov.modelValue', { model: data.modelLabel })}</dd>
+          <dd>{t('ov.modelValue', { model: modelName(t, data.modelLabel) })}</dd>
         </div>
       </dl>
       <div className="inset cluster cluster--nowrap callout">

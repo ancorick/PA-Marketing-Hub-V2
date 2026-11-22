@@ -28,9 +28,14 @@ import { EventHubIntegration } from './eventhub/integration.js';
 import { eventHubIntegrationRoutes } from './routes/event-hub-integration.js';
 import { eventRoutes } from './routes/events.js';
 import { alertRoutes } from './routes/alerts.js';
+import { activityRoutes } from './routes/activity.js';
+import { devInboxRoutes } from './routes/dev-inbox.js';
+import { ActivityLog } from './admin/activity.js';
+import { LogEmailAdapter } from './email/log-adapter.js';
 import { privacyRoutes } from './routes/privacy.js';
 import { dmarcRoutes } from './routes/dmarc.js';
 import { newsletterRoutes } from './routes/newsletter.js';
+import { NewsletterRanking } from './newsletter/ranking.js';
 import { Collectors } from './newsletter/collectors.js';
 import { NewsletterService } from './newsletter/service.js';
 import { IssueEditor } from './newsletter/editor.js';
@@ -59,6 +64,8 @@ import { SignupService } from './signup/service.js';
 import { TouchpointRepository } from './touchpoints/repository.js';
 import { createMailDomainChecker, type MailDomainChecker } from './contacts/address-check.js';
 import { contactRoutes } from './routes/contacts.js';
+import { audienceRoutes } from './routes/audience.js';
+import { AudienceInsights } from './audience/insights.js';
 import { domainRoutes } from './routes/domains.js';
 import { healthRoutes } from './routes/health.js';
 import { analyticsRoutes } from './routes/analytics.js';
@@ -109,6 +116,8 @@ declare module 'fastify' {
     pipeline: AnalyticsPipeline;
     eventHub: EventHubService;
     routeList: { method: string; url: string }[];
+    /** The log adapter behind the Dev inbox; null in production and with a real email service. */
+    devInbox: LogEmailAdapter | null;
     taxonomy: ChannelTaxonomy;
     linkBuilder: LinkBuilder;
     costs: CostService;
@@ -253,7 +262,9 @@ export async function buildApp({
     email: app.email,
   });
   await app.register(domainRoutes, { domains, coreEngine: resolvedIntegrations.coreEngine });
-  await app.register(contactRoutes, { contacts, coreEngine: resolvedIntegrations.coreEngine });
+  const insights = new AudienceInsights({ db: database.db });
+  await app.register(contactRoutes, { contacts, coreEngine: resolvedIntegrations.coreEngine, insights });
+  await app.register(audienceRoutes, { insights, coreEngine: resolvedIntegrations.coreEngine });
   await app.register(consentRoutes, { consent, coreEngine: resolvedIntegrations.coreEngine });
   await app.register(publicPreferenceRoutes, {
     consent,
@@ -342,6 +353,13 @@ export async function buildApp({
   const espEvents = new EspEventService({ db: database.db, consent, touchpoints, alerts, killSwitch, logger: app.log, onEngagement: (contactId) => sunset.reactivate(contactId) });
   jobs.register({ name: 'sunset_policy', description: 'Sunset policy: re-engagement emails and leaving regular sends', intervalMs: 24 * 60 * 60_000, run: () => sunset.run() });
   app.decorate('espEvents', espEvents);
+  // Activity log of the Admin page; the Dev inbox exists only outside production and with the log adapter.
+  await app.register(activityRoutes, { activity: new ActivityLog(database.db), coreEngine: resolvedIntegrations.coreEngine });
+  const devInbox = config.nodeEnv !== 'production' && espAdapter instanceof LogEmailAdapter ? espAdapter : null;
+  app.decorate('devInbox', devInbox);
+  if (devInbox) {
+    await app.register(devInboxRoutes, { adapter: devInbox, coreEngine: resolvedIntegrations.coreEngine });
+  }
   await app.register(alertRoutes, { alerts, db: database.db, coreEngine: resolvedIntegrations.coreEngine });
   const privacy = new PrivacyService({ db: database.db, segments, coreEngine: resolvedIntegrations.coreEngine, logger: app.log });
   app.decorate('privacy', privacy);
@@ -356,10 +374,11 @@ export async function buildApp({
     library: resolvedIntegrations.library,
     groupLaunchpad: resolvedIntegrations.groupLaunchpad,
   });
+  const newsletterRanking = new NewsletterRanking(database.db);
   const newsletter = new NewsletterService({
     db: database.db,
     collectors,
-    ranking: async () => undefined,
+    ranking: () => newsletterRanking.get(),
     ctaUrl: config.admissionsUrl,
     // NWS-04: "draft ready" to Slack and the editors.
     onDraftReady: (issue) =>
@@ -396,7 +415,7 @@ export async function buildApp({
       return { rowsIn: result.rowsIn, rowsUpserted: result.rowsUpserted + sent.length };
     },
   });
-  await app.register(newsletterRoutes, { newsletter, editor: issueEditor, publishing, uploads: uploadService, seedList: config.seedList, coreEngine: resolvedIntegrations.coreEngine });
+  await app.register(newsletterRoutes, { newsletter, editor: issueEditor, publishing, ranking: newsletterRanking, uploads: uploadService, seedList: config.seedList, coreEngine: resolvedIntegrations.coreEngine });
   const merge = new MergeService({ db: database.db, coreEngine: resolvedIntegrations.coreEngine, logger: app.log });
   const baseSources = analyticsSources ?? createMockAnalyticsSources();
   // Rates entered on the Costs page (or loaded with the demo set) win over the rate client (9.2).
@@ -414,8 +433,10 @@ export async function buildApp({
   const costs = new CostService(database.db, sources.rates);
   const eventHub = new EventHubService({ db: database.db, contacts, contactRepository, consent, touchpoints, taxonomy, costs, logger: app.log });
   app.decorate('eventHub', eventHub);
+  // Created before the Events routes: the events table credits outcomes by attribution model (R4).
+  const attribution = new AttributionService(database.db);
   await app.register(eventRoutes, {
-    view: new EventsView(database.db),
+    view: new EventsView(database.db, attribution),
     manual: new ManualEvents({ db: database.db, eventHub, consent, touchpoints }),
     coreEngine: resolvedIntegrations.coreEngine,
   });
@@ -427,7 +448,6 @@ export async function buildApp({
   });
   await app.register(webhookRoutes, { events: espEvents, secret: config.espWebhookSecret, eventHub, eventHubSecret: config.eventHubWebhookSecret, sandboxSecret: config.eventHubSandboxSecret });
   app.decorate('costs', costs);
-  const attribution = new AttributionService(database.db);
   app.decorate('attribution', attribution);
   const overview = new OverviewService({ db: database.db, attribution, costs });
   app.decorate('overview', overview);

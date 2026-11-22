@@ -1,6 +1,7 @@
 import { buildApp } from './app.js';
 import { loadConfig } from './config/env.js';
 import { createDatabase, createEmbeddedDatabase } from './db/client.js';
+import { seedDemoInbox } from './demo/inbox.js';
 import { seedDemoData } from './demo/seed.js';
 
 const config = loadConfig();
@@ -36,6 +37,8 @@ if (config.demoSeed) {
     const result = await seedDemoData(database.db, { nodeEnv: config.nodeEnv });
     if (result.status === 'seeded') app.log.warn({ rows: result.rows }, 'DEMO_SEED: synthetic demo data loaded');
     else app.log.warn(`DEMO_SEED: skipped, ${result.reason}`);
+    // The Dev inbox is in memory, so it is filled on every start in demo mode.
+    if (app.devInbox) seedDemoInbox(app.devInbox);
   } catch (error) {
     app.log.error({ err: error }, 'DEMO_SEED: loading demo data failed');
   }

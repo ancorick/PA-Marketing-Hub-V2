@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireRole } from '../auth/staff.js';
+import { ATTRIBUTION_MODELS } from '../analytics/attribution.js';
 import type { EventsView } from '../eventhub/events-view.js';
 import { manualEventSchema, ManualEventError, type ManualEvents } from '../eventhub/manual.js';
 import type { CoreEngineClient } from '../integrations/core-engine/contract.js';
@@ -62,7 +63,22 @@ export async function eventRoutes(
   app.get('/api/events', { preHandler: anyStaff }, async (request, reply) => {
     const query = period.safeParse(request.query);
     if (!query.success) return reply.code(400).send({ error: 'invalid_request', message: query.error.issues[0]?.message, field: query.error.issues[0]?.path.join('.') });
+    const options = z.object({ model: z.enum(ATTRIBUTION_MODELS).optional() }).safeParse(request.query);
+    if (!options.success) return invalid(reply, options.error);
     const shared = !request.staff?.roles.some((role) => role === 'editor' || role === 'marketing_manager' || role === 'admin');
-    return view.list(query.data, shared);
+    return view.list(query.data, shared, options.data.model);
+  });
+
+  // Attendee list of one event (contact data, 4.3): the marketing team only; every download is logged.
+  app.get('/api/events/:id/attendees.csv', { preHandler: marketing }, async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    const file = params.success ? await view.attendeesCsv(params.data.id, request.staff!.userId) : null;
+    if (!file) return reply.code(404).send({ error: 'not_found', message: 'Unknown event' });
+    const name = file.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'event';
+    return reply
+      .header('content-type', 'text/csv; charset=utf-8')
+      .header('content-disposition', `attachment; filename="attendees-${name}.csv"`)
+      .header('cache-control', 'no-store')
+      .send(file.csv);
   });
 }

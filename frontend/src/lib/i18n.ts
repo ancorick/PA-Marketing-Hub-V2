@@ -1,5 +1,8 @@
 import { useSyncExternalStore } from 'react';
 import { MEASURE_STRINGS } from './strings/measure';
+import { REACH_STRINGS } from './strings/reach';
+import { SEND_STRINGS } from './strings/send';
+import { LEGACY_STRINGS } from './strings/legacy';
 
 /**
  * Staff interface language (RESTRUCTURE §3–4): the shell and the new analytics components speak Armenian,
@@ -55,6 +58,13 @@ const SHELL_STRINGS = {
     ru: 'Выход появится вместе со входом через Core Engine; пока его заменяет переключатель роли.',
   },
   'shell.unread': { en: 'unresolved', hy: 'չլուծված', ru: 'не решено' },
+  'shell.pageError': { en: 'This page could not be shown', hy: 'Այս էջը հնարավոր չեղավ ցույց տալ', ru: 'Эту страницу не удалось показать' },
+  'shell.pageErrorHint': {
+    en: 'The rest of the app still works. Reload the page; if it happens again, tell the team what you did. Details:',
+    hy: 'Հավելվածի մնացած մասն աշխատում է։ Վերաբեռնեք էջը․ եթե կրկնվի, պատմեք թիմին, թե ինչ արեցիք։ Մանրամասներ՝',
+    ru: 'Остальное приложение работает. Перезагрузите страницу; если ошибка повторится, расскажите команде, что вы делали. Подробности:',
+  },
+  'shell.reload': { en: 'Reload the page', hy: 'Վերաբեռնել էջը', ru: 'Перезагрузить страницу' },
   'shell.devOnly': { en: 'Development and demo only', hy: 'Միայն մշակման և ցուցադրման համար', ru: 'Только для разработки и демо' },
   // Filters (RESTRUCTURE §4).
   'filter.period': { en: 'Period', hy: 'Ժամանակահատված', ru: 'Период' },
@@ -85,14 +95,40 @@ const SHELL_STRINGS = {
   'chart.noData': { en: 'No data for this period yet.', hy: 'Այս ժամանակահատվածի համար տվյալներ դեռ չկան։', ru: 'Данных за этот период пока нет.' },
   'chart.ofPrevious': { en: 'of the previous step', hy: 'նախորդ քայլից', ru: 'от предыдущего шага' },
   'table.total': { en: 'Total', hy: 'Ընդամենը', ru: 'Итого' },
+  'table.download': { en: 'Download CSV', hy: 'Ներբեռնել CSV', ru: 'Скачать CSV' },
+  'tip.definitionOf': { en: 'Definition of {name}', hy: 'Սահմանում՝ {name}', ru: 'Определение: {name}' },
+  'tile.seeData': { en: 'See data', hy: 'Տվյալները', ru: 'Данные' },
+  'tile.seeDataFor': { en: 'for {name}', hy: '«{name}»-ի համար', ru: 'по показателю «{name}»' },
+  'tile.up': { en: 'up', hy: 'աճ', ru: 'рост' },
+  'tile.down': { en: 'down', hy: 'անկում', ru: 'снижение' },
+  'tile.noChange': { en: 'no change', hy: 'առանց փոփոխության', ru: 'без изменений' },
+  'tile.vsPrevious': { en: 'vs previous period', hy: 'նախորդ ժամանակահատվածի համեմատ', ru: 'к прошлому периоду' },
+  'tile.trend': { en: '{name}: trend', hy: '{name}՝ միտում', ru: '{name}: динамика' },
+  'theme.group': { en: 'Color theme', hy: 'Գունային թեմա', ru: 'Цветовая тема' },
+  'theme.dark': { en: 'Dark theme', hy: 'Մուգ թեմա', ru: 'Тёмная тема' },
+  'theme.light': { en: 'Light theme', hy: 'Բաց թեմա', ru: 'Светлая тема' },
+  'theme.system': { en: 'Match system theme', hy: 'Ինչպես համակարգում', ru: 'Как в системе' },
+  'role.admin': { en: 'Admin', hy: 'Ադմինիստրատոր', ru: 'Администратор' },
+  'role.marketing_manager': { en: 'Marketing manager', hy: 'Մարքեթինգի մենեջեր', ru: 'Маркетинг-менеджер' },
+  'role.editor': { en: 'Editor', hy: 'Խմբագիր', ru: 'Редактор' },
+  'role.viewer': { en: 'Viewer', hy: 'Դիտորդ', ru: 'Наблюдатель' },
+  'role.leadership': { en: 'Leadership', hy: 'Ղեկավարություն', ru: 'Руководство' },
+  'copy.copied': { en: 'Copied', hy: 'Պատճենվեց', ru: 'Скопировано' },
+  'copy.failed': {
+    en: 'Copy failed: select the text and copy it manually',
+    hy: 'Չհաջողվեց պատճենել. ընտրեք տեքստը և պատճենեք ձեռքով',
+    ru: 'Не удалось скопировать: выделите текст и скопируйте вручную',
+  },
+  'chart.showTable': { en: 'Show data as a table', hy: 'Ցույց տալ տվյալները աղյուսակով', ru: 'Показать данные таблицей' },
+  'chart.month': { en: 'Month', hy: 'Ամիս', ru: 'Месяц' },
   'table.previous': { en: 'Previous page', hy: 'Նախորդ էջ', ru: 'Предыдущая страница' },
   'table.next': { en: 'Next page', hy: 'Հաջորդ էջ', ru: 'Следующая страница' },
   'table.range': { en: '{from}–{to} of {total}', hy: '{from}–{to}՝ {total}-ից', ru: '{from}–{to} из {total}' },
   'dialog.close': { en: 'Close', hy: 'Փակել', ru: 'Закрыть' },
 } as const satisfies Record<string, Record<StaffLang, string>>;
 
-/** Shell and kit strings plus the pages rebuilt so far (R3: MEASURE). */
-const STRINGS = { ...SHELL_STRINGS, ...MEASURE_STRINGS } satisfies Record<string, Record<StaffLang, string>>;
+/** Shell and kit strings plus the pages rebuilt so far (R3: MEASURE, R4: REACH, R5: SEND and SETTINGS). */
+const STRINGS = { ...SHELL_STRINGS, ...MEASURE_STRINGS, ...REACH_STRINGS, ...SEND_STRINGS, ...LEGACY_STRINGS } satisfies Record<string, Record<StaffLang, string>>;
 
 export type StringKey = keyof typeof STRINGS;
 

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import type { AppPgDatabase } from '../db/client.js';
 import { collectedItems, issueBlocks, issues, newsletterCadences, type IssueBlockRow, type IssueRow, type NewsletterCadenceRow } from '../db/schema.js';
 import type { Language } from '../integrations/core-engine/contract.js';
@@ -194,6 +194,28 @@ export class NewsletterService {
 
   async list(): Promise<IssueView[]> {
     return (await this.deps.db.select().from(issues).orderBy(desc(issues.plannedSendAt), asc(issues.language))).map(issueView);
+  }
+
+  /**
+   * What the Issues table shows next to each issue (RESTRUCTURE R5): number of blocks, blocks whose text a person
+   * has not yet reviewed (AI drafted), and items the publish rule left out (the same window as `items`).
+   */
+  async overview(): Promise<{ issueId: string; blocks: number; aiToReview: number; skippedItems: number }[]> {
+    const [all, blocks, skipped] = await Promise.all([
+      this.deps.db.select().from(issues),
+      this.deps.db.select({ issueId: issueBlocks.issueId, aiDrafted: issueBlocks.aiDrafted, total: count() }).from(issueBlocks).groupBy(issueBlocks.issueId, issueBlocks.aiDrafted),
+      this.deps.db.select({ occurredAt: collectedItems.occurredAt }).from(collectedItems).where(eq(collectedItems.publishable, false)),
+    ]);
+    return all.map((issue) => {
+      const own = blocks.filter((row) => row.issueId === issue.id);
+      const to = issue.plannedSendAt.getTime() + 75 * DAY;
+      return {
+        issueId: issue.id,
+        blocks: own.reduce((sum, row) => sum + row.total, 0),
+        aiToReview: own.filter((row) => row.aiDrafted).reduce((sum, row) => sum + row.total, 0),
+        skippedItems: skipped.filter((item) => item.occurredAt >= issue.periodStart && item.occurredAt.getTime() <= to).length,
+      };
+    });
   }
 
   async require(id: string): Promise<IssueView> {

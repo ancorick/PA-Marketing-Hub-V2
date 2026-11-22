@@ -196,7 +196,7 @@ export function DataTable<Row>({
                   ) : (
                     c.header
                   )}
-                  {c.definition && <Tooltip label={`Definition of ${c.header}`}>{c.definition}</Tooltip>}
+                  {c.definition && <Tooltip label={t('tip.definitionOf', { name: typeof c.header === 'string' ? c.header : c.key })}>{c.definition}</Tooltip>}
                 </th>
               );
             })}
@@ -246,7 +246,7 @@ export function DataTable<Row>({
     <div className="stack stack--sm">
       <div className="table-tools no-print">
         <Button size="sm" variant="ghost" icon={<DownloadSimple size={16} aria-hidden />} disabled={loading || sorted.length === 0} onClick={() => downloadCsv(exportFile, tableCsv(columns, sorted))}>
-          Download CSV<span className="visually-hidden">: {caption}</span>
+          {t('table.download')}<span className="visually-hidden">: {caption}</span>
         </Button>
       </div>
       {table}

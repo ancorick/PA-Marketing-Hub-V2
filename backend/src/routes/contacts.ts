@@ -1,7 +1,8 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { requireRole } from '../auth/staff.js';
-import { CHANNEL_IDS, CHANNELS, CONTACT_TYPES, ContactFieldError, LANGUAGES } from '../contacts/fields.js';
+import type { AudienceInsights } from '../audience/insights.js';
+import { CHANNEL_IDS, CHANNELS, CONTACT_STATUSES, CONTACT_TYPES, ContactFieldError, LANGUAGES } from '../contacts/fields.js';
 import { DuplicateContactError } from '../contacts/repository.js';
 import { CoreEngineUnavailableError, type ContactService } from '../contacts/service.js';
 import type { CoreEngineClient } from '../integrations/core-engine/contract.js';
@@ -38,6 +39,7 @@ const updateBody = z.object(contactFields).partial().strict();
 const listQuery = z.object({
   q: z.string().max(200).optional(),
   type: z.enum(CONTACT_TYPES).optional(),
+  status: z.enum(CONTACT_STATUSES).optional(),
   language: z.enum(LANGUAGES).optional(),
   tag: z
     .string()
@@ -83,7 +85,7 @@ function sendKnownError(reply: FastifyReply, error: unknown) {
  * Individual contact records are for editors, marketing managers and admins; viewers and leadership
  * see aggregates only (PRD 4.3).
  */
-export async function contactRoutes(app: FastifyInstance, { contacts, coreEngine }: ContactRoutesOptions) {
+export async function contactRoutes(app: FastifyInstance, { contacts, coreEngine, insights }: ContactRoutesOptions & { insights?: AudienceInsights }) {
   const canUseContacts = requireRole(coreEngine, ['editor', 'marketing_manager', 'admin']);
 
   app.get('/api/audience/channels', { preHandler: canUseContacts }, async () => ({ channels: CHANNELS }));
@@ -93,7 +95,14 @@ export async function contactRoutes(app: FastifyInstance, { contacts, coreEngine
     if (!query.success) return invalid(reply, query.error);
     const { q, ...filter } = query.data;
     const page = await contacts.list({ ...filter, search: q });
-    return { ...page, limit: filter.limit, offset: filter.offset };
+    // Newsletter consent per row (RESTRUCTURE R4: the list shows it next to the status).
+    const consent = insights ? await insights.newsletterStates(page.contacts.map((contact) => contact.id)) : new Map();
+    return {
+      ...page,
+      contacts: page.contacts.map((contact) => ({ ...contact, newsletterConsent: consent.get(contact.id) ?? 'unknown' })),
+      limit: filter.limit,
+      offset: filter.offset,
+    };
   });
 
   app.get('/api/audience/contacts/:id', { preHandler: canUseContacts }, async (request, reply) => {

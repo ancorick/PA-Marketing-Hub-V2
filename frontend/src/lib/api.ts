@@ -152,11 +152,14 @@ export type ContactDetail = Contact & {
   history: { action: string; actorId: string; fields: string[]; at: string }[];
 };
 
-export type ContactPage = { contacts: Contact[]; total: number; limit: number; offset: number };
+/** A row of the contact list: the contact plus its latest newsletter consent (RESTRUCTURE R4). */
+export type ContactRow = Contact & { newsletterConsent: ConsentState };
+export type ContactPage = { contacts: ContactRow[]; total: number; limit: number; offset: number };
 
 export type ContactFilters = {
   q?: string;
   type?: ContactType;
+  status?: ContactStatus;
   language?: Language;
   tag?: string;
   limit?: number;
@@ -240,6 +243,25 @@ export const unsubscribeContact = (contactId: string, reason: string) =>
   });
 
 export const getSuppressionSummary = () => apiFetch<{ active: Record<SuppressionReason, number> }>('/api/audience/suppressions/summary');
+
+/* ---------- Audience aggregates (RESTRUCTURE R4) ---------- */
+
+export type AudienceSummary = { total: Count; withConsent: Count; unsubscribed: Count; suppressed: Count };
+export type AudienceHealth = {
+  checkedAt: string;
+  shared: boolean;
+  total: Count;
+  consent: Record<ConsentState, Count>;
+  consentRecordedRate: number | null;
+  grantedRate: number | null;
+  byType: { key: ContactType; count: Count }[];
+  byLanguage: { key: Language; count: Count }[];
+  newPerMonth: { month: string; count: Count }[];
+  leavingPerMonth: { month: string; unsubscribed: Count; bounced: Count; complaints: Count }[];
+  largestSegments: { id: string; name: string; type: 'dynamic' | 'static'; count: Count }[];
+};
+export const getAudienceSummary = () => apiFetch<AudienceSummary>('/api/audience/summary');
+export const getAudienceHealth = () => apiFetch<AudienceHealth>('/api/audience/health');
 
 /* ---------- Public pages: unsubscribe and preferences (AUD-09, AUD-11) ---------- */
 
@@ -509,8 +531,10 @@ export const setKillSwitch = (paused: boolean, reason: string | null) =>
 
 /* ---------- Alerts and import review (PRD 7.4, 14.4) ---------- */
 
-export type StaffAlert = { id: string; level: 'warning' | 'critical'; title: string; message: string; link: string | null; createdAt: string; resolvedAt: string | null };
+export type StaffAlert = { id: string; level: 'warning' | 'critical'; title: string; message: string; link: string | null; createdAt: string; resolvedAt: string | null; resolvedBy?: string | null };
 export const listAlerts = () => apiFetch<{ alerts: StaffAlert[] }>('/api/alerts');
+/** Open alerts first, then the latest resolved ones (the Alerts page history). */
+export const listAlertsWithResolved = () => apiFetch<{ alerts: StaffAlert[] }>('/api/alerts?resolved=true');
 export const resolveAlert = (id: string) => apiFetch<StaffAlert>(`/api/alerts/${encodeURIComponent(id)}/resolve`, { method: 'POST' });
 
 export type ImportRecord = {
@@ -1022,9 +1046,20 @@ export type EventRow = {
   enrolled: Count;
   hired: Count;
   costPerAttendee: number | null;
+  registrationUrl: string | null;
+  registrationOpen: boolean;
+  recordingUrl: string | null;
+  photosUrl: string | null;
+  mediaPublic: boolean;
+  /** Outcomes credited to the event by the chosen model; null without a model. */
+  credited: { lead: Count; enrolled: Count; hired: Count } | null;
+  costPerEnrolled: number | null;
 };
-export type EventTotals = Omit<EventRow, 'id' | 'externalId' | 'title' | 'type' | 'startsAt' | 'language' | 'public' | 'source' | 'campaign'>;
-export const listEvents = (period: Period) => apiFetch<{ period: Period; shared: boolean; events: EventRow[]; totals: EventTotals }>(`/api/events?${periodQuery(period)}`);
+export type EventTotals = Pick<EventRow, 'costAmd' | 'registrations' | 'attendees' | 'leads' | 'enrolled' | 'hired' | 'costPerAttendee' | 'credited' | 'costPerEnrolled'>;
+export type EventList = { period: Period; shared: boolean; events: EventRow[]; totals: EventTotals; model: AttributionModel | null; modelLabel: string | null };
+export const listEvents = (period: Period, model?: AttributionModel) => apiFetch<EventList>(`/api/events?${periodQuery(period)}${model ? `&model=${model}` : ''}`);
+export const downloadAttendees = (id: string, title: string) =>
+  apiDownload(`/api/events/${encodeURIComponent(id)}/attendees.csv`, `attendees-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'event'}.csv`);
 
 export type ManualEventInput = {
   title: string;
@@ -1049,3 +1084,46 @@ export const shareSegmentWithEventHub = (id: string, shared: boolean) =>
 
 export type ProgramMetric = { id: string; name: string; value: string; target: string; status: 'meets' | 'misses' | 'no_data'; detail: string; source: string };
 export const getProgramMetrics = () => apiFetch<{ checkedAt: string; metrics: ProgramMetric[] }>('/api/analytics/metrics');
+
+/* ---------- SEND and SETTINGS pages (RESTRUCTURE R5) ---------- */
+
+export type SendStats = {
+  sendId: string;
+  sent: number;
+  delivered: number;
+  clicked: number;
+  openedEstimated: number;
+  unsubscribed: number;
+  hardBounced: number;
+  softBounced: number;
+  complaints: number;
+};
+export const listSendStats = () => apiFetch<{ stats: SendStats[] }>('/api/email/sends/stats');
+
+export type IssueOverview = { issueId: string; blocks: number; aiToReview: number; skippedItems: number };
+export const listIssueOverview = () => apiFetch<{ overview: IssueOverview[] }>('/api/newsletter/issues/overview');
+
+export type ItemType = 'upcoming_event' | 'recent_event' | 'library' | 'graduation' | 'hire' | 'new_group';
+export type RankingSettings = { weights: Record<ItemType, number>; halfLifeDays: number };
+export const getRanking = () => apiFetch<{ ranking: RankingSettings; types: ItemType[] }>('/api/newsletter/ranking');
+export const saveRanking = (ranking: RankingSettings) => apiFetch<{ ranking: RankingSettings; types: ItemType[] }>('/api/newsletter/ranking', { method: 'PUT', body: JSON.stringify(ranking) });
+
+export type Guardrails = {
+  hardBounceRate: number;
+  hardBounceWindow: number;
+  complaintRate: number;
+  importFirstSendBounceRate: number;
+  minimumSample: number;
+  softBouncesToSuppress: number;
+  softBounceWindowDays: number;
+};
+export const getGuardrails = () => apiFetch<{ guardrails: Guardrails }>('/api/email/guardrails');
+
+export type ActivityEvent = { id: string; at: string; who: string; action: string; entity: string; details: Record<string, unknown> };
+export const listActivity = (action?: string, limit = 200) =>
+  apiFetch<{ actions: string[]; total: number; events: ActivityEvent[] }>(`/api/admin/activity?limit=${limit}${action ? `&action=${encodeURIComponent(action)}` : ''}`);
+
+export type InboxMessage = { id: string; receivedAt: string; to: string; from: string; subject: string; stream: 'marketing' | 'transactional' };
+export type InboxMessageDetail = InboxMessage & { replyTo: string | null; headers: Record<string, string>; html: string; text: string };
+export const listInbox = (to?: string) => apiFetch<{ messages: InboxMessage[]; total: number }>(`/api/dev/inbox${to ? `?to=${encodeURIComponent(to)}` : ''}`);
+export const getInboxMessage = (id: string) => apiFetch<InboxMessageDetail>(`/api/dev/inbox/${encodeURIComponent(id)}`);

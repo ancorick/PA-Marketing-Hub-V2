@@ -3,14 +3,15 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ApiError, createCost, createManualEvent, importAttendees, type EventRow } from '../lib/api';
 import { formatDate, formatNumber } from '../lib/format';
+import { useT } from '../lib/i18n';
 import { useStaffRole } from '../lib/session';
 import { Alert, Button, SelectField, TextField } from '../ui';
-import { EVENT_TYPE_LABEL } from '../lib/events';
 
 const blankEvent = () => ({ title: '', type: 'open_day', date: '', time: '12:00', language: 'hy', public: true, registrationUrl: '' });
 
 /** PRD 10.5 fallback while Event Hub is not connected: events entered by hand, attendee CSV with consent, event costs. */
-export function ManualEvents({ events }: { events: EventRow[] }) {
+export function ManualEvents({ events, stacked = false }: { events: EventRow[]; /** One column, for the side panel. */ stacked?: boolean }) {
+  const t = useT();
   const role = useStaffRole();
   const canCost = role === 'admin' || role === 'marketing_manager';
   const queryClient = useQueryClient();
@@ -62,15 +63,15 @@ export function ManualEvents({ events }: { events: EventRow[] }) {
   });
 
   return (
-    <div className="grid grid--2">
+    <div className={stacked ? 'stack stack--lg' : 'grid grid--2'}>
       <section className="card stack" aria-labelledby="add-event-heading">
         <div className="cluster">
           <span className="icon-tile icon-tile--sm icon-tile--brand">
             <CalendarPlus size={20} weight="bold" aria-hidden />
           </span>
-          <h2 id="add-event-heading">Add an event by hand</h2>
+          <h2 id="add-event-heading">{t('me.addTitle')}</h2>
         </div>
-        <p className="muted">Until Event Hub is connected. Events from Event Hub appear by themselves and are changed there.</p>
+        <p className="muted">{t('me.addHint')}</p>
         <form
           className="stack"
           onSubmit={(e) => {
@@ -78,44 +79,44 @@ export function ManualEvents({ events }: { events: EventRow[] }) {
             create.mutate();
           }}
         >
-          <TextField label="Title" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} error={createError?.details.field === 'title' ? createError.message : undefined} />
+          <TextField label={t('me.title')} required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} error={createError?.details.field === 'title' ? createError.message : undefined} />
           <div className="form-row">
-            <SelectField label="Type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} options={Object.entries(EVENT_TYPE_LABEL).map(([value, label]) => ({ value, label }))} />
+            <SelectField label={t('me.type')} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} options={['open_day', 'workshop', 'info_session', 'meetup', 'graduation', 'guest_visit', 'other'].map((value) => ({ value, label: t(`ev.type.${value}` as 'ev.type.other') }))} />
             <SelectField
-              label="Language"
+              label={t('r.language')}
               value={form.language}
               onChange={(e) => setForm({ ...form, language: e.target.value })}
               options={[
-                { value: 'hy', label: 'Armenian' },
-                { value: 'en', label: 'English' },
-                { value: 'ru', label: 'Russian' },
-                { value: '', label: 'Mixed' },
+                { value: 'hy', label: t('r.lang.hy') },
+                { value: 'en', label: t('r.lang.en') },
+                { value: 'ru', label: t('r.lang.ru') },
+                { value: '', label: t('me.mixed') },
               ]}
             />
           </div>
           <div className="form-row">
-            <TextField label="Date" type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-            <TextField label="Starts at (Yerevan)" type="time" required value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} />
+            <TextField label={t('ev.date')} type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+            <TextField label={t('me.startsAt')} type="time" required value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} />
           </div>
           <TextField
-            label="Registration page"
+            label={t('me.registrationPage')}
             type="url"
             placeholder="https://"
-            hint="Optional; shown in the newsletter for public upcoming events."
+            hint={t('me.registrationHint')}
             value={form.registrationUrl}
             onChange={(e) => setForm({ ...form, registrationUrl: e.target.value })}
-            error={createError?.details.field === 'registrationUrl' ? 'Use an https:// address' : undefined}
+            error={createError?.details.field === 'registrationUrl' ? t('me.httpsOnly') : undefined}
           />
           <label className="check">
             <input type="checkbox" checked={form.public} onChange={(e) => setForm({ ...form, public: e.target.checked })} />
-            <span>Public event (can appear in the newsletter)</span>
+            <span>{t('me.publicEvent')}</span>
           </label>
           <div className="cluster">
             <Button type="submit" variant="secondary" disabled={!form.title.trim() || !form.date} loading={create.isPending}>
-              Add event
+              {t('me.addEvent')}
             </Button>
           </div>
-          {createError && !['title', 'registrationUrl'].includes(createError.details.field ?? '') && <Alert tone="danger" title="Event not added">{createError.message}</Alert>}
+          {createError && !['title', 'registrationUrl'].includes(createError.details.field ?? '') && <Alert tone="danger" title={t('m.notSaved')}>{createError.message}</Alert>}
         </form>
       </section>
 
@@ -124,22 +125,21 @@ export function ManualEvents({ events }: { events: EventRow[] }) {
           <span className="icon-tile icon-tile--sm icon-tile--brand">
             <FileArrowUp size={20} weight="bold" aria-hidden />
           </span>
-          <h2 id="attendees-heading">Attendees and costs of a manual event</h2>
+          <h2 id="attendees-heading">{t('me.attendeesTitle')}</h2>
         </div>
         {manual.length === 0 ? (
-          <p className="muted">No events entered by hand in this period yet.</p>
+          <p className="muted">{t('me.noManual')}</p>
         ) : (
           <>
             <SelectField
-              label="Event"
+              label={t('ev.event')}
               value={event?.id ?? ''}
               onChange={(e) => setSelected(e.target.value)}
               options={manual.map((item) => ({ value: item.id, label: `${formatDate(item.startsAt)} · ${item.title}` }))}
             />
             <p className="muted">
-              CSV columns: <code>email</code> (required); optional <code>first_name, last_name, phone, language, registered_at, attended</code> and{' '}
-              <code>consent_newsletter, consent_courses, consent_events, consent_alumni</code> with the wording version the person agreed to (for example{' '}
-              <code>events-hy-v1</code>; empty = no consent). Nothing is saved unless every row is valid; suppressed addresses never get consent back.
+              {t('me.csvColumns')} <code>email</code>; {t('me.csvOptional')} <code>first_name, last_name, phone, language, registered_at, attended</code>,{' '}
+              <code>consent_newsletter, consent_courses, consent_events, consent_alumni</code> ({t('me.csvConsent')} <code>events-hy-v1</code>). {t('me.csvRules')}
             </p>
             <form
               className="stack"
@@ -148,28 +148,28 @@ export function ManualEvents({ events }: { events: EventRow[] }) {
                 upload.mutate();
               }}
             >
-              <TextField label="Attendee list (CSV)" type="file" accept=".csv,text/csv" required onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+              <TextField label={t('me.attendeeList')} type="file" accept=".csv,text/csv" required onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
               <label className="check">
                 <input type="checkbox" checked={attendedByDefault} onChange={(e) => setAttendedByDefault(e.target.checked)} />
-                <span>Everyone on the list attended (unless the attended column says no)</span>
+                <span>{t('me.attendedByDefault')}</span>
               </label>
               <div className="cluster">
                 <Button type="submit" variant="secondary" disabled={!file || !event} loading={upload.isPending}>
-                  Import attendees
+                  {t('me.importAttendees')}
                 </Button>
                 <span role="status" className="muted">
                   {upload.isSuccess &&
-                    `${formatNumber(upload.data.rows)} rows: ${formatNumber(upload.data.newRegistrations)} new registrations, ${formatNumber(upload.data.attended)} attended, ${formatNumber(upload.data.consentRecords)} consent records.`}
+                    t('me.imported', { rows: formatNumber(upload.data.rows), registrations: formatNumber(upload.data.newRegistrations), attended: formatNumber(upload.data.attended), consents: formatNumber(upload.data.consentRecords) })}
                 </span>
               </div>
               {upload.isError && (
-                <Alert tone="danger" title="List not imported">
+                <Alert tone="danger" title={t('me.notImported')}>
                   {upload.error.message}
                   {uploadError?.details.rows && (
                     <ul className="list-reset">
                       {uploadError.details.rows.slice(0, 10).map((row) => (
                         <li key={`${row.line}-${row.message}`}>
-                          Line {row.line}: {row.message}
+                          {t('cost.line', { n: row.line })}: {row.message}
                         </li>
                       ))}
                     </ul>
@@ -185,15 +185,15 @@ export function ManualEvents({ events }: { events: EventRow[] }) {
                   addCost.mutate();
                 }}
               >
-                <TextField label="Cost" required placeholder="Venue, catering…" value={cost.description} onChange={(e) => setCost({ ...cost, description: e.target.value })} />
-                <TextField label="Amount" required inputMode="decimal" value={cost.amount} onChange={(e) => setCost({ ...cost, amount: e.target.value })} />
-                <SelectField label="Currency" value={cost.currency} onChange={(e) => setCost({ ...cost, currency: e.target.value })} options={['AMD', 'USD', 'EUR', 'RUB', 'GBP'].map((code) => ({ value: code, label: code }))} />
+                <TextField label={t('ev.cost')} required placeholder={t('me.costPlaceholder')} value={cost.description} onChange={(e) => setCost({ ...cost, description: e.target.value })} />
+                <TextField label={t('cost.amount')} required inputMode="decimal" value={cost.amount} onChange={(e) => setCost({ ...cost, amount: e.target.value })} />
+                <SelectField label={t('cost.currency')} value={cost.currency} onChange={(e) => setCost({ ...cost, currency: e.target.value })} options={['AMD', 'USD', 'EUR', 'RUB', 'GBP'].map((code) => ({ value: code, label: code }))} />
                 <Button type="submit" variant="secondary" disabled={!cost.description.trim() || !cost.amount || !event} loading={addCost.isPending}>
-                  Add cost
+                  {t('cost.addCost')}
                 </Button>
               </form>
             )}
-            {addCost.isError && <Alert tone="danger" title="Cost not added">{addCost.error.message}</Alert>}
+            {addCost.isError && <Alert tone="danger" title={t('m.notSaved')}>{addCost.error.message}</Alert>}
           </>
         )}
       </section>

@@ -2,24 +2,20 @@ import { AnimatePresence, m } from 'motion/react';
 import { lazy, Suspense, useEffect } from 'react';
 import { useHashRoute } from './lib/useHashRoute';
 import { pageTransition } from './lib/motion';
-import { EmailSettingsPage } from './pages/EmailSettingsPage';
 import { HomePage } from './pages/HomePage';
-import { PlaceholderPage } from './pages/PlaceholderPage';
 import type { Stage } from './lib/api';
 import { redirectFor, SHOW_DEV_TOOLS } from './lib/routes';
-import { AppShell, SkeletonCard } from './ui';
+import { AppShell, PageErrorBoundary, SkeletonCard } from './ui';
 
 /** The design-system preview is a dev aid with demo charts and data: keep it out of the main bundle. */
 const DesignSystemPage = lazy(() => import('./pages/DesignSystemPage').then((mod) => ({ default: mod.DesignSystemPage })));
 /** Audience screens load on first visit (route-level split keeps the main bundle small). */
-const ContactsPage = lazy(() => import('./pages/ContactsPage').then((mod) => ({ default: mod.ContactsPage })));
+/** REACH pages rebuilt in RESTRUCTURE R4. */
+const ContactsPage = lazy(() => import('./pages/reach/ContactsPage').then((mod) => ({ default: mod.ContactsPage })));
 const ContactPage = lazy(() => import('./pages/ContactPage').then((mod) => ({ default: mod.ContactPage })));
-const AdminPage = lazy(() => import('./pages/AdminPage').then((mod) => ({ default: mod.AdminPage })));
-const SegmentsPage = lazy(() => import('./pages/SegmentsPage').then((mod) => ({ default: mod.SegmentsPage })));
+const SegmentsPage = lazy(() => import('./pages/reach/SegmentsListPage').then((mod) => ({ default: mod.SegmentsListPage })));
 const SegmentPage = lazy(() => import('./pages/SegmentsPage').then((mod) => ({ default: mod.SegmentPage })));
-const CampaignsPage = lazy(() => import('./pages/CampaignsPage').then((mod) => ({ default: mod.CampaignsPage })));
 const CampaignPage = lazy(() => import('./pages/CampaignsPage').then((mod) => ({ default: mod.CampaignPage })));
-const NewsletterPage = lazy(() => import('./pages/NewsletterPage').then((mod) => ({ default: mod.NewsletterPage })));
 const IssuePage = lazy(() => import('./pages/IssuePage').then((mod) => ({ default: mod.IssuePage })));
 const ImportPage = lazy(() => import('./pages/ImportPage').then((mod) => ({ default: mod.ImportPage })));
 const EventsPage = lazy(() => import('./pages/EventsPage').then((mod) => ({ default: mod.EventsPage })));
@@ -36,10 +32,16 @@ const CohortsPage = lazy(() => import('./pages/measure/CohortsPage').then((mod) 
 const CostsPage = lazy(() => import('./pages/measure/CostsPage').then((mod) => ({ default: mod.CostsPage })));
 const CampaignsLinksPage = lazy(() => import('./pages/measure/CampaignsLinksPage').then((mod) => ({ default: mod.CampaignsLinksPage })));
 const DataHealthPage = lazy(() => import('./pages/measure/DataHealthPage').then((mod) => ({ default: mod.DataHealthPage })));
-const AudienceHealthPage = lazy(() => Sections().then((mod) => ({ default: mod.AudienceHealthPage })));
+const AudienceHealthPage = lazy(() => import('./pages/reach/AudienceHealthPage').then((mod) => ({ default: mod.AudienceHealthPage })));
 const ChannelPage = lazy(() => Sections().then((mod) => ({ default: mod.ChannelPage })));
 const PeoplePage = lazy(() => Sections().then((mod) => ({ default: mod.PeoplePage })));
-const AlertsPage = lazy(() => Sections().then((mod) => ({ default: mod.AlertsPage })));
+/** SEND and SETTINGS pages rebuilt in RESTRUCTURE R5. */
+const NewsletterPage = lazy(() => import('./pages/send/NewsletterPage').then((mod) => ({ default: mod.NewsletterPage })));
+const CampaignEmailsPage = lazy(() => import('./pages/send/CampaignEmailsPage').then((mod) => ({ default: mod.CampaignEmailsPage })));
+const DevInboxPage = lazy(() => import('./pages/send/DevInboxPage').then((mod) => ({ default: mod.DevInboxPage })));
+const EmailSettingsPage = lazy(() => import('./pages/settings/EmailSettingsPage').then((mod) => ({ default: mod.EmailSettingsPage })));
+const AlertsPage = lazy(() => import('./pages/settings/AlertsPage').then((mod) => ({ default: mod.AlertsPage })));
+const AdminPage = lazy(() => import('./pages/settings/AdminPage').then((mod) => ({ default: mod.AdminPage })));
 
 const segment = (path: string, pattern: RegExp) => {
   const match = path.match(pattern)?.[1];
@@ -83,7 +85,7 @@ function pageFor(path: string) {
     case '/newsletter':
       return <NewsletterPage />;
     case '/campaign-emails':
-      return <CampaignsPage />;
+      return <CampaignEmailsPage />;
     case '/email-settings':
       return <EmailSettingsPage />;
     case '/alerts':
@@ -93,7 +95,7 @@ function pageFor(path: string) {
     case '/design-system':
       return <DesignSystemPage />;
     case '/dev-inbox':
-      return SHOW_DEV_TOOLS ? <PlaceholderPage title="Dev inbox" phase="RESTRUCTURE step R5" /> : null;
+      return SHOW_DEV_TOOLS ? <DevInboxPage /> : null;
   }
   if (contactId !== undefined) return <ContactPage key={contactId} id={contactId} />;
   if (segmentId !== undefined) return <SegmentPage key={segmentId} id={segmentId === 'new' ? null : segmentId} />;
@@ -131,7 +133,9 @@ export function App() {
       {/* Page change: short crossfade; the old page leaves faster than the new one arrives. */}
       <AnimatePresence mode="wait" initial={false} onExitComplete={() => window.scrollTo({ top: 0 })}>
         <m.div key={current} {...pageTransition}>
-          <Suspense fallback={<SkeletonCard />}>{found ?? <HomePage />}</Suspense>
+          <PageErrorBoundary>
+            <Suspense fallback={<SkeletonCard />}>{found ?? <HomePage />}</Suspense>
+          </PageErrorBoundary>
         </m.div>
       </AnimatePresence>
     </AppShell>

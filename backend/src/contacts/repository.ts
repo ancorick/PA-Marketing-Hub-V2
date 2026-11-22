@@ -39,9 +39,10 @@ export type ContactChanges = Partial<NewContact> & {
 };
 
 export type ContactFilter = {
-  /** Part of the email or of "first last", case-insensitive. */
+  /** Part of the email, of "first last" or of the phone number (digits), case-insensitive. */
   search?: string;
   type?: ContactType;
+  status?: ContactStatus;
   language?: Language;
   tag?: string;
   limit: number;
@@ -101,11 +102,14 @@ export class DrizzleContactRepository implements ContactRepository {
     const search = filter.search?.trim();
     if (search) {
       const pattern = `%${escapeLike(search)}%`;
-      conditions.push(
-        or(ilike(contacts.email, pattern), ilike(sql`concat_ws(' ', ${contacts.firstName}, ${contacts.lastName})`, pattern)) as SQL,
-      );
+      // A search with three or more digits also matches phone numbers, whatever spaces or dashes were typed.
+      const digits = search.replace(/\D/g, '');
+      const matches = [ilike(contacts.email, pattern), ilike(sql`concat_ws(' ', ${contacts.firstName}, ${contacts.lastName})`, pattern)];
+      if (digits.length >= 3) matches.push(ilike(sql`regexp_replace(coalesce(${contacts.phone}, ''), '[^0-9]', '', 'g')`, `%${digits}%`));
+      conditions.push(or(...matches) as SQL);
     }
     if (filter.type) conditions.push(eq(contacts.type, filter.type));
+    if (filter.status) conditions.push(eq(contacts.status, filter.status));
     if (filter.language) conditions.push(eq(contacts.language, filter.language));
     if (filter.tag) conditions.push(arrayContains(contacts.tags, [filter.tag]));
     const where = conditions.length > 0 ? and(...conditions) : undefined;

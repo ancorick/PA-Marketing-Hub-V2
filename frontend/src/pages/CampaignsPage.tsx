@@ -1,4 +1,4 @@
-import { ArrowLeft, EnvelopeSimple, PaperPlaneTilt, Plus } from '@phosphor-icons/react';
+import { ArrowLeft, PaperPlaneTilt } from '@phosphor-icons/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import {
@@ -36,7 +36,6 @@ import {
   Button,
   ConfirmDialog,
   DataTable,
-  EmptyState,
   PageHeader,
   retryServerErrors,
   SelectField,
@@ -61,62 +60,6 @@ export const SEND_STATUS: Record<SendStatus, { tone: Tone; label: string }> = {
 };
 
 const formatTime = (iso: string) => formatDate(iso, undefined, { timeStyle: 'short' });
-
-/** Email → Campaigns (PRD 13.6 "Campaign editor", Flow B). */
-export function CampaignsPage() {
-  const role = useStaffRole();
-  const sends = useQuery({ queryKey: ['sends', role], queryFn: listSends, retry: retryServerErrors });
-  const access = accessProblem(sends.error);
-  const columns: Column<Send>[] = [
-    { key: 'name', header: 'Campaign', render: (s) => <a href={`#/campaign-emails/${s.id}`}>{s.name}</a>, sortValue: (s) => s.name },
-    { key: 'status', header: 'Status', render: (s) => <StatusBadge tone={SEND_STATUS[s.status].tone}>{SEND_STATUS[s.status].label}</StatusBadge> },
-    { key: 'topic', header: 'Topic', render: (s) => `${TOPIC_LABEL[s.topic]} · ${LANGUAGE_LABEL[s.language]}` },
-    { key: 'when', header: 'Scheduled', render: (s) => (s.scheduledAt ? <span className="num">{formatTime(s.scheduledAt)}</span> : <span className="muted">Not yet</span>), sortValue: (s) => s.scheduledAt ?? '' },
-    { key: 'sent', header: 'Sent', numeric: true, render: (s) => <span className="num">{formatNumber(s.sentCount)}</span>, sortValue: (s) => s.sentCount },
-  ];
-  return (
-    <>
-      <PageHeader
-        title="Email"
-        accent="campaigns"
-        description="Write, check, test and send campaigns to a segment. A marketing manager approves every send."
-        actions={
-          !access && (
-            <a className="btn btn--primary" href="#/campaign-emails/new">
-              <Plus size={18} weight="bold" aria-hidden />
-              New campaign
-            </a>
-          )
-        }
-      />
-      {access ? (
-        <AccessNotice problem={access} title="Campaigns are for editors, marketing managers and admins">
-          Your role sees aggregate numbers only (PRD 4.3).
-        </AccessNotice>
-      ) : (
-        <div className="stack stack--lg">
-          <KillSwitchBanner />
-          <section className="card">
-            <DataTable
-              caption="Campaigns"
-              captionHidden
-              columns={columns}
-              rows={sends.data?.sends.filter((s) => s.kind !== 'newsletter') ?? []}
-              rowKey={(s) => s.id}
-              loading={sends.isPending}
-              error={sends.isError ? sends.error.message : undefined}
-              empty={
-                <EmptyState title="No campaigns yet" icon={<EnvelopeSimple size={28} weight="bold" aria-hidden />}>
-                  Build a segment first, then write the campaign for it.
-                </EmptyState>
-              }
-            />
-          </section>
-        </div>
-      )}
-    </>
-  );
-}
 
 const EMPTY: SendInput = {
   name: '',

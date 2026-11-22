@@ -14,9 +14,11 @@ export async function alertRoutes(app: FastifyInstance, { alerts, db, coreEngine
   const anyStaff = requireRole(coreEngine, ['viewer', 'editor', 'marketing_manager', 'admin', 'leadership']);
   const managers = requireRole(coreEngine, ['marketing_manager', 'admin']);
 
+  // ?resolved=true adds the resolved alerts after the open ones (the Alerts page history).
   app.get('/api/alerts', { preHandler: anyStaff }, async (request) => {
     const role = request.staff!.roles[0]!;
-    return { alerts: await alerts.forRole(role) };
+    const resolved = (request.query as { resolved?: string }).resolved === 'true';
+    return { alerts: await alerts.forRole(role, resolved) };
   });
 
   app.post('/api/alerts/:id/resolve', { preHandler: managers }, async (request, reply) => {

@@ -34,9 +34,11 @@ export function formatAmd(value: number, locale?: string): string {
   }).format(value);
 }
 
+/** Dates follow the page language (`<html lang>`, set by the language switcher) unless a locale is given. */
 export function formatDate(value: Date | string, locale?: string, options?: Intl.DateTimeFormatOptions): string {
   const date = typeof value === 'string' ? new Date(value) : value;
-  return new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: 'medium', ...options }).format(date);
+  const pageLocale = locale ?? (typeof document === 'undefined' ? undefined : document.documentElement.lang || undefined);
+  return new Intl.DateTimeFormat(intlLocale(pageLocale), { dateStyle: 'medium', ...options }).format(date);
 }
 
 /** Text shown instead of a count of 1 or 2 people in views shared outside marketing (ANL-14, NFR-P5). */

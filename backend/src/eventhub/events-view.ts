@@ -1,6 +1,7 @@
 import { and, asc, eq, gte, inArray, isNull, lt, sql } from 'drizzle-orm';
 import type { AppPgDatabase } from '../db/client.js';
-import { eventRegistrations, events, manualCosts, outcomes } from '../db/schema.js';
+import { contacts, eventRegistrations, events, exportLog, manualCosts, outcomes } from '../db/schema.js';
+import { MODEL_LABEL, type AttributionModel, type AttributionService } from '../analytics/attribution.js';
 import { suppress, type Count } from '../analytics/overview.js';
 import type { DateRange } from '../analytics/sources/contract.js';
 import { eventCampaignKey } from './service.js';
@@ -22,6 +23,18 @@ export type EventRow = {
   enrolled: Count;
   hired: Count;
   costPerAttendee: number | null;
+  /** Registration page and media for the Events table (RESTRUCTURE R4). */
+  registrationUrl: string | null;
+  registrationOpen: boolean;
+  recordingUrl: string | null;
+  photosUrl: string | null;
+  mediaPublic: boolean;
+  /**
+   * Outcomes in the period credited to the event's campaign by the chosen attribution model (events as a
+   * channel, PRD 9.4); null when no model was asked for.
+   */
+  credited: { lead: Count; enrolled: Count; hired: Count } | null;
+  costPerEnrolled: number | null;
 };
 
 const DAY = 86_400_000;
@@ -33,9 +46,12 @@ const STAGES = ['lead', 'enrolled', 'hired'] as const;
  * everything recorded against the event's campaign. Small numbers are hidden outside marketing (ANL-14).
  */
 export class EventsView {
-  constructor(private readonly db: AppPgDatabase) {}
+  constructor(
+    private readonly db: AppPgDatabase,
+    private readonly attribution?: AttributionService,
+  ) {}
 
-  async list(range: DateRange, shared: boolean) {
+  async list(range: DateRange, shared: boolean, model?: AttributionModel) {
     const start = new Date(`${range.from}T00:00:00+04:00`);
     const end = new Date(new Date(`${range.to}T00:00:00+04:00`).getTime() + DAY);
     const rows = await this.db.select().from(events).where(and(gte(events.startsAt, start), lt(events.startsAt, end))).orderBy(asc(events.startsAt));
@@ -65,6 +81,11 @@ export class EventsView {
           .groupBy(manualCosts.campaign)
       : [];
     const costs = new Map(costRows.map((row) => [row.campaign, Number(row.amount)]));
+    // Credited outcomes per event campaign under the model (only campaigns of the Events channel).
+    const credited = new Map<string, { lead: number; enrolled: number; hired: number }>();
+    if (model && this.attribution) {
+      for (const row of await this.attribution.byCampaign(range, model, 'events')) credited.set(row.key, { lead: row.lead, enrolled: row.enrolled, hired: row.hired });
+    }
 
     const raw = rows.map((event) => {
       const mine = registrations.filter((row) => row.eventId === event.id);
@@ -110,10 +131,80 @@ export class EventsView {
           campaign,
           costAmd: cost,
           ...view(counts, cost),
+          registrationUrl: event.registrationUrl,
+          registrationOpen: event.registrationOpen,
+          recordingUrl: event.recordingUrl,
+          photosUrl: event.photosUrl,
+          mediaPublic: event.mediaPublic,
+          ...this.creditedView(credited.get(campaign), cost, shared, Boolean(model && this.attribution)),
         }),
       ),
-      totals: { costAmd: totals.cost, ...view(totals, totals.cost) },
+      totals: {
+        costAmd: totals.cost,
+        ...view(totals, totals.cost),
+        ...this.creditedView(
+          raw.reduce(
+            (sum, row) => {
+              const item = credited.get(row.campaign);
+              return item ? { lead: sum.lead + item.lead, enrolled: sum.enrolled + item.enrolled, hired: sum.hired + item.hired } : sum;
+            },
+            { lead: 0, enrolled: 0, hired: 0 },
+          ),
+          totals.cost,
+          shared,
+          Boolean(model && this.attribution),
+        ),
+      },
+      model: model ?? null,
+      modelLabel: model ? MODEL_LABEL[model] : null,
     };
+  }
+
+  private creditedView(values: { lead: number; enrolled: number; hired: number } | undefined, cost: number, shared: boolean, enabled: boolean) {
+    if (!enabled) return { credited: null, costPerEnrolled: null };
+    const round = (value: number) => Math.round(value * 100) / 100;
+    const item = values ?? { lead: 0, enrolled: 0, hired: 0 };
+    const enrolled = suppress(round(item.enrolled), shared);
+    return {
+      credited: { lead: suppress(round(item.lead), shared), enrolled, hired: suppress(round(item.hired), shared) },
+      // A cost per person over 1 or 2 people would reveal the count.
+      costPerEnrolled: typeof enrolled === 'number' && enrolled > 0 ? Math.round(cost / enrolled) : null,
+    };
+  }
+
+  /**
+   * Attendee list of one event as CSV (contact data: marketing roles only). Each download is recorded in the
+   * export log, like segment exports (NFR-P4).
+   */
+  async attendeesCsv(id: string, actorId: string): Promise<{ title: string; csv: string; rows: number } | null> {
+    const [event] = await this.db.select({ id: events.id, title: events.title }).from(events).where(eq(events.id, id));
+    if (!event) return null;
+    const rows = await this.db
+      .select({
+        firstName: contacts.firstName,
+        lastName: contacts.lastName,
+        email: contacts.email,
+        language: contacts.language,
+        status: eventRegistrations.status,
+        registeredAt: eventRegistrations.registeredAt,
+        checkedInAt: eventRegistrations.checkedInAt,
+        source: eventRegistrations.source,
+      })
+      .from(eventRegistrations)
+      .leftJoin(contacts, eq(contacts.id, eventRegistrations.contactId))
+      .where(eq(eventRegistrations.eventId, id))
+      .orderBy(asc(eventRegistrations.registeredAt));
+    const cell = (value: string | null | undefined) => {
+      const raw = value ?? '';
+      const text = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+      return /[",\n\r;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    };
+    const header = ['first_name', 'last_name', 'email', 'language', 'registration', 'registered_at', 'attended', 'checked_in_at', 'source'];
+    const lines = rows.map((row) =>
+      [row.firstName, row.lastName, row.email, row.language, row.status, row.registeredAt.toISOString(), row.checkedInAt ? 'yes' : 'no', row.checkedInAt?.toISOString() ?? '', row.source].map(cell).join(','),
+    );
+    await this.db.insert(exportLog).values({ actorId, kind: 'event_attendees', segmentName: event.title, rowCount: rows.length });
+    return { title: event.title, csv: `\uFEFF${[header.join(','), ...lines].join('\r\n')}\r\n`, rows: rows.length };
   }
 
   async exists(id: string) {

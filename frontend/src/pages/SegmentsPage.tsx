@@ -1,4 +1,4 @@
-import { ArrowLeft, Funnel, Plus, Trash } from '@phosphor-icons/react';
+import { ArrowLeft, Trash } from '@phosphor-icons/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent } from 'react';
 import {
@@ -10,7 +10,6 @@ import {
   exportSegmentCsv,
   getSegment,
   listSegmentMembers,
-  listSegments,
   removeSegmentMembers,
   updateSegment,
   shareSegmentWithEventHub,
@@ -19,7 +18,7 @@ import {
   type SegmentRule,
 } from '../lib/api';
 import { contactPath, fullName, LANGUAGE_LABEL, STATUS, TYPE_LABEL } from '../lib/contacts';
-import { formatDate, formatNumber } from '../lib/format';
+import { formatNumber } from '../lib/format';
 import { useStaffRole } from '../lib/session';
 import {
   AccessNotice,
@@ -29,7 +28,6 @@ import {
   Button,
   ConfirmDialog,
   DataTable,
-  EmptyState,
   PageHeader,
   retryServerErrors,
   SkeletonCard,
@@ -53,62 +51,6 @@ const contactColumns: Column<SegmentContact>[] = [
   { key: 'language', header: 'Language', render: (c) => LANGUAGE_LABEL[c.language] },
   { key: 'status', header: 'Status', render: (c) => <StatusBadge tone={STATUS[c.status].tone}>{STATUS[c.status].label}</StatusBadge> },
 ];
-
-/** Audience → Segments: dynamic segments and static lists (AUD-13 to AUD-15). */
-export function SegmentsPage() {
-  const role = useStaffRole();
-  const segments = useQuery({ queryKey: ['segments', role], queryFn: listSegments, retry: retryServerErrors });
-  const access = accessProblem(segments.error);
-  const columns: Column<Segment>[] = [
-    { key: 'name', header: 'Segment', render: (s) => <a href={`#/segments/${s.id}`}>{s.name}</a>, sortValue: (s) => s.name },
-    { key: 'type', header: 'Kind', render: (s) => (s.type === 'dynamic' ? 'Dynamic rule' : 'Static list') },
-    { key: 'count', header: 'People', numeric: true, render: (s) => <span className="num">{s.lastCount === null ? '—' : formatNumber(s.lastCount)}</span>, sortValue: (s) => s.lastCount ?? 0 },
-    { key: 'updated', header: 'Updated', render: (s) => formatDate(s.updatedAt), sortValue: (s) => s.updatedAt },
-  ];
-  return (
-    <>
-      <a className="back-link" href="#/contacts">
-        <ArrowLeft size={16} weight="bold" aria-hidden />
-        All contacts
-      </a>
-      <PageHeader
-        title="Audience"
-        accent="segments"
-        description="Dynamic segments recount at send time; static lists keep hand-picked people."
-        actions={
-          !access && (
-            <a className="btn btn--primary" href="#/segments/new">
-              <Plus size={18} weight="bold" aria-hidden />
-              New segment
-            </a>
-          )
-        }
-      />
-      {access ? (
-        <AccessNotice problem={access} title="Segments are for editors, marketing managers and admins">
-          Your role sees aggregate numbers only (PRD 4.3).
-        </AccessNotice>
-      ) : (
-        <section className="card">
-          <DataTable
-            caption="Segments"
-            captionHidden
-            columns={columns}
-            rows={segments.data?.segments ?? []}
-            rowKey={(s) => s.id}
-            loading={segments.isPending}
-            error={segments.isError ? segments.error.message : undefined}
-            empty={
-              <EmptyState title="No segments yet" icon={<Funnel size={28} weight="bold" aria-hidden />}>
-                Build the first one, for example “Open day attendees, not applied”.
-              </EmptyState>
-            }
-          />
-        </section>
-      )}
-    </>
-  );
-}
 
 /** Waits until editing pauses before counting. */
 function useDebounced<T>(value: T, ms: number): T {

@@ -1385,7 +1385,7 @@ class DemoBuilder {
       if (person.importId && person.firstTouchAt > recent) audit(person.id, 'contact.imported', STAFF.editor, ['email', 'firstName', 'lastName', 'language'], person.firstTouchAt);
       else if (person.lead && person.lead > recent) audit(person.id, 'contact.created', 'system:navigator_crm', ['email', 'firstName', 'lastName', 'crmLeadId', 'crmStage'], person.lead);
       else if (person.firstTouchAt > plus(this.now, -14 * DAY) && !person.lead) audit(person.id, 'contact.created', 'system:signup', ['email', 'language', 'sourceChannel'], person.firstTouchAt);
-      if (person.tags.length && person.firstTouchAt > recent) audit(person.id, 'contact.updated', STAFF.editor, ['tags'], plus(person.firstTouchAt, 2 * DAY));
+      if (person.tags.length && person.firstTouchAt > recent) audit(person.id, 'contact.updated', STAFF.editor, ['tags'], new Date(Math.min(plus(person.firstTouchAt, 2 * DAY).getTime(), this.now.getTime() - HOUR)));
       if (person.enrolled && person.enrolled > recent) audit(person.id, 'contact.updated', 'system:core_engine', ['type', 'corePersonId'], person.enrolled);
     }
     this.data.auditEvents.sort((a, b) => (a.createdAt as Date).getTime() - (b.createdAt as Date).getTime());

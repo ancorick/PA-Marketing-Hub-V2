@@ -12,6 +12,8 @@ export class LogEmailAdapter implements EmailAdapter {
   private readonly sent = new Map<string, EmailSendResult>();
   /** The latest messages (up to 1,000), for tests and for looking at emails during local work. */
   readonly outbox: EmailMessage[] = [];
+  /** The same messages with an ID and arrival time: the Dev inbox page reads this (never available in production). */
+  readonly inbox: { id: string; receivedAt: Date; message: EmailMessage }[] = [];
 
   constructor(private readonly logger: Logger) {}
 
@@ -21,8 +23,7 @@ export class LogEmailAdapter implements EmailAdapter {
 
     const result: EmailSendResult = { messageId: `log-${randomUUID()}`, acceptedAt: new Date() };
     this.sent.set(message.idempotencyKey, result);
-    this.outbox.push(message);
-    if (this.outbox.length > 1000) this.outbox.shift();
+    this.record(result.messageId, result.acceptedAt, message);
     this.logger.info(
       {
         email: {
@@ -39,6 +40,14 @@ export class LogEmailAdapter implements EmailAdapter {
       'email (log adapter, not sent)',
     );
     return result;
+  }
+
+  /** Adds a message to the outbox and the inbox, keeping the latest 1,000. Also used to preload demo messages. */
+  record(id: string, receivedAt: Date, message: EmailMessage) {
+    this.outbox.push(message);
+    this.inbox.push({ id, receivedAt, message });
+    if (this.outbox.length > 1000) this.outbox.shift();
+    if (this.inbox.length > 1000) this.inbox.shift();
   }
 
   /**

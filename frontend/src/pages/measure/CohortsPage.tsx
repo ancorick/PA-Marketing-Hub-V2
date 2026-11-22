@@ -22,7 +22,7 @@ import {
 } from '../../ui';
 import { CountCell, countCsv, countText, countValue } from '../analytics/numbers';
 import { useModel } from '../analytics/period';
-import { amd, ChannelFilter, chartCount, chartCountFormat, ExportCsvButton, LineChart, useMonthLabel } from './shared';
+import { amd, ChannelFilter, chartCount, chartCountFormat, ExportCsvButton, LineChart, modelName, useMonthLabel } from './shared';
 
 const STAGES = ['lead', 'applied', 'enrolled', 'completed', 'hired'] as const;
 const sum = (rows: CohortRow[], pick: (row: CohortRow) => number) => rows.reduce((total, row) => total + pick(row), 0);
@@ -92,7 +92,9 @@ export function CohortsPage() {
             <span className="muted">—</span>
           ) : (
             <span className="muted">
-              {formatAmd(row.costPerHiredSoFar)} {t('co.soFar')}
+              {formatAmd(row.costPerHiredSoFar)}
+              <br />
+              <span className="text-xs">{t('co.soFar')}</span>
             </span>
           )
         ) : (
@@ -111,7 +113,7 @@ export function CohortsPage() {
   const chronological = [...rows].reverse().map((row) => ({ month: row.month, label: monthLabel(row.month), lead: chartCount(row.lead), enrolled: chartCount(row.enrolled), hired: chartCount(row.hired) }));
   const best = chronological.reduce<(typeof chronological)[number] | null>((top, row) => (!top || row.lead > top.lead ? row : top), null);
   const totals = Object.fromEntries(STAGES.map((stage) => [stage, sum(rows, (row) => countValue(row[stage]))])) as Record<(typeof STAGES)[number], number>;
-  const modelLabel = cohorts.data?.modelLabel ?? '';
+  const modelLabel = modelName(t, cohorts.data?.modelLabel ?? '');
   // Sums over hidden small counts would be guesses: views shared outside marketing show no totals.
   const total = (value: number) => (!cohorts.data || shared ? '—' : countText(value));
 

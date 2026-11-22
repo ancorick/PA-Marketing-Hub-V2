@@ -373,6 +373,38 @@ export class SendService {
     return this.setStatus(id, { status: 'cancelled', finishedAt: this.now() });
   }
 
+  /**
+   * Per-send delivery numbers for the Campaign emails table and charts (RESTRUCTURE R5): one grouped query for
+   * every send. Rates are computed by the interface from these counts (click rate = clickers ÷ sent).
+   */
+  async stats() {
+    const rows = await this.deps.db
+      .select({
+        sendId: deliveries.sendId,
+        sent: sql<number>`count(*) filter (where ${deliveries.sentAt} is not null)`,
+        delivered: sql<number>`count(*) filter (where ${deliveries.status} in ('delivered', 'complained'))`,
+        clicked: sql<number>`count(${deliveries.firstClickAt})`,
+        opened: sql<number>`count(${deliveries.openedAt})`,
+        unsubscribed: sql<number>`count(${deliveries.unsubscribedAt})`,
+        hardBounced: sql<number>`count(*) filter (where ${deliveries.status} = 'bounced_hard')`,
+        softBounced: sql<number>`count(*) filter (where ${deliveries.status} = 'bounced_soft')`,
+        complaints: sql<number>`count(*) filter (where ${deliveries.status} = 'complained')`,
+      })
+      .from(deliveries)
+      .groupBy(deliveries.sendId);
+    return rows.map((row) => ({
+      sendId: row.sendId,
+      sent: Number(row.sent),
+      delivered: Number(row.delivered),
+      clicked: Number(row.clicked),
+      openedEstimated: Number(row.opened),
+      unsubscribed: Number(row.unsubscribed),
+      hardBounced: Number(row.hardBounced),
+      softBounced: Number(row.softBounced),
+      complaints: Number(row.complaints),
+    }));
+  }
+
   /** Delivery counts by status (the send report; opens are estimated, PRD 7.5). */
   async report(id: string) {
     await this.require(id);

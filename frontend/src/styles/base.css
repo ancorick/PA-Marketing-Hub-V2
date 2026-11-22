@@ -14,6 +14,8 @@ html {
   text-size-adjust: 100%;
   /* Space for the scrollbar is always kept, so short and long pages share one width and nothing shifts sideways. */
   scrollbar-gutter: stable;
+  /* Keyboard focus and anchors land below the sticky top bar and filter panel (FilterBar sets its height). */
+  scroll-padding-top: calc(var(--topbar-height) + var(--filterbar-height, 0px) + var(--space-4));
 }
 
 body {
@@ -230,4 +232,11 @@ button:disabled {
 
 .nowrap {
   white-space: nowrap;
+}
+
+/* Addresses and IDs may break anywhere so a long one does not widen its table column, but keep a readable width. */
+.break-anywhere {
+  display: inline-block;
+  min-width: 10rem;
+  overflow-wrap: anywhere;
 }

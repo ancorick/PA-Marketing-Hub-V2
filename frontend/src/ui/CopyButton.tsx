@@ -1,5 +1,6 @@
 import { Check, Copy } from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
+import { useT } from '../lib/i18n';
 import { Button } from './Button';
 
 /**
@@ -7,6 +8,7 @@ import { Button } from './Button';
  * shown as a check mark for 2 s; if the clipboard is blocked, it says to select the text instead.
  */
 export function CopyButton({ value, label }: { value: string; label: string }) {
+  const t = useT();
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
 
   useEffect(() => {
@@ -38,7 +40,7 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
         onClick={() => void copy()}
       />
       <span className="visually-hidden" role="status">
-        {state === 'copied' ? 'Copied' : state === 'failed' ? 'Copy failed: select the text and copy it manually' : ''}
+        {state === 'copied' ? t('copy.copied') : state === 'failed' ? t('copy.failed') : ''}
       </span>
     </span>
   );

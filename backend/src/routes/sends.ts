@@ -4,6 +4,7 @@ import { requireRole } from '../auth/staff.js';
 import { TOPICS } from '../consent/wordings.js';
 import { LANGUAGES } from '../contacts/fields.js';
 import type { CoreEngineClient } from '../integrations/core-engine/contract.js';
+import { GUARDRAILS } from '../events/service.js';
 import type { KillSwitch } from '../sends/kill-switch.js';
 import { SendError, type SendService } from '../sends/service.js';
 
@@ -78,6 +79,10 @@ export async function sendRoutes(app: FastifyInstance, { sends, killSwitch, seed
   });
 
   app.get('/api/email/sends', { preHandler: canEdit }, async () => ({ sends: await sends.list(), seedList }));
+  // Delivery numbers of every send in one call, for the Campaign emails and Newsletter tables and charts (R5).
+  app.get('/api/email/sends/stats', { preHandler: canEdit }, async () => ({ stats: await sends.stats() }));
+  // PRD 7.4 thresholds, read-only: they live in code so a change goes through review.
+  app.get('/api/email/guardrails', { preHandler: canEdit }, async () => ({ guardrails: GUARDRAILS }));
 
   app.post('/api/email/sends', { preHandler: canEdit }, async (request, reply) => {
     const body = sendBody.safeParse(request.body);

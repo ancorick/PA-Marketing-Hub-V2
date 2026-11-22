@@ -1,13 +1,14 @@
 import { Desktop, Moon, Sun } from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
+import { useT } from '../lib/i18n';
 
 export type ThemeChoice = 'dark' | 'light' | 'system';
 export const THEME_STORAGE_KEY = 'mh-theme';
 
 const OPTIONS = [
-  { value: 'dark', label: 'Dark theme', icon: Moon },
-  { value: 'light', label: 'Light theme', icon: Sun },
-  { value: 'system', label: 'Match system theme', icon: Desktop },
+  { value: 'dark', label: 'theme.dark', icon: Moon },
+  { value: 'light', label: 'theme.light', icon: Sun },
+  { value: 'system', label: 'theme.system', icon: Desktop },
 ] as const;
 
 function readChoice(): ThemeChoice {
@@ -22,6 +23,7 @@ function apply(choice: ThemeChoice) {
 }
 
 export function ThemeSwitcher() {
+  const t = useT();
   const [choice, setChoice] = useState<ThemeChoice>(readChoice);
 
   useEffect(() => {
@@ -36,15 +38,15 @@ export function ThemeSwitcher() {
   }, [choice]);
 
   return (
-    <div className="segmented" role="group" aria-label="Color theme">
+    <div className="segmented" role="group" aria-label={t('theme.group')}>
       {OPTIONS.map(({ value, label, icon: ItemIcon }) => (
         <button
           key={value}
           type="button"
           className="segmented__btn"
           aria-pressed={choice === value}
-          aria-label={label}
-          title={label}
+          aria-label={t(label)}
+          title={t(label)}
           onClick={() => setChoice(value)}
         >
           <ItemIcon size={16} weight="bold" aria-hidden />
